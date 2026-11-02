@@ -17,8 +17,15 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
@@ -27,10 +34,14 @@ import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnumLiteral;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
+import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLBaseVisitor;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
+import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.transaction.TransactionModel;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.symboltable.LocalScope;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
@@ -102,6 +113,36 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   private final List<ViolationRecord> violationRecords = new ArrayList<>();
 
+  /**
+   * One {@code pre}/{@code post} block that was not evaluated because this {@link
+   * EvaluationVisitor} was constructed without transaction support (see {@link
+   * #transactionSupported}).
+   *
+   * @param kind {@code "pre"} or {@code "post"}
+   * @param blockName the block's own optional name (e.g. {@code p1} in {@code pre p1: ...}), or
+   *     {@code null} if unnamed
+   * @param contextName the enclosing context's display name (e.g. {@code spaceMission::Spacecraft})
+   */
+  public record SkippedConstraint(String kind, String blockName, String contextName) {}
+
+  private final List<SkippedConstraint> skippedConstraints = new ArrayList<>();
+
+  /**
+   * Number of context instances {@link #visitClassifierContextCS} evaluated its inv/pre/post blocks
+   * for during this run. Pure bookkeeping for the incremental evaluator's test statistics; it has
+   * no influence on evaluation.
+   */
+  private int evaluatedInstanceCount = 0;
+
+  /**
+   * Optional replacement for the context extension in {@link #visitClassifierContextCS}: when set,
+   * it supplies the instances to evaluate per classifier context instead of {@code
+   * specification.getAllInstances(contextClass)}. {@code null} (the default, and the value for
+   * every caller except the incremental evaluator) keeps the full-extension behaviour unchanged.
+   */
+  private Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>>
+      contextInstanceOverride = null;
+
   /* Cache for allInstances() results to avoid redundant metamodel queries during evaluation. */
   private final java.util.Map<EClass, Value> allInstancesCache = new java.util.HashMap<>();
 
@@ -121,10 +162,53 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private Deque<Value> receiverStack = new ArrayDeque<>();
 
+  /**
+   * The transaction (ordered list of atomic changes between pre-state and the current post-state)
+   * that {@code @pre} and the {@code OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted} lifecycle
+   * predicates are evaluated against. Empty by default — every pre-existing caller that doesn't
+   * supply a transaction gets the safe no-op behavior documented on {@link TransactionModel}.
+   */
+  private final TransactionModel transaction;
+
+  /**
+   * Whether this evaluation run has a real transaction context at all — {@code true} only when
+   * constructed via the explicit-transaction constructor (even with an empty change list, which
+   * legitimately means "a transaction happened but touched nothing"). {@code false} for the
+   * no-transaction constructor, used by every caller that has no notion of a transaction at all
+   * (CLI, VS Code plugin): there, {@code pre}/{@code post} blocks are not evaluated with vacuous
+   * empty-transaction semantics (which could silently misreport, e.g. {@code OCLisModified} always
+   * {@code false}) — they are skipped outright and reported via {@link #getSkippedConstraints()}.
+   */
+  private final boolean transactionSupported;
+
+  /**
+   * System property that switches the correspondence fast paths off (participant filter of {@link
+   * CorrespondenceLookup} and guard short-circuits, steps A3/A4); read once per visitor.
+   */
+  public static final String PROP_NO_CORRESPONDENCE_FAST_PATHS =
+      "vitruvocl.eval.noCorrespondenceFastPaths";
+
+  /**
+   * Memoized correspondence checks for every form of {@code ~}; lives as long as this visitor, so
+   * each distinct object is looked up in the correspondence model at most once per evaluation.
+   */
+  private final CorrespondenceLookup correspondences;
+
+  /** Whether the correspondence fast paths are on (see {@link #PROP_NO_CORRESPONDENCE_FAST_PATHS}). */
+  private final boolean correspondenceFastPaths;
+
+  /** Result of {@link #cannotReportErrors} per constraint (parse-tree root). */
+  private final Map<ParseTree, Boolean> errorFreeConstraints = new IdentityHashMap<>();
+
+  /** Right operands skipped because their correspondence guard was false (statistics). */
+  private int correspondenceShortCircuits;
+
   // ==================== Constructor ====================
 
   /**
-   * Constructs an EvaluationVisitor for Phase 3 of the compilation pipeline.
+   * Constructs an EvaluationVisitor for Phase 3 of the compilation pipeline, with no transaction
+   * support — {@code pre}/{@code post} blocks are skipped (see {@link #transactionSupported}) and
+   * only {@code inv} is evaluated.
    *
    * @param st The symbol table containing variable and type definitions
    * @param specification The metamodel wrapper providing access to model instances
@@ -136,8 +220,59 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       MetamodelWrapperInterface specification,
       ErrorCollector errors,
       ParseTreeProperty<Type> nodeTypes) {
+    this(st, specification, errors, nodeTypes, List.of(), false);
+  }
+
+  /**
+   * Constructs an EvaluationVisitor for Phase 3 of the compilation pipeline, with transaction
+   * support enabled — {@code pre}/{@code post} blocks are evaluated against {@code
+   * transactionChanges} (which may itself be empty, meaning "a transaction happened but touched
+   * nothing").
+   *
+   * @param st The symbol table containing variable and type definitions
+   * @param specification The metamodel wrapper providing access to model instances
+   * @param errors The error collector for reporting runtime errors
+   * @param nodeTypes Pre-computed type information from the type checking phase
+   * @param transactionChanges the ordered list of atomic changes for this transaction (may be
+   *     empty — see {@link TransactionModel})
+   */
+  public EvaluationVisitor(
+      SymbolTable st,
+      MetamodelWrapperInterface specification,
+      ErrorCollector errors,
+      ParseTreeProperty<Type> nodeTypes,
+      List<EChange<EObject>> transactionChanges) {
+    this(st, specification, errors, nodeTypes, transactionChanges, true);
+  }
+
+  /**
+   * Full constructor used by {@link tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler}, which
+   * itself distinguishes "no transaction constructor used" from "explicit, possibly-empty
+   * transaction" the same way (see {@code VitruvOCLCompiler}'s own two constructors).
+   *
+   * @param transactionSupported see {@link #transactionSupported}
+   */
+  public EvaluationVisitor(
+      SymbolTable st,
+      MetamodelWrapperInterface specification,
+      ErrorCollector errors,
+      ParseTreeProperty<Type> nodeTypes,
+      List<EChange<EObject>> transactionChanges,
+      boolean transactionSupported) {
     super(st, specification, errors);
     this.nodeTypes = nodeTypes;
+    this.transaction = new TransactionModel(transactionChanges);
+    this.transactionSupported = transactionSupported;
+    this.correspondenceFastPaths = !Boolean.getBoolean(PROP_NO_CORRESPONDENCE_FAST_PATHS);
+    this.correspondences = new CorrespondenceLookup(specification, correspondenceFastPaths);
+  }
+
+  /**
+   * How many right operands of {@code G and R} / {@code G implies R} were skipped because the
+   * correspondence guard {@code G} was false (step A4); for tests and statistics.
+   */
+  public int getCorrespondenceShortCircuits() {
+    return correspondenceShortCircuits;
   }
 
   // ==================== Error Reporting ====================
@@ -225,12 +360,17 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.bag(Type.BOOLEAN));
     }
 
-    // Retrieve all instances of the context type from the metamodel
-    List<EObject> instances = specification.getAllInstances(eClass);
+    // Retrieve all instances of the context type from the metamodel (or the incremental
+    // evaluator's relevant subset of them, if an override is installed)
+    List<EObject> instances =
+        contextInstanceOverride != null
+            ? contextInstanceOverride.apply(ctx)
+            : specification.getAllInstances(eClass);
     List<OCLElement> allResults = new ArrayList<>();
 
     // Evaluate invariants for each instance
     for (EObject instance : instances) {
+      evaluatedInstanceCount++;
       // Create instance-specific scope
       Scope instanceScope = new LocalScope(symbolTable.getCurrentScope());
       symbolTable.enterScope(instanceScope);
@@ -251,27 +391,136 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         symbolTable.defineVariable(newSelf);
       }
 
-      // Evaluate all invariants for this instance
-      for (VitruvOCLParser.InvCSContext inv : ctx.invCS()) {
-        Value invResult = visit(inv);
-        if (invResult != null && !invResult.isEmpty()) {
-          OCLElement elem = invResult.getElements().get(0);
-          allResults.add(elem);
-          // Track violating instance for precise error reporting
-          Boolean boolResult = elem.tryGetBool();
-          if (boolResult == null || !boolResult) {
-            violatingInstances.add(instance);
-            String severity = extractSeverity(inv);
-            String customMessage = extractCustomMessage(inv, instance);
-            violationRecords.add(new ViolationRecord(severity, customMessage, instance));
+      // Operation-context params (context Type::operation(name: Type, ...)): there is no
+      // method-invocation mechanism in this evaluator, so — unlike 'self' — these are always
+      // bound to an empty value rather than a real argument (see class-level docs on
+      // pre/post support). Binding them at all (instead of leaving them unresolved) matters:
+      // an unresolved variable is a hard evaluation error via handleUndefinedSymbol, whereas an
+      // empty-valued binding lets the constraint evaluate (typically to a vacuous/empty result)
+      // until a future Reactions/YAML layer supplies real argument values.
+      if (ctx.operationParamListCS() != null) {
+        for (VitruvOCLParser.OperationParamCSContext param :
+            ctx.operationParamListCS().operationParamCS()) {
+          String paramName = param.paramName.getText();
+          Value emptyValue = Value.empty(Type.ANY);
+          VariableSymbol paramSymbol = symbolTable.resolveVariable(paramName);
+          if (paramSymbol != null) {
+            paramSymbol.setValue(emptyValue);
+          } else {
+            VariableSymbol newParam =
+                new VariableSymbol(paramName, Type.ANY, symbolTable.getCurrentScope(), false);
+            newParam.setValue(emptyValue);
+            symbolTable.defineVariable(newParam);
           }
         }
       }
 
-      symbolTable.exitScope();
+      // Evaluate all invariants/preconditions/postconditions for this instance
+      for (VitruvOCLParser.InvCSContext inv : ctx.invCS()) {
+        // Re-enter defensively before each invariant - see EvaluationVisitor#exitScope(Scope):
+        // 'self' is never lazy so nothing here currently drains an outer sibling value mid-loop,
+        // but this keeps the loop correct regardless of what a future invariant body might touch.
+        symbolTable.enterScope(instanceScope);
+        Value invResult = visit(inv);
+        recordConstraintResult(invResult, allResults, instance, inv.annotationCS());
+      }
+      if (transactionSupported) {
+        for (VitruvOCLParser.PreCSContext pre : ctx.preCS()) {
+          symbolTable.enterScope(instanceScope);
+          Value preResult = visit(pre);
+          recordConstraintResult(preResult, allResults, instance, pre.annotationCS());
+        }
+        for (VitruvOCLParser.PostCSContext post : ctx.postCS()) {
+          symbolTable.enterScope(instanceScope);
+          Value postResult = visit(post);
+          recordConstraintResult(postResult, allResults, instance, post.annotationCS());
+        }
+      }
+
+      exitScope(instanceScope);
+    }
+
+    // pre/post require a transaction this evaluation run doesn't have — record once per context
+    // (not per instance: which blocks are skipped is a static, instance-independent fact).
+    if (!transactionSupported && (!ctx.preCS().isEmpty() || !ctx.postCS().isEmpty())) {
+      String contextName = describeContextForSkipNotice(ctx);
+      for (VitruvOCLParser.PreCSContext pre : ctx.preCS()) {
+        skippedConstraints.add(new SkippedConstraint("pre", nameOf(pre.ID()), contextName));
+      }
+      for (VitruvOCLParser.PostCSContext post : ctx.postCS()) {
+        skippedConstraints.add(new SkippedConstraint("post", nameOf(post.ID()), contextName));
+      }
     }
 
     return Value.of(allResults, Type.bag(Type.BOOLEAN));
+  }
+
+  private static String nameOf(org.antlr.v4.runtime.tree.TerminalNode idToken) {
+    return idToken != null ? idToken.getText() : null;
+  }
+
+  /** Best-effort display name for a context header, used only in skip notices. */
+  private static String describeContextForSkipNotice(VitruvOCLParser.ClassifierContextCSContext ctx) {
+    if (ctx.metamodel != null && ctx.className != null) {
+      return ctx.metamodel.getText() + "::" + ctx.className.getText();
+    }
+    if (ctx.contextName != null) {
+      return ctx.contextName.getText();
+    }
+    return "<context>";
+  }
+
+  /**
+   * Returns the {@code pre}/{@code post} blocks that were not evaluated because this evaluation run
+   * has no transaction context (see {@link #transactionSupported}). Empty whenever transaction
+   * support is enabled, or whenever the evaluated document has no {@code pre}/{@code post} blocks.
+   */
+  public List<SkippedConstraint> getSkippedConstraints() {
+    return Collections.unmodifiableList(skippedConstraints);
+  }
+
+  /**
+   * Returns how many context instances this run evaluated (summed over all classifier contexts).
+   * Used only for statistics; see {@link #evaluatedInstanceCount}.
+   */
+  public int getEvaluatedInstanceCount() {
+    return evaluatedInstanceCount;
+  }
+
+  /**
+   * Installs a replacement for the context extension (see {@link #contextInstanceOverride}). Only
+   * used by the incremental evaluator to evaluate a constraint on its relevant instances.
+   *
+   * @param override per classifier context, the instances to evaluate; {@code null} restores the
+   *     default full-extension behaviour
+   */
+  public void setContextInstanceOverride(
+      Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>> override) {
+    this.contextInstanceOverride = override;
+  }
+
+  /**
+   * Shared bookkeeping for one inv/pre/post evaluation result against one instance: appends the
+   * boolean element to {@code allResults} and, if the result is false (or unreadable as a
+   * boolean), records the instance as violating with its severity/message annotations.
+   */
+  private void recordConstraintResult(
+      Value result,
+      List<OCLElement> allResults,
+      EObject instance,
+      List<VitruvOCLParser.AnnotationCSContext> annotations) {
+    if (result == null || result.isEmpty()) {
+      return;
+    }
+    OCLElement elem = result.getElements().get(0);
+    allResults.add(elem);
+    Boolean boolResult = elem.tryGetBool();
+    if (boolResult == null || !boolResult) {
+      violatingInstances.add(instance);
+      String severity = extractSeverity(annotations);
+      String customMessage = extractCustomMessage(annotations, instance);
+      violationRecords.add(new ViolationRecord(severity, customMessage, instance));
+    }
   }
 
   /**
@@ -294,8 +543,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Collections.unmodifiableList(violationRecords);
   }
 
-  private String extractSeverity(VitruvOCLParser.InvCSContext inv) {
-    for (VitruvOCLParser.AnnotationCSContext ann : inv.annotationCS()) {
+  private String extractSeverity(List<VitruvOCLParser.AnnotationCSContext> annotations) {
+    for (VitruvOCLParser.AnnotationCSContext ann : annotations) {
       if (ann instanceof VitruvOCLParser.SeverityAnnotationContext sev) {
         return sev.severityValue.getText();
       }
@@ -304,11 +553,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /**
-   * Returns the interpolated {@code @message} template for the invariant, or {@code null} when no
+   * Returns the interpolated {@code @message} template for the constraint, or {@code null} when no
    * {@code @message} annotation is present.
    */
-  private String extractCustomMessage(VitruvOCLParser.InvCSContext inv, EObject instance) {
-    for (VitruvOCLParser.AnnotationCSContext ann : inv.annotationCS()) {
+  private String extractCustomMessage(
+      List<VitruvOCLParser.AnnotationCSContext> annotations, EObject instance) {
+    for (VitruvOCLParser.AnnotationCSContext ann : annotations) {
       if (ann instanceof VitruvOCLParser.MessageAnnotationContext msg) {
         String raw = msg.message.getText();
         String template = raw.length() >= 2 ? raw.substring(1, raw.length() - 1) : raw;
@@ -403,13 +653,36 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitInvCS(VitruvOCLParser.InvCSContext ctx) {
-    List<VitruvOCLParser.SpecificationCSContext> specs = ctx.specificationCS();
-    Value result = Value.boolValue(true);
+    return evaluateSpecs(ctx.specificationCS());
+  }
 
+  /**
+   * Evaluates a precondition constraint. Mirrors {@link #visitInvCS}.
+   *
+   * @param ctx The precondition node
+   * @return The boolean result of the constraint evaluation
+   */
+  @Override
+  public Value visitPreCS(VitruvOCLParser.PreCSContext ctx) {
+    return evaluateSpecs(ctx.specificationCS());
+  }
+
+  /**
+   * Evaluates a postcondition constraint. Mirrors {@link #visitInvCS}.
+   *
+   * @param ctx The postcondition node
+   * @return The boolean result of the constraint evaluation
+   */
+  @Override
+  public Value visitPostCS(VitruvOCLParser.PostCSContext ctx) {
+    return evaluateSpecs(ctx.specificationCS());
+  }
+
+  private Value evaluateSpecs(List<VitruvOCLParser.SpecificationCSContext> specs) {
+    Value result = Value.boolValue(true);
     for (VitruvOCLParser.SpecificationCSContext spec : specs) {
       result = visit(spec);
     }
-
     return result;
   }
 
@@ -1182,27 +1455,35 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.boolValue(false);
     }
 
+    // Category 2 (early termination, worst case strict): pulls receiver.elementIterator()
+    // instead of getElements(), and - new - stops as soon as a *second* match is found, since
+    // "exactly one" is already disproven at that point. Previously this loop always ran to
+    // completion (no early return at all), so even after switching to elementIterator() the
+    // upstream chain would still have been fully drained; both the internal early return and the
+    // streaming receiver access are needed together for the abort to actually reduce upstream
+    // consumption.
     Type elemType = receiver.getRuntimeType().getElementType();
     Type iterVarType = Type.singleton(elemType);
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      int count = 0;
-      for (OCLElement elem : receiver.getElements()) {
-        VariableSymbol iterSymbol =
-            new VariableSymbol(iterVars.get(0), iterVarType, iterScope, true);
-        iterSymbol.setValue(new Value(List.of(elem), iterVarType));
-        symbolTable.defineVariable(iterSymbol);
-        Value bodyResult = visit(ctx.body);
-        Boolean condition = bodyResult.getElements().get(0).tryGetBool();
-        if (condition != null && condition) {
-          count++;
+    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
+    int count = 0;
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      // evalInScope enters/exits iterScope around exactly this element's body evaluation (not
+      // once around the whole loop): visit(ctx.body) may itself materialize an unrelated lazy
+      // Value bound elsewhere, whose own scope dance restores symbolTable.currentScope to *its*
+      // parent, not to iterScope - re-entering iterScope per element is what keeps that safe.
+      Value bodyResult = evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      Boolean condition = bodyResult.getElements().get(0).tryGetBool();
+      if (condition != null && condition) {
+        count++;
+        if (count == 2) {
+          return Value.boolValue(false); // "exactly one" already disproven - stop early
         }
       }
-      return Value.boolValue(count == 1);
-    } finally {
-      symbolTable.exitScope();
     }
+    return Value.boolValue(count == 1);
   }
 
   /**
@@ -1232,26 +1513,23 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.optional(Type.ANY));
     }
 
+    // Category 2 (early termination, worst case strict): pulls receiver.elementIterator()
+    // instead of getElements() so an upstream lazy chain also stops at the first match.
     Type elemType = receiver.getRuntimeType().getElementType();
     Type iterVarType = Type.singleton(elemType);
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      for (OCLElement elem : receiver.getElements()) {
-        VariableSymbol iterSymbol =
-            new VariableSymbol(iterVars.get(0), iterVarType, iterScope, true);
-        iterSymbol.setValue(new Value(List.of(elem), iterVarType));
-        symbolTable.defineVariable(iterSymbol);
-        Value bodyResult = visit(ctx.body);
-        Boolean condition = bodyResult.getElements().get(0).tryGetBool();
-        if (condition != null && condition) {
-          return new Value(List.of(elem), Type.optional(elemType));
-        }
+    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      Value bodyResult =
+          evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      Boolean condition = bodyResult.getElements().get(0).tryGetBool();
+      if (condition != null && condition) {
+        return new Value(List.of(elem), Type.optional(elemType));
       }
-      return Value.empty(Type.singleton(elemType));
-    } finally {
-      symbolTable.exitScope();
     }
+    return Value.empty(Type.singleton(elemType));
   }
 
   /**
@@ -1282,39 +1560,39 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.boolValue(true);
     }
 
+    // Category 2 (early termination, worst case strict): pulls receiver.elementIterator()
+    // instead of getElements() so an upstream lazy chain also stops as soon as the first
+    // duplicate is found - the internal early return below was already present, but was
+    // previously moot: getElements() forced the whole upstream chain to materialize before this
+    // loop (and its early return) ever ran.
     Type elemType = receiver.getRuntimeType().getElementType();
     Type iterVarType = Type.singleton(elemType);
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      List<Value> seen = new ArrayList<>();
-      for (OCLElement elem : receiver.getElements()) {
-        VariableSymbol iterSymbol =
-            new VariableSymbol(iterVars.get(0), iterVarType, iterScope, true);
-        iterSymbol.setValue(new Value(List.of(elem), iterVarType));
-        symbolTable.defineVariable(iterSymbol);
-        Value bodyResult = visit(ctx.body);
-        for (Value s : seen) {
-          if (s.getElements().size() == bodyResult.getElements().size()) {
-            boolean allEqual = true;
-            for (int i = 0; i < s.getElements().size(); i++) {
-              if (!OCLElement.semanticEquals(
-                  s.getElements().get(i), bodyResult.getElements().get(i))) {
-                allEqual = false;
-                break;
-              }
-            }
-            if (allEqual) {
-              return Value.boolValue(false);
+    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
+    List<Value> seen = new ArrayList<>();
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      Value bodyResult =
+          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      for (Value s : seen) {
+        if (s.getElements().size() == bodyResult.getElements().size()) {
+          boolean allEqual = true;
+          for (int i = 0; i < s.getElements().size(); i++) {
+            if (!OCLElement.semanticEquals(
+                s.getElements().get(i), bodyResult.getElements().get(i))) {
+              allEqual = false;
+              break;
             }
           }
+          if (allEqual) {
+            return Value.boolValue(false);
+          }
         }
-        seen.add(bodyResult);
       }
-      return Value.boolValue(true);
-    } finally {
-      symbolTable.exitScope();
+      seen.add(bodyResult);
     }
+    return Value.boolValue(true);
   }
 
   /**
@@ -1346,21 +1624,35 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     Type elemType = receiver.getRuntimeType().getElementType();
     Type iterVarType = Type.singleton(elemType);
 
-    List<OCLElement> elements = new ArrayList<>(receiver.getElements());
+    // iterScope MUST be constructed before touching the receiver at all - not just before this
+    // operation's own loop body runs. Draining a lazy receiver (e.g. a preceding select()) walks
+    // *its own* predicate scope(s), parented off wherever that select() was originally evaluated -
+    // an entirely different (sibling) scope from the one active right here. Each such predicate
+    // call correctly restores symbolTable's current scope to *its own* parent when it finishes,
+    // not back to whatever was active before the drain started here. So if `new
+    // LocalScope(symbolTable.getCurrentScope())` ran *after* draining, it would silently capture
+    // that unrelated sibling scope as iterScope's parent instead of the correct enclosing one -
+    // this was a real, reproducible bug (empirically confirmed by reverting this exact ordering
+    // and re-running LazyChainRegressionTest's shadowing test for sortedBy(), which then failed
+    // with the exact same wrong result as originally discovered), not just a theoretical concern.
+    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
+    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
+
+    // Streams the (possibly lazy) receiver via elementIterator() into exactly one local list,
+    // instead of receiver.getElements() (which would materialize-and-cache its own internal copy
+    // via Value.materialize()) followed by a *second*, separate new ArrayList<>(...) copy of that
+    // same data. sortedBy() needs its own mutable, randomly-addressable list either way (for the
+    // key-based index sort below) - draining straight from elementIterator() into that one list
+    // avoids allocating the receiver's own internal cache array for data nobody else will ever
+    // read back through `receiver` again.
+    List<OCLElement> elements = new ArrayList<>();
+    receiver.elementIterator().forEachRemaining(elements::add);
     List<Value> keys = new ArrayList<>();
 
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      for (OCLElement elem : elements) {
-        VariableSymbol iterSymbol =
-            new VariableSymbol(iterVars.get(0), iterVarType, iterScope, true);
-        iterSymbol.setValue(new Value(List.of(elem), iterVarType));
-        symbolTable.defineVariable(iterSymbol);
-        keys.add(visit(ctx.body));
-      }
-    } finally {
-      symbolTable.exitScope();
+    for (OCLElement elem : elements) {
+      // Keys are compared later, outside this loop, after iterSymbol has been rebound many more
+      // times - must materialize now, not defer.
+      keys.add(evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body)));
     }
 
     List<Integer> indices = new ArrayList<>();
@@ -1410,22 +1702,29 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
     Type elemType = receiver.getRuntimeType().getElementType();
     Type iterVarType = Type.singleton(elemType);
+    // iterScope MUST be constructed before touching the receiver at all - see visitSortedByOp's
+    // identical comment for why (draining a lazy receiver walks its own, unrelated sibling
+    // scope(s), which would otherwise get silently captured as iterScope's parent instead of the
+    // correct enclosing one). Empirically confirmed as a real bug here too (reverting this
+    // ordering makes LazyChainRegressionTest's shadowing test for collectNested() return
+    // [-3, -2, -1] instead of [1, 2, 3]).
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem : receiver.getElements()) {
-        VariableSymbol iterSymbol =
-            new VariableSymbol(iterVars.get(0), iterVarType, iterScope, true);
-        iterSymbol.setValue(new Value(List.of(elem), iterVarType));
-        symbolTable.defineVariable(iterSymbol);
-        Value bodyResult = visit(ctx.body);
-        results.add(new OCLElement.NestedCollection(bodyResult));
-      }
-      return Value.of(results, Type.bag(elemType));
-    } finally {
-      symbolTable.exitScope();
+    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
+    // Streams the (possibly lazy) receiver via elementIterator() instead of getElements(), so a
+    // preceding select()/collect() chain is pulled one element at a time instead of forced into
+    // its own fully materialized ArrayList before this loop even starts.
+    Iterator<OCLElement> it = receiver.elementIterator();
+    List<OCLElement> results = new ArrayList<>();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      // The NestedCollection wraps bodyResult for indefinite later consumption (e.g. by a
+      // subsequent flatten()), well after iterSymbol has been rebound to later elements - must
+      // materialize now, not defer.
+      Value bodyResult =
+          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      results.add(new OCLElement.NestedCollection(bodyResult));
     }
+    return Value.of(results, Type.bag(elemType));
   }
 
   /**
@@ -1455,26 +1754,38 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     Value accValue = visit(varSpec.accInit);
 
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      VariableSymbol accSymbol =
-          new VariableSymbol(varSpec.accVar.getText(), accValue.getRuntimeType(), iterScope, false);
-      accSymbol.setValue(accValue);
-      symbolTable.defineVariable(accSymbol);
+    VariableSymbol accSymbol =
+        new VariableSymbol(varSpec.accVar.getText(), accValue.getRuntimeType(), iterScope, false);
+    iterScope.defineVariable(accSymbol);
+    accSymbol.setValue(accValue);
+    VariableSymbol iterSymbol = defineIterVar(varSpec.iterVar.getText(), iterVarType, iterScope);
 
-      for (OCLElement elem : receiver.getElements()) {
-        VariableSymbol iterSymbol =
-            new VariableSymbol(varSpec.iterVar.getText(), iterVarType, iterScope, true);
-        iterSymbol.setValue(new Value(List.of(elem), iterVarType));
-        symbolTable.defineVariable(iterSymbol);
-
-        Value bodyResult = visit(ctx.body);
-        accSymbol.setValue(bodyResult);
-      }
-      return accSymbol.getValue();
-    } finally {
-      symbolTable.exitScope();
+    // Streams the (possibly lazy) receiver via elementIterator() instead of forcing it into one
+    // fully materialized List up front: a preceding select()->collect() chain is pulled one
+    // element at a time instead of copied into its own intermediate ArrayList before iterate()
+    // even starts. This is safe because evalInScope unconditionally re-enters iterScope as its
+    // very first action - regardless of what currentScope drifted to while pulling the next
+    // element from an upstream chain with its own, unrelated scope (e.g. a preceding select()'s
+    // predicate scope, parented off wherever the receiver was originally evaluated, not off
+    // iterScope) - so nothing here ever depends on currentScope already being correct going into
+    // an iteration step. The accumulator itself is still forced to materialize each step (see
+    // evalInScopeMaterialized) - iterate() remains structurally strict, only its source streams.
+    //
+    // Verified empirically in both directions (see LazyChainRegressionTest's
+    // iterateBodyResolvesAShadowedOuterVariableCorrectlyOnEveryStepWhilePullingFromALazySelectReceiver):
+    // streaming via elementIterator() and the previous getElements()-based materialization produce
+    // identical results for a targeted shadowing/gap construction - this change fixes no
+    // correctness bug (there wasn't one), it is a pure memory/streaming optimization.
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      // The accumulator carries into the *next* iteration's body evaluation (e.g. `acc + n`),
+      // which rebinds iterSymbol before resolving it - must materialize now, not defer.
+      Value bodyResult =
+          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      accSymbol.setValue(bodyResult);
     }
+    return accSymbol.getValue();
   }
 
   /**
@@ -1716,23 +2027,49 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return value;
   }
 
-  /** Binds both iterator variables of a two-var (Cartesian product) iteration as singletons. */
-  private void bindTwoVars(
-      String var1,
-      String var2,
-      Type iterVarType,
-      LocalScope scope,
-      OCLElement elem1,
-      OCLElement elem2) {
-    bindIterVar(var1, iterVarType, scope, elem1);
-    bindIterVar(var2, iterVarType, scope, elem2);
+  /**
+   * Creates and registers a fresh iterator-variable symbol directly in {@code scope}'s own symbol
+   * map (bypassing {@code symbolTable.defineVariable}, which would require {@code scope} to
+   * already be the active current scope). Call this exactly once per iteration expression, then
+   * use {@link #rebindIterVar} to update the same symbol's value for each subsequent element —
+   * allocating a fresh {@link VariableSymbol} (and re-inserting it into the scope's map) per
+   * element is pure waste, since the identical name/scope/type is being re-registered every time.
+   *
+   * @param name the iterator variable's name
+   * @param iterVarType the singleton type the variable is bound at
+   * @param scope the scope to register the symbol in
+   * @return the newly registered, as-yet-unbound symbol
+   */
+  private VariableSymbol defineIterVar(String name, Type iterVarType, LocalScope scope) {
+    VariableSymbol symbol = new VariableSymbol(name, iterVarType, scope, true);
+    scope.defineVariable(symbol);
+    return symbol;
   }
 
-  /** Binds {@code name} to {@code elem} as a singleton value in the given scope. */
-  private void bindIterVar(String name, Type iterVarType, LocalScope scope, OCLElement elem) {
-    VariableSymbol symbol = new VariableSymbol(name, iterVarType, scope, true);
+  /**
+   * Rebinds an already-registered iterator-variable symbol (from {@link #defineIterVar}) to
+   * {@code elem}, without reallocating the symbol or touching its scope's variable map again.
+   */
+  private static void rebindIterVar(VariableSymbol symbol, Type iterVarType, OCLElement elem) {
     symbol.setValue(new Value(List.of(elem), iterVarType));
-    symbolTable.defineVariable(symbol);
+  }
+
+  /**
+   * Creates and registers both iterator-variable symbols of a two-var (Cartesian product)
+   * iteration once; use {@link #rebindTwoVars} to update their values for each subsequent pair.
+   */
+  private VariableSymbol[] defineTwoVars(
+      String var1, String var2, Type iterVarType, LocalScope scope) {
+    return new VariableSymbol[] {
+      defineIterVar(var1, iterVarType, scope), defineIterVar(var2, iterVarType, scope)
+    };
+  }
+
+  /** Rebinds both iterator-variable symbols of a two-var iteration (from {@link #defineTwoVars}). */
+  private static void rebindTwoVars(
+      VariableSymbol[] symbols, Type iterVarType, OCLElement elem1, OCLElement elem2) {
+    rebindIterVar(symbols[0], iterVarType, elem1);
+    rebindIterVar(symbols[1], iterVarType, elem2);
   }
 
   /** Evaluates {@code body} and extracts its result as a boolean predicate (default false). */
@@ -1757,20 +2094,21 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private Value evaluateForAllSingleVar(
       VitruvOCLParser.ForAllOpContext ctx, Value receiver, String iterVar) {
+    // Category 2 (early termination, worst case strict): pulls from receiver.elementIterator()
+    // instead of getElements(), so an upstream lazy chain (e.g. a preceding select()) is also
+    // only consumed as far as the first `false` result requires. In the success case every
+    // element must still be checked - structurally strict, matching the classification.
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      for (OCLElement elem : receiver.getElements()) {
-        bindIterVar(iterVar, iterVarType, iterScope, elem);
-        if (!evalBooleanBody(ctx.body)) {
-          return Value.boolValue(false); // short-circuit on first false result
-        }
+    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      if (!evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body))) {
+        return Value.boolValue(false); // short-circuit on first false result
       }
-      return Value.boolValue(true);
-    } finally {
-      symbolTable.exitScope();
     }
+    return Value.boolValue(true);
   }
 
   /**
@@ -1787,13 +2125,25 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private Value evaluateForAllTwoVars(
       VitruvOCLParser.ForAllOpContext ctx, Value receiver, String var1, String var2) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
+    // iterScope MUST be constructed before touching the receiver at all, not just before this
+    // operation's own scope is entered: draining a lazy receiver (e.g. a preceding select())
+    // walks its own predicate scope(s), parented off wherever that select() was originally
+    // evaluated - an unrelated sibling scope. Each such predicate call correctly restores
+    // symbolTable's current scope to *its own* parent when done, not back to whatever was active
+    // before the drain started here - so constructing iterScope only *after* draining would
+    // silently capture that unrelated sibling scope as its parent instead of the correct
+    // enclosing one. (Empirically confirmed as a real, reproducible bug for sortedBy()/
+    // collectNested() when this ordering was wrong; fixed the same way here.)
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
+    List<OCLElement> elements = receiver.getElements();
     symbolTable.enterScope(iterScope);
     try {
-      List<OCLElement> elements = receiver.getElements();
+      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
       for (OCLElement elem1 : elements) {
         for (OCLElement elem2 : elements) {
-          bindTwoVars(var1, var2, iterVarType, iterScope, elem1, elem2);
+          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
+          symbolTable.enterScope(iterScope);
+          rebindTwoVars(symbols, iterVarType, elem1, elem2);
           if (!evalBooleanBody(ctx.body)) {
             return Value.boolValue(false); // short-circuit on first false result
           }
@@ -1801,7 +2151,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
       return Value.boolValue(true);
     } finally {
-      symbolTable.exitScope();
+      exitScope(iterScope);
     }
   }
 
@@ -1819,19 +2169,84 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       VitruvOCLParser.SelectOpContext ctx, Value receiver, String iterVar) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
+    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
+    Predicate<OCLElement> predicate =
+        elem ->
+            evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body));
+    OCLElementSource filtered = LazyOperations.filter(receiver.asSource(), predicate);
+    return Value.lazy(filtered, receiver.getRuntimeType());
+  }
+
+  /**
+   * Evaluates {@code body} with {@code iterSymbol} rebound to {@code elem} in {@code scope}.
+   *
+   * <p>Scope entry/exit is bracketed around exactly this one element's evaluation (not around a
+   * whole enclosing loop), so that a lazy consumer which stops pulling early (e.g. {@code exists})
+   * never leaves a dangling entered scope: each call is self-contained regardless of how many
+   * elements, if any, are pulled afterwards. {@code enterScope}/{@code exitScope} are a single
+   * field assignment each in this codebase's {@code SymbolTableImpl}, so bracketing them per
+   * element is cheap; {@code iterSymbol} itself is allocated once by the caller (via {@link
+   * #defineIterVar}) and only rebound here, avoiding a {@link VariableSymbol} allocation per
+   * element.
+   *
+   * @param scope the iterator variable's scope; may be reused across multiple elements/traversals
+   *     — see {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations} for why this is
+   *     safe with lazy chains (each element's full evaluation, including any nested lazy
+   *     sub-chains, completes before the next element is pulled)
+   * @param iterSymbol the already-registered symbol to rebind (from {@link #defineIterVar})
+   */
+  private <T> T evalInScope(
+      LocalScope scope, VariableSymbol iterSymbol, Type iterVarType, OCLElement elem, Supplier<T> body) {
+    symbolTable.enterScope(scope);
     try {
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem : receiver.getElements()) {
-        bindIterVar(iterVar, iterVarType, iterScope, elem);
-        if (evalBooleanBody(ctx.body)) {
-          results.add(elem);
-        }
-      }
-      return Value.of(results, receiver.getRuntimeType());
+      rebindIterVar(iterSymbol, iterVarType, elem);
+      return body.get();
     } finally {
-      symbolTable.exitScope();
+      exitScope(scope);
     }
+  }
+
+  /**
+   * Restores {@code symbolTable}'s current scope to {@code enteredScope}'s enclosing scope,
+   * explicitly — <b>not</b> via the symbol table's own {@code exitScope()}, which ascends from
+   * whatever scope happens to be current rather than from {@code enteredScope} specifically.
+   *
+   * <p>That distinction is load-bearing once lazy {@link Value}s are involved: evaluating a body
+   * expression while {@code enteredScope} is current can itself force materialization of an
+   * <em>outer</em>, already-existing lazy {@code Value} (e.g. a {@code let}-bound variable, or an
+   * enclosing iterator variable's collection) whose own scope has nothing to do with {@code
+   * enteredScope}. Draining that outer value enters/exits <em>its</em> scope internally, leaving
+   * {@code symbolTable}'s current scope pointing at some ancestor of {@code enteredScope} by the
+   * time control returns here — the plain, argument-less {@code exitScope()} would then ascend
+   * from that wrong place instead of from {@code enteredScope}. Since a {@link LocalScope}'s
+   * parent is fixed at construction (see {@link LocalScope#getEnclosingScope()}), going there
+   * directly is always correct regardless of any such drift.
+   *
+   * @param enteredScope the exact scope object that was entered and is now being left
+   */
+  private void exitScope(Scope enteredScope) {
+    symbolTable.enterScope(enteredScope.getEnclosingScope());
+  }
+
+  /**
+   * Like {@link #evalInScope}, but additionally forces the resulting {@link Value} to materialize
+   * (and cache) before returning, while {@code scope} is still correctly bound to {@code elem}.
+   *
+   * <p>Use this whenever the result will be <em>stored</em> and consumed later — after the loop,
+   * or during a later iteration that has since rebound the same iterator-variable symbol — rather
+   * than drained immediately within the same element's evaluation. A stored, still-lazy {@link
+   * Value} would otherwise resolve its iterator variable against whatever {@code iterSymbol}
+   * happens to be bound to at the time it is eventually consumed, not the element it was actually
+   * computed for. (This is safe to skip when the result is consumed synchronously and fully within
+   * the current element's evaluation — e.g. {@code select}/{@code reject}'s predicates reduce to a
+   * plain {@code boolean} immediately, and {@code collect}'s flatMap fully drains one element's
+   * expansion before the next upstream pull rebinds the symbol.)
+   */
+  private Value evalInScopeMaterialized(
+      LocalScope scope, VariableSymbol iterSymbol, Type iterVarType, OCLElement elem, Supplier<Value> body) {
+    Value result = evalInScope(scope, iterSymbol, iterVarType, elem, body);
+    result.getElements(); // force + cache materialization now, before the symbol is rebound again
+    return result;
   }
 
   /**
@@ -1848,14 +2263,19 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private Value evaluateSelectTwoVars(
       VitruvOCLParser.SelectOpContext ctx, Value receiver, String var1, String var2) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
+    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
+    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
+    List<OCLElement> elements = receiver.getElements();
     symbolTable.enterScope(iterScope);
     try {
+      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
       List<OCLElement> results = new ArrayList<>();
-      List<OCLElement> elements = receiver.getElements();
       for (OCLElement elem1 : elements) {
         for (OCLElement elem2 : elements) {
-          bindTwoVars(var1, var2, iterVarType, iterScope, elem1, elem2);
+          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
+          symbolTable.enterScope(iterScope);
+          rebindTwoVars(symbols, iterVarType, elem1, elem2);
           if (evalBooleanBody(ctx.body)) {
             results.add(elem1);
             results.add(elem2);
@@ -1864,7 +2284,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
       return Value.of(results, receiver.getRuntimeType());
     } finally {
-      symbolTable.exitScope();
+      exitScope(iterScope);
     }
   }
 
@@ -1882,19 +2302,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       VitruvOCLParser.RejectOpContext ctx, Value receiver, String iterVar) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem : receiver.getElements()) {
-        bindIterVar(iterVar, iterVarType, iterScope, elem);
-        if (!evalBooleanBody(ctx.body)) {
-          results.add(elem);
-        }
-      }
-      return Value.of(results, receiver.getRuntimeType());
-    } finally {
-      symbolTable.exitScope();
-    }
+    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
+    Predicate<OCLElement> predicate =
+        elem ->
+            !evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body));
+    OCLElementSource filtered = LazyOperations.filter(receiver.asSource(), predicate);
+    return Value.lazy(filtered, receiver.getRuntimeType());
   }
 
   /**
@@ -1912,15 +2325,20 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       VitruvOCLParser.RejectOpContext ctx, Value receiver, String var1, String var2) {
     Type elemType = receiver.getRuntimeType().getElementType();
     Type iterVarType = Type.singleton(elemType);
+    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
+    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
+    List<OCLElement> elements = receiver.getElements();
     symbolTable.enterScope(iterScope);
 
     try {
+      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
       List<OCLElement> results = new ArrayList<>();
-      List<OCLElement> elements = receiver.getElements();
       for (OCLElement elem1 : elements) {
         for (OCLElement elem2 : elements) {
-          bindTwoVars(var1, var2, iterVarType, iterScope, elem1, elem2);
+          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
+          symbolTable.enterScope(iterScope);
+          rebindTwoVars(symbols, iterVarType, elem1, elem2);
           if (!evalBooleanBody(ctx.body)) {
             results.add(elem1);
             results.add(elem2);
@@ -1929,7 +2347,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
       return Value.of(results, receiver.getRuntimeType());
     } finally {
-      symbolTable.exitScope();
+      exitScope(iterScope);
     }
   }
 
@@ -1947,18 +2365,14 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       VitruvOCLParser.CollectOpContext ctx, Value receiver, String iterVar) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem : receiver.getElements()) {
-        bindIterVar(iterVar, iterVarType, iterScope, elem);
-        results.addAll(visit(ctx.body).getElements());
-      }
-      Type resultType = nodeTypes.get(ctx);
-      return Value.of(results, resultType != null ? resultType : Type.set(Type.ANY));
-    } finally {
-      symbolTable.exitScope();
-    }
+    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
+    Function<OCLElement, Iterator<OCLElement>> expand =
+        elem ->
+            evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body))
+                .elementIterator();
+    OCLElementSource mapped = LazyOperations.flatMap(receiver.asSource(), expand);
+    Type resultType = nodeTypes.get(ctx);
+    return Value.lazy(mapped, resultType != null ? resultType : Type.set(Type.ANY));
   }
 
   /**
@@ -1975,21 +2389,26 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private Value evaluateCollectTwoVars(
       VitruvOCLParser.CollectOpContext ctx, Value receiver, String var1, String var2) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
+    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
+    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
+    List<OCLElement> elements = receiver.getElements();
     symbolTable.enterScope(iterScope);
     try {
+      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
       List<OCLElement> results = new ArrayList<>();
-      List<OCLElement> elements = receiver.getElements();
       for (OCLElement elem1 : elements) {
         for (OCLElement elem2 : elements) {
-          bindTwoVars(var1, var2, iterVarType, iterScope, elem1, elem2);
+          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
+          symbolTable.enterScope(iterScope);
+          rebindTwoVars(symbols, iterVarType, elem1, elem2);
           results.addAll(visit(ctx.body).getElements());
         }
       }
       Type resultType = nodeTypes.get(ctx);
       return Value.of(results, resultType != null ? resultType : Type.set(Type.ANY));
     } finally {
-      symbolTable.exitScope();
+      exitScope(iterScope);
     }
   }
 
@@ -2005,20 +2424,18 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private Value evaluateExistsSingleVar(
       VitruvOCLParser.ExistsOpContext ctx, Value receiver, String iterVar) {
+    // Category 2 (early termination, worst case strict): see evaluateForAllSingleVar.
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    symbolTable.enterScope(iterScope);
-    try {
-      for (OCLElement elem : receiver.getElements()) {
-        bindIterVar(iterVar, iterVarType, iterScope, elem);
-        if (evalBooleanBody(ctx.body)) {
-          return Value.boolValue(true); // short-circuit on first true result
-        }
+    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      OCLElement elem = it.next();
+      if (evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body))) {
+        return Value.boolValue(true); // short-circuit on first true result
       }
-      return Value.boolValue(false);
-    } finally {
-      symbolTable.exitScope();
     }
+    return Value.boolValue(false);
   }
 
   /**
@@ -2035,13 +2452,18 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private Value evaluateExistsTwoVars(
       VitruvOCLParser.ExistsOpContext ctx, Value receiver, String var1, String var2) {
     Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
+    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
+    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
+    List<OCLElement> elements = receiver.getElements();
     symbolTable.enterScope(iterScope);
     try {
-      List<OCLElement> elements = receiver.getElements();
+      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
       for (OCLElement elem1 : elements) {
         for (OCLElement elem2 : elements) {
-          bindTwoVars(var1, var2, iterVarType, iterScope, elem1, elem2);
+          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
+          symbolTable.enterScope(iterScope);
+          rebindTwoVars(symbols, iterVarType, elem1, elem2);
           if (evalBooleanBody(ctx.body)) {
             return Value.boolValue(true); // short-circuit on first true result
           }
@@ -2049,7 +2471,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
       return Value.boolValue(false);
     } finally {
-      symbolTable.exitScope();
+      exitScope(iterScope);
     }
   }
 
@@ -2072,12 +2494,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitIncludesAllOp(VitruvOCLParser.IncludesAllOpContext ctx) {
     Value receiver = receiverStack.peek();
     Value arg = visit(ctx.arg);
-    for (OCLElement elem : arg.getElements()) {
-      if (!receiver.includes(elem)) {
-        return Value.boolValue(false);
-      }
-    }
-    return Value.boolValue(true);
+    return Value.boolValue(receiver.includesAll(arg));
   }
 
   /**
@@ -2098,12 +2515,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitExcludesAllOp(VitruvOCLParser.ExcludesAllOpContext ctx) {
     Value receiver = receiverStack.peek();
     Value arg = visit(ctx.arg);
-    for (OCLElement elem : arg.getElements()) {
-      if (receiver.includes(elem)) {
-        return Value.boolValue(false);
-      }
-    }
-    return Value.boolValue(true);
+    return Value.boolValue(receiver.excludesAll(arg));
   }
 
   /**
@@ -2263,25 +2675,30 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    *
    * <p>Example: {@code 7->div(2)} yields {@code 3}
    *
+   * <p>Follows OCL#'s "no object" propagation: an empty receiver/argument, a non-integer operand,
+   * or a zero divisor all yield an empty result rather than a numeric placeholder, so that the
+   * absence is never mistaken for a genuine computed value downstream.
+   *
    * @param ctx the parse tree node for the {@code div()} operation, including the argument
    *     expression
-   * @return a singleton {@code INTEGER} value representing the truncated quotient; or an error
-   *     value if either operand is not a singleton {@code Integer}, or the divisor is zero
+   * @return a singleton {@code INTEGER} value representing the truncated quotient; or an empty
+   *     {@code INTEGER} value ("no object") if either operand is not a singleton {@code Integer},
+   *     or the divisor is zero
    */
   @Override
   public Value visitDivOp(VitruvOCLParser.DivOpContext ctx) {
     Value receiver = receiverStack.peek();
     Value arg = visit(ctx.arg);
     if (receiver.isEmpty() || arg.isEmpty()) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     Integer left = receiver.getElements().get(0).tryGetInt();
     Integer right = arg.getElements().get(0).tryGetInt();
     if (left == null || right == null) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     if (right == 0) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     return Value.intValue(left / right);
   }
@@ -2290,30 +2707,34 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * Evaluates the {@code mod()} integer remainder operation.
    *
    * <p>Computes the remainder of dividing the receiver by the argument using Java's {@code %}
-   * operator. Both operands must be singleton {@code INTEGER} values. Division by zero yields
-   * {@code 0} rather than an error, consistent with a null-free evaluation strategy.
+   * operator. Both operands must be singleton {@code INTEGER} values.
    *
    * <p>Example: {@code 7->mod(3)} yields {@code 1}
    *
+   * <p>Follows OCL#'s "no object" propagation: an empty receiver/argument, a non-integer operand,
+   * or a zero divisor all yield an empty result rather than a numeric placeholder, so that the
+   * absence is never mistaken for a genuine computed value downstream.
+   *
    * @param ctx the parse tree node for the {@code mod()} operation, including the argument
    *     expression
-   * @return a singleton {@code INTEGER} value representing the remainder; {@code 0} if the divisor
-   *     is zero; or an error value if either operand is not a singleton {@code Integer}
+   * @return a singleton {@code INTEGER} value representing the remainder; or an empty {@code
+   *     INTEGER} value ("no object") if either operand is not a singleton {@code Integer}, or the
+   *     divisor is zero
    */
   @Override
   public Value visitModOp(VitruvOCLParser.ModOpContext ctx) {
     Value receiver = receiverStack.peek();
     Value arg = visit(ctx.arg);
     if (receiver.isEmpty() || arg.isEmpty()) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     Integer left = receiver.getElements().get(0).tryGetInt();
     Integer right = arg.getElements().get(0).tryGetInt();
     if (left == null || right == null) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     if (right == 0) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     return Value.intValue(left % right);
   }
@@ -2575,6 +2996,14 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitLogicalAnd(VitruvOCLParser.LogicalAndContext ctx) {
+    if (isCorrespondenceGuard(ctx.left)) {
+      Value guard = visit(ctx.left);
+      if (isFalse(guard) && cannotReportErrors(ctx.right)) {
+        correspondenceShortCircuits++;
+        return Value.boolValue(false); // false and R is false for every value of R
+      }
+      return combineLogical(guard, visit(ctx.right), (left, right) -> left && right);
+    }
     return evaluateBinaryLogical(ctx.left, ctx.right, (left, right) -> left && right);
   }
 
@@ -2621,7 +3050,14 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
     Value leftValue = visit(leftCtx);
     Value rightValue = visit(rightCtx);
+    return combineLogical(leftValue, rightValue, logicalFn);
+  }
 
+  /** Applies a binary logical operation to two already evaluated operands. */
+  private static Value combineLogical(
+      Value leftValue,
+      Value rightValue,
+      java.util.function.BiPredicate<Boolean, Boolean> logicalFn) {
     if (leftValue.isEmpty() || rightValue.isEmpty()) {
       return Value.boolValue(false);
     }
@@ -2664,6 +3100,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitImplication(VitruvOCLParser.ImplicationContext ctx) {
     Value leftValue = visit(ctx.left);
+    if (isCorrespondenceGuard(ctx.left) && isFalse(leftValue) && cannotReportErrors(ctx.right)) {
+      correspondenceShortCircuits++;
+      return Value.boolValue(true); // false implies R is true for every value of R
+    }
     Value rightValue = visit(ctx.right);
 
     if (leftValue.isEmpty() || rightValue.isEmpty()) {
@@ -2709,10 +3149,22 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.ANY);
     }
 
-    // Process navigation chain
+    // Process navigation chain. A property-nav step immediately followed by '@pre' is evaluated
+    // specially (reading the transaction's pre-state instead of the live value); the '@pre' step
+    // itself is then skipped since it was consumed by the property access before it.
     List<VitruvOCLParser.NavigationChainCSContext> navChain = ctx.navigationChainCS();
-    for (VitruvOCLParser.NavigationChainCSContext nav : navChain) {
-      currentValue = visitNavigationWithReceiver(nav, currentValue);
+    for (int i = 0; i < navChain.size(); i++) {
+      VitruvOCLParser.NavigationChainCSContext nav = navChain.get(i);
+      if (nav.AT_PRE() != null) {
+        continue;
+      }
+      boolean nextIsAtPre = i + 1 < navChain.size() && navChain.get(i + 1).AT_PRE() != null;
+      if (nextIsAtPre
+          && nav.navigationTargetCS() instanceof VitruvOCLParser.PropertyNavContext propNav) {
+        currentValue = visitPropertyAccessWithReceiverPreState(propNav, currentValue);
+      } else {
+        currentValue = visitNavigationWithReceiver(nav, currentValue);
+      }
     }
 
     return currentValue;
@@ -2806,7 +3258,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         new VitruvOCLBaseVisitor<Value>() {
           @Override
           public Value visitPropertyNav(VitruvOCLParser.PropertyNavContext ctx) {
-            return visitPropertyAccessWithReceiver(ctx.propertyAccess(), receiver);
+            return visitPropertyAccessWithReceiver(ctx, receiver);
           }
 
           @Override
@@ -2816,10 +3268,30 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
           }
 
           @Override
+          public Value visitLifecycleNav(VitruvOCLParser.LifecycleNavContext ctx) {
+            return visitLifecyclePredicateWithReceiver(ctx.lifecyclePredicateCS(), receiver);
+          }
+
+          @Override
           protected Value defaultResult() {
             return Value.empty(Type.ANY);
           }
         });
+  }
+
+  /**
+   * Pushes {@code receiver} onto {@code receiverStack} before evaluating an {@code
+   * OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted} predicate, mirroring {@link
+   * #visitOperationCallWithReceiver}.
+   */
+  private Value visitLifecyclePredicateWithReceiver(
+      VitruvOCLParser.LifecyclePredicateCSContext ctx, Value receiver) {
+    receiverStack.push(receiver);
+    try {
+      return visit(ctx);
+    } finally {
+      receiverStack.pop();
+    }
   }
 
   /**
@@ -2916,58 +3388,175 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    *   <li>{@code company.employees} → collection of all employees
    * </ul>
    *
-   * @param ctx The property access node
+   * @param navCtx The property navigation node - the type is looked up under this node because
+   *     {@link tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor#visitPropertyNav} stores
+   *     the combined Ctype keyed by the navigation node, not by the inner {@code propertyAccess()}
+   *     node (looking it up under the inner node always misses and silently falls back to {@code
+   *     Type.set(Type.ANY)}, which is always {@code unique=true} - this used to make {@code
+   *     LazyOperations#dedupe} run unconditionally on every {@code e.p} navigation regardless of
+   *     the feature's real {@code unique} flag, silently dropping genuine duplicates from any
+   *     many-valued, non-unique feature's result).
    * @param receiver The receiver value (must contain metaclass instances)
    * @return Collection of property values from all receiver instances
    */
   @SuppressWarnings("java:S3776")
   private Value visitPropertyAccessWithReceiver(
-      VitruvOCLParser.PropertyAccessContext ctx, Value receiver) {
+      VitruvOCLParser.PropertyNavContext navCtx, Value receiver) {
+    VitruvOCLParser.PropertyAccessContext ctx = navCtx.propertyAccess();
     String propertyName = ctx.propertyName.getText();
+    Type resultType = nodeTypes.get(navCtx);
+    Type finalType = resultType != null ? resultType : Type.set(Type.ANY);
+    Type emptyType = resultType != null ? resultType : Type.optional(Type.ANY);
 
-    if (receiver.isEmpty()) {
-      Type resultType = nodeTypes.get(ctx);
-      return Value.empty(resultType != null ? resultType : Type.optional(Type.ANY));
+    // Peek (without materializing the rest) to validate that the receiver contains metaclass
+    // instances at all; a throwaway single-pull iterator keeps this check lazy.
+    Iterator<OCLElement> probe = receiver.elementIterator();
+    if (!probe.hasNext()) {
+      return Value.empty(emptyType);
+    }
+    if (probe.next().tryGetInstance() == null) {
+      return Value.empty(emptyType);
     }
 
-    // Validate that receiver contains metaclass instances
-    EObject firstInstance = receiver.getElements().get(0).tryGetInstance();
-    if (firstInstance == null) {
-      Type resultType = nodeTypes.get(ctx);
-      return Value.empty(resultType != null ? resultType : Type.optional(Type.ANY));
-    }
+    // Category 1 (fully lazy): each receiver element expands to zero or more navigated values;
+    // navigation never needs to consume more of the receiver than the outer consumer asks for.
+    Function<OCLElement, Iterator<OCLElement>> expand = elem -> navigateOne(elem, propertyName);
+    OCLElementSource mapped = LazyOperations.flatMap(receiver.asSource(), expand);
+    // A unique result type (Set/OrderedSet) is only guaranteed duplicate-free once explicitly
+    // deduplicated — collecting across multiple receiver elements can otherwise yield the same
+    // feature value more than once even though the combined Ctype (see
+    // TypeCheckVisitor#typeCheckPropertyAccess) says "unique". Deduplicated incrementally (Kern-
+    // anforderung 2) instead of via a post-hoc removeDuplicates() pass over a fully built list.
+    OCLElementSource result =
+        finalType.isUnique() ? LazyOperations.dedupe(mapped, OCLElement::semanticEquals) : mapped;
+    return Value.lazy(result, finalType);
+  }
 
-    // Collect property values from all instances in receiver
+  /**
+   * Pre-state counterpart of {@link #visitPropertyAccessWithReceiver}: reads each receiver
+   * element's feature value as it existed at transaction start (via {@link TransactionModel}),
+   * instead of the current live value. Used for the {@code self.attr@pre} navigation form.
+   *
+   * <p>Unlike the live path, this eagerly materializes the receiver ({@code receiver.getElements()})
+   * rather than staying lazy — {@code @pre} is a comparatively rare, non-hot-path construct, so the
+   * added simplicity outweighs the lazy-pipeline benefits that matter for large collection chains.
+   *
+   * @param navCtx the property navigation node the {@code @pre} step is attached to
+   * @param receiver the receiver value (must contain metaclass instances)
+   * @return collection of pre-state property values from all receiver instances
+   */
+  private Value visitPropertyAccessWithReceiverPreState(
+      VitruvOCLParser.PropertyNavContext navCtx, Value receiver) {
+    VitruvOCLParser.PropertyAccessContext ctx = navCtx.propertyAccess();
+    String propertyName = ctx.propertyName.getText();
+    Type resultType = nodeTypes.get(navCtx);
+    Type finalType = resultType != null ? resultType : Type.set(Type.ANY);
+
     List<OCLElement> results = new ArrayList<>();
     for (OCLElement elem : receiver.getElements()) {
       EObject instance = elem.tryGetInstance();
-
-      if (instance != null) {
-        EStructuralFeature feature = instance.eClass().getEStructuralFeature(propertyName);
-
-        if (feature != null) {
-          Object value = instance.eGet(feature);
-
-          // Handle multi-valued features (collections)
-          if (feature.isMany()) {
-            List<?> list = (List<?>) value;
-            for (Object item : list) {
-              if (item != null) {
-                results.add(wrapValue(item));
-              }
-            }
-          } else {
-            if (value == null) {
-              continue; // unset optional attribute → ?T? = []
-            }
-            results.add(wrapValue(value));
+      if (instance == null) {
+        continue;
+      }
+      EStructuralFeature feature = instance.eClass().getEStructuralFeature(propertyName);
+      if (feature == null) {
+        continue;
+      }
+      if (feature.isMany()) {
+        List<?> currentList = (List<?>) instance.eGet(feature);
+        List<Object> currentValues = new ArrayList<>(currentList);
+        List<Object> preValues =
+            transaction.getPreStateMultiValue(instance, feature, currentValues);
+        for (Object v : preValues) {
+          if (v != null) {
+            results.add(wrapValue(v));
           }
+        }
+      } else {
+        Object currentVal = instance.eGet(feature);
+        Object preVal = transaction.getPreStateSingleValue(instance, feature, currentVal);
+        if (preVal != null) {
+          results.add(wrapValue(preVal));
+        }
+      }
+    }
+    return Value.of(results, finalType);
+  }
+
+  /** Navigates {@code propertyName} on a single receiver element; used by {@link #visitPropertyAccessWithReceiver}. */
+  private Iterator<OCLElement> navigateOne(OCLElement elem, String propertyName) {
+    EObject instance = elem.tryGetInstance();
+    if (instance == null) {
+      return Collections.emptyIterator();
+    }
+    EStructuralFeature feature = instance.eClass().getEStructuralFeature(propertyName);
+    if (feature == null) {
+      return Collections.emptyIterator();
+    }
+    Object value = instance.eGet(feature);
+    if (feature.isMany()) {
+      // Category 1 (fully lazy): wraps each raw element on demand as the outer consumer (select,
+      // exists, notEmpty, ...) actually pulls, instead of eagerly copying the entire feature
+      // value into a new ArrayList up front (which used to defeat early termination for any
+      // consumer chained onto a single receiver element's many-valued feature - see
+      // NavigationSelectNotEmptyStreamingTest). `list.iterator()` is whatever EList
+      // implementation EMF backs the feature with, which already transparently resolves proxies
+      // on iteration for EReference features exactly as it did before - this only changes *when*
+      // elements are pulled from it, not *how* each one is obtained or wrapped.
+      List<?> list = (List<?>) value;
+      return new SkipNullMappingIterator(list.iterator());
+    }
+    if (value == null) {
+      return Collections.emptyIterator(); // unset optional attribute → ?T? = []
+    }
+    return List.of(wrapValue(value)).iterator();
+  }
+
+  /**
+   * Lazily maps a raw {@code Iterator<?>} (a many-valued EMF feature's backing list iterator) to
+   * {@link OCLElement}s via {@link #wrapValue}, skipping {@code null} entries one at a time
+   * instead of pre-filtering the whole source. Mirrors {@code
+   * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations}'s {@code FilterIterator} lookahead
+   * pattern: {@code hasNext()} is answered from an already-computed pending element, so
+   * constructing/advancing this iterator pulls at most one raw element ahead of what has actually
+   * been yielded downstream.
+   */
+  private final class SkipNullMappingIterator implements Iterator<OCLElement> {
+    private final Iterator<?> upstream;
+    private OCLElement pending;
+    private boolean hasPending;
+
+    SkipNullMappingIterator(Iterator<?> upstream) {
+      this.upstream = upstream;
+      advance();
+    }
+
+    private void advance() {
+      hasPending = false;
+      while (upstream.hasNext()) {
+        Object item = upstream.next();
+        if (item != null) {
+          pending = wrapValue(item);
+          hasPending = true;
+          return;
         }
       }
     }
 
-    Type resultType = nodeTypes.get(ctx);
-    return Value.of(results, resultType != null ? resultType : Type.set(Type.ANY));
+    @Override
+    public boolean hasNext() {
+      return hasPending;
+    }
+
+    @Override
+    public OCLElement next() {
+      if (!hasPending) {
+        throw new NoSuchElementException();
+      }
+      OCLElement result = pending;
+      advance();
+      return result;
+    }
   }
 
   /**
@@ -3475,6 +4064,16 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitVariableDeclaration(VitruvOCLParser.VariableDeclarationContext ctx) {
+    // Captured *before* evaluating varInit, and used directly (bypassing
+    // symbolTable.defineVariable()'s dependence on "whatever the current scope now is"): if
+    // varInit itself forces materialization of an outer, already-existing lazy Value (e.g. an
+    // enclosing let-bound or iterator-bound collection), symbolTable's current scope can drift
+    // away from this declaration's actual scope by the time visit(ctx.varInit) returns - see
+    // EvaluationVisitor#exitScope(Scope) for the general explanation of why laziness makes this
+    // distinction load-bearing. Empirically confirmed: reverting this and the corresponding fix
+    // in visitLetExpCS makes LazyChainRegressionTest's shadowing test resolve a variable from the
+    // wrong enclosing scope (111 instead of 222).
+    Scope declaringScope = symbolTable.getCurrentScope();
     String varName = ctx.varName.getText();
     Value initValue = visit(ctx.varInit);
 
@@ -3490,10 +4089,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
     }
 
-    Scope currentScope = symbolTable.getCurrentScope();
-    VariableSymbol varSymbol = new VariableSymbol(varName, varType, currentScope, false);
+    VariableSymbol varSymbol = new VariableSymbol(varName, varType, declaringScope, false);
     varSymbol.setValue(initValue);
-    symbolTable.defineVariable(varSymbol);
+    declaringScope.defineVariable(varSymbol);
 
     return initValue;
   }
@@ -3586,12 +4184,25 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     LocalScope letScope = new LocalScope(symbolTable.getCurrentScope());
     symbolTable.enterScope(letScope);
     try {
-      // Evaluate and bind each variable declaration
-      visit(ctx.variableDeclarations());
+      // Re-enter letScope explicitly before every declaration and before every body expression,
+      // rather than relying on it having "stayed" current since the top of this method: any one
+      // of them may itself force materialization of an outer, already-existing lazy Value (e.g. an
+      // enclosing let-bound or iterator-bound collection), which leaves symbolTable's current
+      // scope pointing away from letScope by the time visit() returns - see
+      // EvaluationVisitor#exitScope(Scope) for why. Each step must start from a known-correct
+      // scope regardless of what the previous one did to the current-scope pointer. Empirically
+      // confirmed: reverting this (and the corresponding fix in visitVariableDeclaration) makes
+      // LazyChainRegressionTest's shadowing test resolve a variable from the wrong enclosing scope
+      // (111 instead of 222).
+      for (VitruvOCLParser.VariableDeclarationContext varDecl :
+          ctx.variableDeclarations().variableDeclaration()) {
+        symbolTable.enterScope(letScope);
+        visit(varDecl);
+      }
 
-      // Evaluate body, return last expression
       Value result = null;
       for (VitruvOCLParser.ExpCSContext exp : ctx.expCS()) {
+        symbolTable.enterScope(letScope);
         result = visit(exp);
       }
 
@@ -3600,7 +4211,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
       return result;
     } finally {
-      symbolTable.exitScope();
+      exitScope(letScope);
     }
   }
 
@@ -3687,26 +4298,147 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Value.boolValue(corresponds);
   }
 
+  // ==================== Correspondence guard short-circuit (step A4) ====================
+
+  /** Whether {@code operand} is a binary {@code ~} and the fast paths are on. */
+  private boolean isCorrespondenceGuard(ParserRuleContext operand) {
+    return correspondenceFastPaths && operand instanceof VitruvOCLParser.CorrespondenceContext;
+  }
+
+  private static boolean isFalse(Value value) {
+    if (value.isEmpty() || value.size() != 1) {
+      return false;
+    }
+    return Boolean.FALSE.equals(value.getElements().get(0).tryGetBool());
+  }
+
+  /**
+   * Whether skipping {@code operand} is unobservable: no expression evaluated while {@code operand}
+   * is evaluated can report a runtime error or throw because of the constraint's own content.
+   *
+   * <p>The evaluator reports runtime errors only for comparisons whose operands are not singletons
+   * at runtime and for unbound variables (excluded by the type checker), and throws for integer
+   * literals that do not fit an {@code int} and for {@code substring} bounds that are no integers.
+   * The check covers the <em>whole constraint</em>, not just {@code operand}, because lazily
+   * evaluated {@code let} values from outside can be forced inside it. It requires: no {@code
+   * append}/{@code iterate} (result types not trusted, as in the incremental analysis), no node
+   * typed {@code OclAny} or erroneous (an {@code OclAny} may hold a collection), every comparison
+   * operand of a non-collection type, and every integer literal within {@code int} range. Exceptions
+   * from the model access itself (the wrapper) are infrastructure failures and are not considered.
+   */
+  private boolean cannotReportErrors(ParserRuleContext operand) {
+    return errorFreeConstraints.computeIfAbsent(root(operand), this::isErrorFree);
+  }
+
+  private boolean isErrorFree(ParseTree node) {
+    if (node instanceof VitruvOCLParser.AppendOpContext
+        || node instanceof VitruvOCLParser.IterateOpContext) {
+      return false;
+    }
+    if (isUntyped(nodeTypes.get(node))) {
+      return false;
+    }
+    if (isComparison(node)) {
+      ParserRuleContext ctx = (ParserRuleContext) node;
+      for (ParseTree side : List.of(ctx.getChild(0), ctx.getChild(ctx.getChildCount() - 1))) {
+        Type type = staticType(side);
+        if (type == null || type.isCollection() || isUntyped(type)) {
+          return false;
+        }
+      }
+    }
+    if (node instanceof VitruvOCLParser.NumberLitContext literal && !fitsLiteral(literal.getText())) {
+      return false;
+    }
+    if (node instanceof VitruvOCLParser.SubstringOpContext substring
+        && !(isInteger(staticType(substring.start)) && isInteger(staticType(substring.end)))) {
+      return false; // visitSubstringOp casts both bounds to IntValue
+    }
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (!isErrorFree(node.getChild(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** {@code OclAny} or an error type, also as the element of an optional. */
+  private static boolean isUntyped(Type type) {
+    if (type == null) {
+      return false;
+    }
+    if (type == Type.ANY || type.isError()) {
+      return true;
+    }
+    if (type.isOptional()) {
+      Type element = type.getElementType();
+      return element == Type.ANY || element != null && element.isError();
+    }
+    return false;
+  }
+
+  private static boolean isInteger(Type type) {
+    return type != null && type.equals(Type.INTEGER);
+  }
+
+  /** Mirrors {@link #visitNumberLit}: whether parsing the literal cannot throw. */
+  private static boolean fitsLiteral(String text) {
+    if (text.contains(".") || text.contains("e") || text.contains("E")) {
+      return true;
+    }
+    try {
+      Integer.parseInt(text);
+      return true;
+    } catch (NumberFormatException e) {
+      return false;
+    }
+  }
+
+  /** The type checker's type of {@code node}, looking through single-child wrapper nodes. */
+  private Type staticType(ParseTree node) {
+    ParseTree current = node;
+    while (current != null) {
+      Type type = nodeTypes.get(current);
+      if (type != null) {
+        return type;
+      }
+      current = current.getChildCount() == 1 ? current.getChild(0) : null;
+    }
+    return null;
+  }
+
+  private static boolean isComparison(ParseTree node) {
+    return node instanceof VitruvOCLParser.EqualityComparisonContext
+        || node instanceof VitruvOCLParser.InequalityComparisonContext
+        || node instanceof VitruvOCLParser.LessThanComparisonContext
+        || node instanceof VitruvOCLParser.LessThanOrEqualComparisonContext
+        || node instanceof VitruvOCLParser.GreaterThanComparisonContext
+        || node instanceof VitruvOCLParser.GreaterThanOrEqualComparisonContext
+        || node instanceof VitruvOCLParser.SingleEqualsOpContext
+        || node instanceof VitruvOCLParser.MultiEqualsOpContext
+        || node instanceof VitruvOCLParser.InvalidBinaryOpContext;
+  }
+
+  private static ParseTree root(ParseTree node) {
+    ParseTree current = node;
+    while (current.getParent() != null) {
+      current = current.getParent();
+    }
+    return current;
+  }
+
   /**
    * Checks if two EObjects are related via a Correspondence.
    *
-   * <p>Searches all Correspondence objects loaded in the VSUM for a relationship between obj1 and
-   * obj2. The correspondence is bidirectional: obj1 can appear in leftEObjects or rightEObjects.
+   * <p>The correspondence is bidirectional: obj1 can appear in leftEObjects or rightEObjects.
+   * Lookups are memoized per visitor (see {@link CorrespondenceLookup}).
    *
    * @param obj1 First object
    * @param obj2 Second object
    * @return true if a Correspondence relates obj1 and obj2, false otherwise
    */
   private boolean checkCorrespondence(EObject obj1, EObject obj2) {
-    // VSUM-Pfad: über MetamodelWrapperInterface (funktioniert sowohl mit
-    // VsumWrapper als auch mit MetamodelWrapper falls getCorrespondingObjects
-    // dort implementiert ist)
-    Set<EObject> correspondents = specification.getCorrespondingObjects(obj1);
-    if (correspondents.contains(obj2)) {
-      return true;
-    }
-    // bidirektional
-    return specification.getCorrespondingObjects(obj2).contains(obj1);
+    return correspondences.corresponds(obj1, obj2);
   }
 
   // ==================== Not Yet Implemented Features ====================
@@ -3783,6 +4515,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitNavigationChainCS(VitruvOCLParser.NavigationChainCSContext ctx) {
+    if (ctx.navigationTargetCS() == null) {
+      return Value.empty(Type.ANY); // '@pre' reached without receiver context — see visitPrimaryWithNav
+    }
     return visit(ctx.navigationTargetCS());
   }
 
@@ -3814,6 +4549,123 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitPropertyAccess(VitruvOCLParser.PropertyAccessContext ctx) {
     return Value.empty(Type.ANY);
+  }
+
+  /**
+   * Error: lifecycle predicate visited without receiver context.
+   *
+   * <p>Should be visited via {@link #visitLifecyclePredicateWithReceiver}.
+   */
+  @Override
+  public Value visitLifecycleNav(VitruvOCLParser.LifecycleNavContext ctx) {
+    return Value.empty(Type.ANY);
+  }
+
+  // ==================== Object-Lifecycle Predicates ====================
+
+  /**
+   * Evaluates {@code OCLisNew} (bare or with a {@code (attr => val, ...)} aggregate) for each
+   * receiver element: {@code true} iff the underlying instance was created in this evaluation's
+   * transaction and, for the aggregate form, its current (post-state) attribute values match.
+   *
+   * @param ctx The OCLisNew predicate node
+   * @return one Boolean per receiver element
+   */
+  @Override
+  public Value visitOclIsNewPred(VitruvOCLParser.OclIsNewPredContext ctx) {
+    Value receiver = receiverStack.peek();
+    List<OCLElement> results = new ArrayList<>();
+    for (OCLElement elem : receiver.getElements()) {
+      EObject instance = elem.tryGetInstance();
+      boolean matches =
+          instance != null
+              && transaction.wasCreated(instance)
+              && matchesAggregate(instance, ctx.lifecycleAggregateArgs());
+      results.add(new OCLElement.BoolValue(matches));
+    }
+    Type resultType = nodeTypes.get(ctx);
+    return Value.of(results, resultType != null ? resultType : Type.singleton(Type.BOOLEAN));
+  }
+
+  /**
+   * Evaluates {@code OCLisModified} (bare or with a {@code (attr => val, ...)} aggregate) for each
+   * receiver element: {@code true} iff the underlying instance had any feature changed in this
+   * evaluation's transaction and, for the aggregate form, its current (post-state, i.e.
+   * target-value, not delta) attribute values match.
+   *
+   * @param ctx The OCLisModified predicate node
+   * @return one Boolean per receiver element
+   */
+  @Override
+  public Value visitOclIsModifiedPred(VitruvOCLParser.OclIsModifiedPredContext ctx) {
+    Value receiver = receiverStack.peek();
+    List<OCLElement> results = new ArrayList<>();
+    for (OCLElement elem : receiver.getElements()) {
+      EObject instance = elem.tryGetInstance();
+      boolean matches =
+          instance != null
+              && transaction.wasModified(instance)
+              && matchesAggregate(instance, ctx.lifecycleAggregateArgs());
+      results.add(new OCLElement.BoolValue(matches));
+    }
+    Type resultType = nodeTypes.get(ctx);
+    return Value.of(results, resultType != null ? resultType : Type.singleton(Type.BOOLEAN));
+  }
+
+  /**
+   * Evaluates {@code OCLisDeleted} for each receiver element: {@code true} iff the underlying
+   * instance was deleted in this evaluation's transaction. No aggregate form exists.
+   *
+   * <p>Structurally, {@code self.OCLisDeleted} is always {@code false}: {@code
+   * visitClassifierContextCS} only ever iterates currently-live instances, so a deleted object can
+   * never be bound to {@code self}. This only becomes meaningful when navigating to a still-
+   * reachable (e.g. {@code @pre}-recovered) reference to a since-deleted object.
+   *
+   * @param ctx The OCLisDeleted predicate node
+   * @return one Boolean per receiver element
+   */
+  @Override
+  public Value visitOclIsDeletedPred(VitruvOCLParser.OclIsDeletedPredContext ctx) {
+    Value receiver = receiverStack.peek();
+    List<OCLElement> results = new ArrayList<>();
+    for (OCLElement elem : receiver.getElements()) {
+      EObject instance = elem.tryGetInstance();
+      results.add(new OCLElement.BoolValue(instance != null && transaction.wasDeleted(instance)));
+    }
+    Type resultType = nodeTypes.get(ctx);
+    return Value.of(results, resultType != null ? resultType : Type.singleton(Type.BOOLEAN));
+  }
+
+  /**
+   * Checks a {@code (attr => val, ...)} aggregate's attribute values against {@code instance}'s
+   * <em>current</em> (post-state) values — target-value semantics, not deltas, and not {@code
+   * @pre}-relative (see {@code visitOclIsNewPred}/{@code visitOclIsModifiedPred} docs). Returns
+   * {@code true} (vacuously) for the bare, no-aggregate form.
+   */
+  private boolean matchesAggregate(
+      EObject instance, VitruvOCLParser.LifecycleAggregateArgsContext argsCtx) {
+    if (argsCtx == null) {
+      return true;
+    }
+    for (VitruvOCLParser.LifecycleAggregateArgContext arg : argsCtx.lifecycleAggregateArg()) {
+      String attrName = arg.attr.getText();
+      EStructuralFeature feature = instance.eClass().getEStructuralFeature(attrName);
+      if (feature == null) {
+        return false; // type-checker already rejects unknown attributes; defensive fallback
+      }
+      Value expectedValue = visit(arg.value);
+      if (expectedValue == null || expectedValue.isEmpty()) {
+        return false;
+      }
+      Object actualRaw = instance.eGet(feature);
+      if (actualRaw == null) {
+        return false;
+      }
+      if (!OCLElement.semanticEquals(wrapValue(actualRaw), expectedValue.getElements().get(0))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // ==================== Miscellaneous ====================
@@ -4100,13 +4952,24 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /**
    * Evaluates the {@code intersection()} operation on a collection receiver.
    *
-   * <p>Returns a collection containing only those elements of the receiver that are also present in
-   * the argument collection, tested via {@link Value#includes}. The result type is taken from the
-   * type-checker annotation on the node if available, falling back to the receiver's runtime type.
-   * If the result type enforces uniqueness (e.g. {@code Set}), duplicates are removed after
-   * construction.
+   * <p>Category 3 (lazy, incremental buffer reconciliation): delegates to {@link
+   * Value#intersection}, which pulls from both sides in alternation via {@link
+   * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#intersect} instead of fully
+   * materializing either side first. The result type is taken from the type-checker annotation on
+   * the node if available, falling back to the receiver's runtime type. If the result type
+   * enforces uniqueness (e.g. {@code Set}), duplicates are removed afterward (also lazily, see
+   * {@link Value#removeDuplicates}).
    *
    * <p>Example: {@code Set{1, 2, 3}->intersection(Set{2, 3, 4})} yields {@code Set{2, 3}}
+   *
+   * <p><b>Note:</b> the alternating dual-buffer algorithm matches elements pairwise (multiset
+   * intersection), which is equivalent to the receiver-membership-filter semantics used here
+   * previously whenever at least one side has no internal duplicates — true for every {@code
+   * Set}/{@code OrderedSet} receiver or argument, i.e. the standard case. It can differ from that
+   * prior behavior for a {@code Bag}/{@code Sequence} receiver <em>and</em> argument that both
+   * contain duplicates of the same value; a non-unique result type is then no longer guaranteed to
+   * reproduce every receiver occurrence that has some match, only up to the argument's matching
+   * multiplicity. A unique ({@code Set}/{@code OrderedSet}) result type is unaffected either way.
    *
    * @param ctx the parse tree node for the {@code intersection()} operation, including the argument
    *     expression
@@ -4118,17 +4981,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     Value receiver = receiverStack.peek();
     Value arg = visit(ctx.arg);
 
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (arg.includes(elem)) {
-        results.add(elem);
-      }
-    }
-
     Type resultType = nodeTypes.get(ctx);
-    Value result = Value.of(results, resultType != null ? resultType : receiver.getRuntimeType());
+    Value result =
+        Value.lazy(
+            receiver.intersection(arg).asSource(),
+            resultType != null ? resultType : receiver.getRuntimeType());
 
-    // Remove duplicates if result is unique
     if (result.getRuntimeType().isUnique()) {
       result = result.removeDuplicates();
     }
@@ -4464,8 +5322,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /**
    * Returns true if elemObject passes both the type and tag filter relative to selfObject.
    *
-   * <p>Type filter is a pure EMF instanceof check (cheap). Tag filter delegates to {@code
-   * specification.correspondenceHasTag} which searches the correspondence model. When no filter is
+   * <p>Type filter is a pure EMF instanceof check (cheap). Tag filter goes through the memoized
+   * {@link CorrespondenceLookup}, like the plain check. When no filter is
    * set the plain {@code checkCorrespondence} result is returned.
    */
   private boolean passesCorrespondenceFilter(
@@ -4476,7 +5334,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     }
     // Tag filter: correspondence must carry the required tag
     if (tagFilter != null) {
-      return specification.correspondenceHasTag(selfObject, elemObject, tagFilter);
+      return correspondences.corresponds(selfObject, elemObject, tagFilter);
     }
     // No filter: plain bidirectional correspondence check
     return checkCorrespondence(selfObject, elemObject);

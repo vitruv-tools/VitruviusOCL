@@ -1,45 +1,12 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
-const vscode = __importStar(require("vscode"));
-const child_process = __importStar(require("child_process"));
-const util = __importStar(require("util"));
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
+const vscode = require("vscode");
+const child_process = require("child_process");
+const util = require("util");
+const fs = require("fs");
+const path = require("path");
 const node_1 = require("vscode-languageclient/node");
 const execFile = util.promisify(child_process.execFile);
 const constraintResults = new Map();
@@ -374,6 +341,12 @@ async function runConstraint(constraintName, documentUri) {
             updateInlineErrors(editor, details);
         }
         showEvalResult(constraintName, result);
+        const skippedCount = (result.warnings || []).filter(isSkipNotice).length;
+        if (skippedCount > 0) {
+            vscode.window.showInformationMessage(`ℹ VitruvOCL: '${constraintName}' contains pre/post constraint(s) that were not ` +
+                `evaluated — this plugin only runs invariants (no transaction context available). ` +
+                `See the VitruvOCL output channel for details.`);
+        }
         fs.unlinkSync(tempFile);
     }
     catch (error) {
@@ -507,7 +480,7 @@ function extractConstraint(text, constraintName) {
     return constraint.trim() || null;
 }
 async function writeTempConstraint(constraint) {
-    const os = await import('os');
+    const os = await Promise.resolve().then(() => require('os'));
     const tempDir = os.tmpdir();
     const tempFile = path.join(tempDir, `vitruvocl-${Date.now()}.ocl`);
     fs.writeFileSync(tempFile, constraint, 'utf-8');
@@ -632,6 +605,18 @@ async function findInstanceFiles(constraintFileUri) {
 // Output
 // ---------------------------------------------------------------------------
 let outputChannel;
+/**
+ * Stable prefix identifying a pre/post-skip notice among a constraint's plain-string warnings —
+ * must match {@code VitruvOCL.PRE_POST_SKIPPED_PREFIX} on the Java side exactly. Pre/post
+ * constraints (anything using `pre`/`post`/`@pre`/`OCLisNew`/`OCLisModified`/`OCLisDeleted`) cannot
+ * be evaluated by this plugin: it has no notion of a transaction (that only exists once a real
+ * Reactions integration supplies one), so the CLI it shells out to always uses the no-transaction
+ * evaluation path, which skips pre/post outright rather than silently mis-evaluating them.
+ */
+const PRE_POST_SKIPPED_PREFIX = 'PRE/POST SKIPPED:';
+function isSkipNotice(warning) {
+    return warning.startsWith(PRE_POST_SKIPPED_PREFIX);
+}
 function showEvalResult(name, result) {
     if (!outputChannel) {
         outputChannel = vscode.window.createOutputChannel('VitruvOCL');
@@ -640,6 +625,9 @@ function showEvalResult(name, result) {
     channel.clear();
     channel.show(true);
     channel.appendLine(`=== ${name} ===\n`);
+    const allWarnings = result.warnings || [];
+    const skipNotices = allWarnings.filter(isSkipNotice);
+    const otherWarnings = allWarnings.filter(w => !isSkipNotice(w));
     if (!result.success) {
         channel.appendLine('❌ COMPILATION ERRORS:');
         result.errors.forEach(e => channel.appendLine(`  Line ${e.line}: ${e.message}`));
@@ -649,9 +637,14 @@ function showEvalResult(name, result) {
     }
     else {
         channel.appendLine('❌ CONSTRAINT VIOLATED');
-        if (result.warnings.length > 0) {
-            result.warnings.forEach(w => channel.appendLine(w));
-        }
+        otherWarnings.forEach(w => channel.appendLine(w));
+    }
+    // Shown regardless of pass/fail — a skipped pre/post is not a violation, but the user must
+    // still be told it was not checked at all.
+    if (skipNotices.length > 0) {
+        channel.appendLine('');
+        channel.appendLine('ℹ NOTE: this only ran invariants — the following were not evaluated:');
+        skipNotices.forEach(w => channel.appendLine('  ' + w));
     }
     channel.appendLine('');
 }
@@ -673,14 +666,20 @@ function showSummaryResult(passed, failed, constraints) {
         channel.appendLine(`Failed: ${failed}\n`);
     }
     channel.appendLine('Individual Results:');
+    let skippedCount = 0;
     for (const constraint of constraints) {
         const icon = constraint.satisfied ? '✅' : '❌';
         channel.appendLine(`  ${icon} ${constraint.name}`);
-        if (!constraint.satisfied && constraint.warnings) {
-            constraint.warnings.forEach(w => {
-                channel.appendLine(`     ${w}`);
-            });
+        const allWarnings = constraint.warnings || [];
+        const skipNotices = allWarnings.filter(isSkipNotice);
+        const otherWarnings = allWarnings.filter(w => !isSkipNotice(w));
+        if (!constraint.satisfied) {
+            otherWarnings.forEach(w => channel.appendLine(`     ${w}`));
         }
+        // Shown regardless of pass/fail — a skipped pre/post is not a violation, but the user
+        // must still be told it was not checked at all.
+        skipNotices.forEach(w => channel.appendLine(`     ℹ ${w}`));
+        skippedCount += skipNotices.length;
     }
     channel.appendLine('');
     if (failed === 0) {
@@ -689,9 +688,14 @@ function showSummaryResult(passed, failed, constraints) {
     else {
         vscode.window.showWarningMessage(`❌ ${failed}/${total} constraints failed`);
     }
+    if (skippedCount > 0) {
+        vscode.window.showInformationMessage(`ℹ VitruvOCL: ${skippedCount} pre/post constraint(s) were not evaluated — this plugin ` +
+            `only runs invariants (no transaction context available). See the VitruvOCL output ` +
+            `channel for details.`);
+    }
 }
 /**
- * After the user presses Enter on an 'inv ...:' line, automatically opens
+ * After the user presses Enter on an 'inv/pre/post ...:' line, automatically opens
  * the suggestion widget on the new blank/indented line below.
  */
 function triggerSuggestAfterInvNewline(editor, event) {
@@ -707,7 +711,7 @@ function triggerSuggestAfterInvNewline(editor, event) {
         if (newLineText.trim() !== '')
             continue;
         // Walk upward from the new line: only suggest annotations when every non-blank
-        // line between here and the 'inv ...:' header is itself an annotation line.
+        // line between here and the 'inv/pre/post ...:' header is itself an annotation line.
         // The moment we hit any other content (OCL body), we stop.
         let inAnnotationZone = false;
         for (let i = newLine - 1; i >= 0; i--) {
@@ -715,8 +719,8 @@ function triggerSuggestAfterInvNewline(editor, event) {
             const trimmed = lineText.trim();
             if (trimmed === '')
                 continue; // blank lines are fine
-            if (/\binv\s+\w+\s*:/.test(lineText)) {
-                inAnnotationZone = true; // reached the inv header — we're in the zone
+            if (/\b(inv|pre|post)\s+\w+\s*:/.test(lineText)) {
+                inAnnotationZone = true; // reached the inv/pre/post header — we're in the zone
                 break;
             }
             if (/^\s*@(severity|message)\b/.test(lineText))

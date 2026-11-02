@@ -39,7 +39,7 @@ To use vitruvocl in your own Java project, build and install it:
 git clone https://github.com/vitruv-tools/VitruviusOCL.git
 cd VitruviusOCL
 
-# Build and install everything (JARs + VSCode extension)
+# Build everything (JARs + VSCode extension) and install the JARs into the local Maven repository
 ./mvnw clean install
 ```
 
@@ -213,15 +213,19 @@ context family::Member inv:
 ./mvnw clean package
 ```
 
-This builds all three modules in order:
-1. `language/` → `language/target/tools.vitruv.vitruvocl.language-<version>.jar`, plus the standalone CLI `…-cli.jar` (compiler + evaluator)
-2. `vitruvocl-language-server/` → `vitruvocl-language-server/target/tools.vitruv.vitruvocl.languageserver-<version>-shaded.jar`
-3. `vitruvocl-vscode-extension/` → copies both JARs into `lib/`, then runs `vsce package` → `.vsix`
+This builds all four modules in order:
+1. `vitruvocl-allinstances/` → efficient `allInstances()` computation used by the evaluator
+2. `language/` → `language/target/tools.vitruv.vitruvocl.language-<version>.jar`, plus the standalone CLI `…-cli.jar` (compiler + evaluator)
+3. `vitruvocl-language-server/` → `vitruvocl-language-server/target/tools.vitruv.vitruvocl.languageserver-<version>-shaded.jar`
+4. `vitruvocl-vscode-extension/` → copies both JARs into `lib/`, then runs `vsce package` → `.vsix`
+
+The root POM inherits from `tools.vitruv:parent` like the other Vitruvius repositories. All
+artifacts have the group `tools.vitruv` and the prefix `tools.vitruv.vitruvocl`.
 
 ### Build without VSCode Extension
 
 ```bash
-./mvnw clean package -pl language,vitruvocl-language-server
+./mvnw clean package -pl vitruvocl-allinstances,language,vitruvocl-language-server
 ```
 
 ### Run Tests

@@ -2,10 +2,11 @@
 
 ## Module Structure
 
-vitruvocl is a Maven multi-module project with three modules, built in order:
+vitruvocl is a Maven multi-module project with four modules, built in order:
 
 ```
 VitruviusOCL/                       (root aggregator POM, tools.vitruv:tools.vitruv.vitruvocl)
+├── vitruvocl-allinstances/         → tools.vitruv.vitruvocl.allinstances (allInstances() computation)
 ├── language/                       → tools.vitruv.vitruvocl.language (compiler + evaluator, plus a -cli jar)
 ├── vitruvocl-language-server/      → tools.vitruv.vitruvocl.languageserver (LSP server, -shaded jar)
 └── vitruvocl-vscode-extension/     → vitruvocl-0.0.1.vsix (editor extension)
@@ -17,7 +18,7 @@ dependencies.
 
 Dependencies flow in one direction only:
 ```
-vscode-extension → language-server → language
+vscode-extension → language-server → language → allinstances
 ```
 
 ---

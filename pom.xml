@@ -37,6 +37,7 @@
 
     <!-- Modules -->
     <modules>
+        <module>vitruvocl-allinstances</module>
         <module>language</module>
         <module>vitruvocl-language-server</module>
         <module>vitruvocl-vscode-extension</module>
