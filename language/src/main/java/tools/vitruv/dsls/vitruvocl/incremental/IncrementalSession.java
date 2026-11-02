@@ -54,7 +54,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 public final class IncrementalSession implements AutoCloseable {
 
   /**
-   * System property that turns off the shared correspondence lookup (step C4): evaluations then
+   * System property that turns off the shared correspondence lookup: evaluations then
    * query the wrapper directly, as before. Read once per session.
    */
   public static final String PROP_NO_SHARED_CORRESPONDENCE_LOOKUP =
@@ -90,7 +90,7 @@ public final class IncrementalSession implements AutoCloseable {
 
   /**
    * The wrapper the current transaction's evaluations use: a {@link SnapshotCorrespondenceWrapper}
-   * over the current snapshot if there is one (step C4), else the session's wrapper. Rebuilt
+   * over the current snapshot if there is one, else the session's wrapper. Rebuilt
    * whenever the snapshot is replaced.
    */
   private MetamodelWrapperInterface evaluationWrapper;
@@ -266,7 +266,7 @@ public final class IncrementalSession implements AutoCloseable {
         : previous.diff(current);
   }
 
-  /** The evaluation view for {@code snapshot}: answers correspondence queries from it (step C4). */
+  /** The evaluation view for {@code snapshot}: answers correspondence queries from it. */
   private MetamodelWrapperInterface viewOf(CorrespondenceSnapshot snapshot) {
     // The snapshot answers correspondenceHasTag as the two-way tagged lookup, which is only the
     // wrapper's own answer under that contract.

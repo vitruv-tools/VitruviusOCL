@@ -35,14 +35,14 @@ import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Manual benchmark for step B1 of {@code docs/correspondence-incremental-plan.md}: the cost of
+ * Manual benchmark: the cost of
  * capturing and diffing a {@link CorrespondenceSnapshot} over the real Vitruvius correspondence
  * model ({@code PersistableCorrespondenceModelImpl}) through {@link VsumWrapper}, for growing
  * numbers of 1:1 correspondences.
  *
  * <p>For comparison it also measures one lookup per object, which is what a full evaluation of a
- * single {@code Y.allInstances()->select(~)} constraint costs after step A1. Disabled by default;
- * run with {@code -Dvitruvocl.bench.corrSnapshot=true} (optionally {@code
+ * single {@code Y.allInstances()->select(~)} constraint costs with the cached correspondence
+ * lookup. Disabled by default; run with {@code -Dvitruvocl.bench.corrSnapshot=true} (optionally {@code
  * -Dvitruvocl.bench.corrSizes=500,1000,2000,4000}).
  */
 class CorrespondenceSnapshotBenchmark {

@@ -36,7 +36,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
  * MetamodelWrapperInterface#hasTaggedCorrespondenceLookup()}); otherwise they go to the wrapper
  * unchanged. A {@code null} lookup result counts as no correspondents.
  *
- * <p>With the participant filter (step A3), once a few lookups have been made the lookup also
+ * <p>With the participant filter, once a few lookups have been made the lookup also
  * fetches the set of all objects that take part in some correspondence (one scan, if the wrapper
  * can enumerate it); an object outside that set has no correspondent, so its checks need no lookup.
  *

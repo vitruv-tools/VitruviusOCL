@@ -158,7 +158,7 @@ final class CompiledConstraint {
   /**
    * As {@link #evaluate(List, boolean, Function)}, but evaluating through {@code view}: a view of
    * the compile-time wrapper on the same model state (e.g. one that answers correspondence queries
-   * from a snapshot, step C4).
+   * from a snapshot).
    */
   EvaluationOutcome evaluate(
       MetamodelWrapperInterface view,

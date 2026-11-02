@@ -37,8 +37,7 @@ import tools.vitruv.change.atomic.root.InsertRootEObject;
 import tools.vitruv.change.atomic.root.RemoveRootEObject;
 
 /**
- * Maps a recorded {@code EChange} sequence to a {@link TransactionDelta} (event model, see the
- * table in {@code docs/incremental-implementation-report.md}, §4).
+ * Maps a recorded {@code EChange} sequence to a {@link TransactionDelta}.
  *
  * <p>Deduplication follows Cabot &amp; Teniente 2006, Prop. 4.2 / Fernández-Álvarez et al. 2016,
  * §5.5, restricted to what is safe for ordered, non-unique lists: identical events are kept once,

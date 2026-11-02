@@ -33,9 +33,8 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.FakeCorrespondenceModel;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 
 /**
- * Unit tests for {@link CorrespondenceSnapshot} and {@link CorrespondenceDelta} (step B1 of {@code
- * docs/correspondence-incremental-plan.md}): the diff of two snapshots reports exactly the
- * (unordered, tagged) pairs whose two-way relation {@code b ∈ corr(a, t) ∨ a ∈ corr(b, t)} changed.
+ * Unit tests for {@link CorrespondenceSnapshot} and {@link CorrespondenceDelta}: the diff of two
+ * snapshots reports exactly the (unordered, tagged) pairs whose two-way relation {@code b ∈ corr(a, t) ∨ a ∈ corr(b, t)} changed.
  */
 class CorrespondenceSnapshotTest {
 

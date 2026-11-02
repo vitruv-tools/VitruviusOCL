@@ -40,7 +40,7 @@ import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Manual benchmark for step C4 of {@code docs/correspondence-incremental-plan.md}: an incremental
+ * Manual benchmark: an incremental
  * session over the real Vitruvius correspondence model, with and without the shared
  * correspondence lookup. Model: {@code n} {@code SubA} and {@code n} {@code Other}, the first half
  * of each corresponding 1:1. Measured: {@code initialize()}, a transaction changing one {@code

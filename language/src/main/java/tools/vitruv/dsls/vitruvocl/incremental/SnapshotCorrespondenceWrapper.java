@@ -23,7 +23,7 @@ import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 
 /**
- * Step C4 of {@code docs/correspondence-incremental-plan.md}: a view of a wrapper that answers
+ * A view of a wrapper that answers
  * every correspondence query from a {@link CorrespondenceSnapshot} of the current state and
  * delegates everything else.
  *

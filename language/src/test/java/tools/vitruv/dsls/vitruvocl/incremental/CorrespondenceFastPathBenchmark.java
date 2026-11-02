@@ -42,7 +42,7 @@ import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Manual benchmark for steps A3/A4 of {@code docs/correspondence-incremental-plan.md}: full
+ * Manual benchmark: full
  * evaluation of {@code ~} constraints over the real Vitruvius correspondence model, with and
  * without the correspondence fast paths. The model has {@code n} {@code SubA} and {@code n} {@code
  * Other} objects; the first half of each corresponds 1:1, the second half takes part in no

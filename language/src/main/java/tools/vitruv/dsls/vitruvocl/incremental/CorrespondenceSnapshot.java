@@ -25,14 +25,13 @@ import tools.vitruv.dsls.vitruvocl.incremental.CorrespondenceDelta.Pair;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 
 /**
- * The correspondence relation at one point in time (step B1 of {@code
- * docs/correspondence-incremental-plan.md}): for every object in some correspondence, its
+ * The correspondence relation at one point in time: for every object in some correspondence, its
  * single-object lookup result per tag, exactly as the evaluator's {@code ~} sees it.
  *
  * <p>Capturing costs one lookup per object in a correspondence. With Vitruvius each lookup scans
  * the whole correspondence model, so a capture is quadratic in its size; see {@code
  * CorrespondenceSnapshotBenchmark}. In return the snapshot answers every lookup of the same state
- * by hash lookups (step C4, {@link SnapshotCorrespondenceWrapper}). It is immutable after capture
+ * by hash lookups ({@link SnapshotCorrespondenceWrapper}). It is immutable after capture
  * and may be read from several threads.
  */
 final class CorrespondenceSnapshot {

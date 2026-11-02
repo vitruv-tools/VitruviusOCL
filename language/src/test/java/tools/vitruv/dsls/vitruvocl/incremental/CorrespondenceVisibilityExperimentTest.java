@@ -55,8 +55,7 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  *
  * <p>The assertions pin down the <em>observed</em> behaviour of Vitruvius {@code 4.0.1-SNAPSHOT}
  * so that a framework change that alters it makes this test fail (and the conservative
- * correspondence handling in the incremental evaluator must then be revisited). Results are
- * documented in {@code docs/incremental-implementation-report.md}.
+ * correspondence handling in the incremental evaluator must then be revisited).
  */
 class CorrespondenceVisibilityExperimentTest {
 

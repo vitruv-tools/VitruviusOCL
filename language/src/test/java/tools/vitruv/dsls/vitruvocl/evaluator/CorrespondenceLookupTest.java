@@ -36,8 +36,7 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 
 /**
- * Unit tests for {@link CorrespondenceLookup} (step A1 of {@code
- * docs/correspondence-incremental-plan.md}): the answers equal the uncached bidirectional check
+ * Unit tests for {@link CorrespondenceLookup}: the answers equal the uncached bidirectional check
  * {@code b ∈ corr(a) ∨ a ∈ corr(b)} (also for one-directional lookups, as Vitruvius produces for
  * correspondences with several objects on a side), and every distinct object is looked up at most
  * once per tag.

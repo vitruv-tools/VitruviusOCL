@@ -25,7 +25,7 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
- * Step A4 of {@code docs/correspondence-incremental-plan.md}: in {@code G and R} and {@code G
+ * In {@code G and R} and {@code G
  * implies R} with a correspondence guard {@code G}, the right side {@code R} is not evaluated when
  * {@code G} is false, if {@code R} cannot report a runtime error (the only observable effect of
  * evaluating it). The result is unchanged in every case.

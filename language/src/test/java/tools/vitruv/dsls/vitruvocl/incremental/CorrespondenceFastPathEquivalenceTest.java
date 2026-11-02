@@ -30,7 +30,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
 
 /**
- * Differential check of steps A3/A4 of {@code docs/correspondence-incremental-plan.md}: every
+ * Differential check of the correspondence fast paths: every
  * corpus constraint gives the same outcome (failure flag, errors and violation records in order)
  * with and without the correspondence fast paths, on every model set.
  */

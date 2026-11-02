@@ -190,7 +190,7 @@ class RelevantInstanceTest {
               correspond(fx, "a2", "x");
               EdgeFixture.list(fx.root(2), "tags").add("unrelated");
             });
-    // the changed pair (a2, x) makes only a2 relevant (step C3), not both SubA instances
+    // the changed pair (a2, x) makes only a2 relevant, not both SubA instances
     assertPartial(stats, 1);
   }
 
@@ -198,7 +198,7 @@ class RelevantInstanceTest {
   void idiomRuleSeesSilentCorrespondenceChangesOnceTheyAreObserved() {
     // Without the snapshot diff the idiom rule missed this (CorrespondenceVisibilityExperimentTest):
     // a correspondence added silently together with an unrelated change. The observed
-    // correspondence delta now makes a2 relevant (step C3); verify mode checks the result.
+    // correspondence delta now makes a2 relevant; verify mode checks the result.
     IncrementalConfig on =
         IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES).withCorrespondenceIdiom(true);
     IncrementalStats stats =

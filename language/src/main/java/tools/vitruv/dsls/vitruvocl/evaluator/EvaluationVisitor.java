@@ -183,7 +183,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   /**
    * System property that switches the correspondence fast paths off (participant filter of {@link
-   * CorrespondenceLookup} and guard short-circuits, steps A3/A4); read once per visitor.
+   * CorrespondenceLookup} and guard short-circuits); read once per visitor.
    */
   public static final String PROP_NO_CORRESPONDENCE_FAST_PATHS =
       "vitruvocl.eval.noCorrespondenceFastPaths";
@@ -269,7 +269,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   /**
    * How many right operands of {@code G and R} / {@code G implies R} were skipped because the
-   * correspondence guard {@code G} was false (step A4); for tests and statistics.
+   * correspondence guard {@code G} was false; for tests and statistics.
    */
   public int getCorrespondenceShortCircuits() {
     return correspondenceShortCircuits;
@@ -4298,7 +4298,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Value.boolValue(corresponds);
   }
 
-  // ==================== Correspondence guard short-circuit (step A4) ====================
+  // ==================== Correspondence guard short-circuit ====================
 
   /** Whether {@code operand} is a binary {@code ~} and the fast paths are on. */
   private boolean isCorrespondenceGuard(ParserRuleContext operand) {

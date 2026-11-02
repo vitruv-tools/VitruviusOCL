@@ -65,7 +65,7 @@ final class RelevantInstanceResolver {
 
   /**
    * The wrapper of the current state, read per call: the session's evaluation view, which answers
-   * correspondence queries from the transaction's snapshot (step C4).
+   * correspondence queries from the transaction's snapshot.
    */
   private final Supplier<MetamodelWrapperInterface> wrapper;
 

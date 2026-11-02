@@ -27,7 +27,8 @@ import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
  * A failing correspondence snapshot must not break the session: the transaction falls back to an
- * unknown correspondence delta (the behaviour before step B1), and observation resumes later.
+ * unknown correspondence delta (the behaviour before correspondence snapshots), and observation
+ * resumes later.
  */
 class CorrespondenceObservationFailureTest {
 

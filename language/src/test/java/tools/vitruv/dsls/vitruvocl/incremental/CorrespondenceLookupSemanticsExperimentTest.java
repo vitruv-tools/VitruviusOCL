@@ -44,9 +44,9 @@ import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Step 0 of {@code docs/correspondence-incremental-plan.md}: pins down the lookup semantics of the
- * Vitruvius correspondence model that the {@code ~} optimizations (part A) and the correspondence
- * snapshot (part B) rely on, against a real VSUM:
+ * Pins down the lookup semantics of the
+ * Vitruvius correspondence model that the {@code ~} optimizations and the correspondence
+ * snapshot rely on, against a real VSUM:
  *
  * <ol>
  *   <li>lookups of single-object correspondences are symmetric, untagged and tagged, but

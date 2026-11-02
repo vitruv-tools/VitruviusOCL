@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 
 /**
- * Step C3 of {@code docs/correspondence-incremental-plan.md}: an observed correspondence change
+ * An observed correspondence change
  * {@code (a, b)} re-evaluates only the context instances that reach {@code a} or {@code b} through a
  * traceable operand of some {@code ~} (binary in either operand order, {@code select/reject/
  * exists(~)}), instead of forcing the whole extension. Every session runs in oracle mode, so each

@@ -26,7 +26,7 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
- * Step C4 of {@code docs/correspondence-incremental-plan.md}: the session answers every
+ * The session answers every
  * correspondence check of a transaction's evaluations from its snapshot, so no constraint scans
  * the correspondence model again. Correctness of the snapshot-backed answers is checked by the
  * oracle (verify mode evaluates from scratch on the real wrapper).
