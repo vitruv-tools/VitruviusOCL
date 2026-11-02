@@ -19,6 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EPackage;
@@ -64,11 +68,15 @@ class VitruvOclVsumIntegrationTest {
   }
 
   private InternalVirtualModel buildVsum() throws Exception {
+    return buildVsum(folder.resolve("vsum"));
+  }
+
+  private InternalVirtualModel buildVsum(Path storageFolder) throws Exception {
     // other tests remove the correspondence package from the global registry, but a restarted
     // virtual model needs it to load its correspondences
     EPackage.Registry.INSTANCE.put(CorrespondencePackage.eNS_URI, CorrespondencePackage.eINSTANCE);
     return new VirtualModelBuilder()
-        .withStorageFolder(folder.resolve("vsum"))
+        .withStorageFolder(storageFolder)
         .withUserInteractor(
             UserInteractionFactory.instance.createUserInteractor(
                 UserInteractionFactory.instance.createPredefinedInteractionResultProvider(null)))
@@ -125,7 +133,48 @@ class VitruvOclVsumIntegrationTest {
         vsum.getConstraints().stream().map(constraint -> constraint.id()).toList());
   }
 
+  @Test
+  @DisplayName("two virtual models validated in parallel report only their own violations")
+  void parallelVirtualModels() throws Exception {
+    InternalVirtualModel other = buildVsum(folder.resolve("other"));
+    try {
+      propagateItems(
+          vsum,
+          URI.createFileURI(folder.resolve("items.shop").toString()),
+          shop.createItem("coupon", -5));
+      propagateItems(
+          other,
+          URI.createFileURI(folder.resolve("other.shop").toString()),
+          shop.createItem("gift", -1));
+      ExecutorService executor = Executors.newFixedThreadPool(2);
+      try {
+        for (int round = 0; round < 20; round++) {
+          Future<String> first = executor.submit(() -> violatingName(vsum));
+          Future<String> second = executor.submit(() -> violatingName(other));
+          assertEquals("coupon", first.get(30, TimeUnit.SECONDS));
+          assertEquals("gift", second.get(30, TimeUnit.SECONDS));
+        }
+      } finally {
+        executor.shutdownNow();
+      }
+    } finally {
+      other.dispose();
+    }
+  }
+
+  private String violatingName(InternalVirtualModel virtualModel) {
+    List<ResolvedConstraintViolation> violations =
+        virtualModel.validateConstraints().results().get(0).violations();
+    assertEquals(1, violations.size());
+    return (String) violations.get(0).element().eGet(shop.name);
+  }
+
   private void propagateItems(URI modelUri, EObject... items) {
+    propagateItems(vsum, modelUri, items);
+  }
+
+  private static void propagateItems(
+      InternalVirtualModel virtualModel, URI modelUri, EObject... items) {
     ResourceSet resourceSet = new ResourceSetImpl();
     VitruviusChange<Uuid> change;
     try (ChangeRecorder recorder = new ChangeRecorder(resourceSet)) {
@@ -137,6 +186,6 @@ class VitruvOclVsumIntegrationTest {
           VitruviusChangeResolverFactory.forUuids(UuidResolver.create(resourceSet))
               .assignIds(recorder.endRecording());
     }
-    vsum.propagateChange(change);
+    virtualModel.propagateChange(change);
   }
 }

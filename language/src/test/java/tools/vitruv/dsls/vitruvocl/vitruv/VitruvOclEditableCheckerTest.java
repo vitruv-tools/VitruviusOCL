@@ -97,6 +97,35 @@ class VitruvOclEditableCheckerTest {
   }
 
   @Test
+  @DisplayName("diagnostics point to the line and column of the faulty feature")
+  void typeErrorColumn() {
+    InvalidConstraintException exception =
+        assertThrows(
+            InvalidConstraintException.class,
+            () -> checker.create("context shop::Item\n  inv heavy: self.weight > 0"));
+
+    ConstraintDiagnostic diagnostic = exception.getDiagnostics().get(0);
+    assertEquals(2, diagnostic.line());
+    assertEquals("  inv heavy: self.".length(), diagnostic.column());
+    assertTrue(diagnostic.message().contains("weight"), diagnostic.message());
+  }
+
+  @Test
+  @DisplayName("sources with an unknown context type are rejected with its position")
+  void unknownType() {
+    InvalidConstraintException exception =
+        assertThrows(
+            InvalidConstraintException.class,
+            () -> checker.create("context shop::Order inv placed: true"));
+
+    ConstraintDiagnostic diagnostic = exception.getDiagnostics().get(0);
+    assertEquals(1, diagnostic.line());
+    assertEquals("context shop::".length(), diagnostic.column(), "points to the unknown class");
+    assertTrue(diagnostic.message().contains("Order"), diagnostic.message());
+    assertTrue(checker.getConstraints().isEmpty());
+  }
+
+  @Test
   @DisplayName("exactly one named invariant must be given")
   void singleNamedInvariant() {
     assertThrows(

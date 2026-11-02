@@ -126,6 +126,23 @@ class VitruvOclConstraintCheckerTest {
   }
 
   @Test
+  @DisplayName("metamodels reached through the correspondence operator are reported")
+  void reportsTheMetamodelsOfCorrespondences() {
+    List<ConstraintDescriptor> constraints =
+        VitruvOclConstraintChecker.fromString(
+                """
+                context shop::Item inv catalogued: catalog::Entry.allInstances().exists(~)
+
+                context shop::Item inv billed:
+                  shop::Item.allInstances().select(~, Type = billing::Invoice).notEmpty()
+                """)
+            .getConstraints();
+
+    assertEquals(List.of("shop", "catalog"), List.copyOf(constraints.get(0).metamodels()));
+    assertEquals(List.of("shop", "billing"), List.copyOf(constraints.get(1).metamodels()));
+  }
+
+  @Test
   @DisplayName("enum literals compared with == are not reported as metamodels")
   void ignoresComparedEnumLiterals() {
     ConstraintDescriptor constraint =
