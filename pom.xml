@@ -55,8 +55,6 @@
         <vitruv.version>4.0.2-SNAPSHOT</vitruv.version>
         <!-- Vitruv-Change version used by the framework version above -->
         <vitruv-change.version>4.0.2-SNAPSHOT</vitruv-change.version>
-        <!-- Vitruv-Server, only for the end-to-end test of constraints over REST -->
-        <vitruv-server.version>4.0.1-SNAPSHOT</vitruv-server.version>
 
         <!-- External dependency versions -->
         <antlr4.version>4.13.2</antlr4.version>
