@@ -70,7 +70,7 @@ public class SymbolProvider {
     // produce a fullRange that doesn't contain selectionRange (LSP clients reject that).
     Range full = union(ruleRange(ctx), selection);
 
-    DocumentSymbol symbol = new DocumentSymbol(name, SymbolKind.Class, full, selection);
+    final DocumentSymbol symbol = new DocumentSymbol(name, SymbolKind.Class, full, selection);
 
     // Use typed accessors for invCS/preCS/postCS children
     List<DocumentSymbol> children = new ArrayList<>();

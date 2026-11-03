@@ -1,15 +1,9 @@
 package tools.vitruv.dsls.vitruvocl.allinstances.collect;
 
-import static tools.vitruv.dsls.vitruvocl.allinstances.fixtures.ModelBuilding.addMany;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static tools.vitruv.dsls.vitruvocl.allinstances.fixtures.ModelBuilding.addMany;
 
-import tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallCollector;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
-import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +11,12 @@ import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallCollector;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
+import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
 
 class SinglePassInstanceCollectorTest {
 
@@ -95,7 +95,8 @@ class SinglePassInstanceCollectorTest {
         new SinglePassInstanceCollector()
             .collectInstances(List.of(department), typeConfig, typeTraversable);
 
-    // Member is abstract: no EObject's exact type is ever Member, regardless of Student/Staff instances
+    // Member is abstract: no EObject's exact type is ever Member, regardless of Student/Staff
+    // instances
     assertTrue(typeResult.get(f.memberClass).isEmpty());
     // Staff is concrete and requested exactly: only the Staff instance, not the Student
     assertEquals(List.of(staff), typeResult.get(f.staffClass));

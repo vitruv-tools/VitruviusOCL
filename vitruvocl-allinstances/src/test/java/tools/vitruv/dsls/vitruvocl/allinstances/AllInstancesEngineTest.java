@@ -1,18 +1,18 @@
 package tools.vitruv.dsls.vitruvocl.allinstances;
 
-import static tools.vitruv.dsls.vitruvocl.allinstances.fixtures.ModelBuilding.addMany;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static tools.vitruv.dsls.vitruvocl.allinstances.fixtures.ModelBuilding.addMany;
 
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
-import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
+import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
 
 /** End-to-end tests tying static analysis, pruning, and single-pass collection together. */
 class AllInstancesEngineTest {
@@ -72,7 +72,8 @@ class AllInstancesEngineTest {
     assertEquals(1, firstResult.get(f.studentClass).size());
 
     // The instance model changes between calls; the same engine (same cacheConfig/traverse) must
-    // reflect the new state on the next compute(), since only the metamodel-derived cache is reused.
+    // reflect the new state on the next compute(), since only the metamodel-derived cache is
+    // reused.
     EObject student2 = f.create(f.studentClass);
     addMany(department, f.departmentMembers, student2);
 

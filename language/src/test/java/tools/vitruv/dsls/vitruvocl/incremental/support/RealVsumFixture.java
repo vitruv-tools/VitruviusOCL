@@ -38,18 +38,20 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  * A real (not mocked) Vitruvius VSUM for tests, over two tiny dynamic metamodels {@code incra} and
  * {@code incrb}, each with a root class holding a containment list of named elements.
  *
- * <p>Used by the correspondence-visibility experiment and by the end-to-end listener tests, where
- * a hand-written {@link ChangePropagationSpecification} plays the role that generated Reactions
- * code plays in a real methodology: it reacts to changes in {@code incra} by changing {@code
- * incrb} and by editing the correspondence model.
+ * <p>Used by the correspondence-visibility experiment and by the end-to-end listener tests, where a
+ * hand-written {@link ChangePropagationSpecification} plays the role that generated Reactions code
+ * plays in a real methodology: it reacts to changes in {@code incra} by changing {@code incrb} and
+ * by editing the correspondence model.
  */
 public final class RealVsumFixture {
 
   public static final String EXT_A = "incra";
   public static final String EXT_B = "incrb";
 
-  public static final EPackage PACKAGE_A = createPackage("incra", "http://vitruvocl.test/incr/a", "A");
-  public static final EPackage PACKAGE_B = createPackage("incrb", "http://vitruvocl.test/incr/b", "B");
+  public static final EPackage PACKAGE_A =
+      createPackage("incra", "http://vitruvocl.test/incr/a", "A");
+  public static final EPackage PACKAGE_B =
+      createPackage("incrb", "http://vitruvocl.test/incr/b", "B");
 
   static {
     // Other tests register the test metamodel correspondence.ecore under Vitruvius' own
@@ -100,18 +102,22 @@ public final class RealVsumFixture {
     return pkg;
   }
 
+  /** The class {@code ARoot}. */
   public static EClass rootA() {
     return (EClass) PACKAGE_A.getEClassifier("ARoot");
   }
 
+  /** The class {@code AElem}. */
   public static EClass elemA() {
     return (EClass) PACKAGE_A.getEClassifier("AElem");
   }
 
+  /** The class {@code BRoot}. */
   public static EClass rootB() {
     return (EClass) PACKAGE_B.getEClassifier("BRoot");
   }
 
+  /** The class {@code BElem}. */
   public static EClass elemB() {
     return (EClass) PACKAGE_B.getEClassifier("BElem");
   }
@@ -129,7 +135,8 @@ public final class RealVsumFixture {
 
   /** Opens a change-recording view over everything currently in {@code vsum}. */
   public static CommittableView openView(InternalVirtualModel vsum) {
-    ViewSelector selector = vsum.createSelector(ViewTypeFactory.createIdentityMappingViewType("all"));
+    ViewSelector selector =
+        vsum.createSelector(ViewTypeFactory.createIdentityMappingViewType("all"));
     selector.getSelectableElements().forEach(e -> selector.setSelected(e, true));
     return selector.createView().withChangeRecordingTrait();
   }

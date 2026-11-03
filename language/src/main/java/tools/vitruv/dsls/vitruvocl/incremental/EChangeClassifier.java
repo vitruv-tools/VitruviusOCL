@@ -122,7 +122,10 @@ public final class EChangeClassifier {
     }
   }
 
-  /** Maps one atomic change to an event; unknown change types map to {@link ModelEvent.Kind#UNKNOWN}. */
+  /**
+   * Maps one atomic change to an event; unknown change types map to {@link
+   * ModelEvent.Kind#UNKNOWN}.
+   */
   static ModelEvent toEvent(EChange<EObject> change) {
     if (change instanceof CreateEObject<EObject> create) {
       return existence(ModelEvent.Kind.CREATE, create.getAffectedElement());
@@ -153,11 +156,21 @@ public final class EChangeClassifier {
     if (feature instanceof EAttribute) {
       if (change instanceof InsertInListEChange<?, ?, ?> insert) {
         return new ModelEvent(
-            ModelEvent.Kind.INSERT_ATTRIBUTE_VALUE, affected, feature, null, insert.getNewValue(), false);
+            ModelEvent.Kind.INSERT_ATTRIBUTE_VALUE,
+            affected,
+            feature,
+            null,
+            insert.getNewValue(),
+            false);
       }
       if (change instanceof RemoveFromListEChange<?, ?, ?> remove) {
         return new ModelEvent(
-            ModelEvent.Kind.REMOVE_ATTRIBUTE_VALUE, affected, feature, remove.getOldValue(), null, false);
+            ModelEvent.Kind.REMOVE_ATTRIBUTE_VALUE,
+            affected,
+            feature,
+            remove.getOldValue(),
+            null,
+            false);
       }
       if (change instanceof ReplaceSingleValuedFeatureEChange<?, ?, ?> replace) {
         return new ModelEvent(
@@ -168,15 +181,26 @@ public final class EChangeClassifier {
             replace.getNewValue(),
             false);
       }
-      return new ModelEvent(ModelEvent.Kind.OTHER_FEATURE_CHANGE, affected, feature, null, null, false);
+      return new ModelEvent(
+          ModelEvent.Kind.OTHER_FEATURE_CHANGE, affected, feature, null, null, false);
     }
     if (change instanceof InsertInListEChange<?, ?, ?> insert) {
       return new ModelEvent(
-          ModelEvent.Kind.INSERT_REFERENCE, affected, feature, null, insert.getNewValue(), containment);
+          ModelEvent.Kind.INSERT_REFERENCE,
+          affected,
+          feature,
+          null,
+          insert.getNewValue(),
+          containment);
     }
     if (change instanceof RemoveFromListEChange<?, ?, ?> remove) {
       return new ModelEvent(
-          ModelEvent.Kind.REMOVE_REFERENCE, affected, feature, remove.getOldValue(), null, containment);
+          ModelEvent.Kind.REMOVE_REFERENCE,
+          affected,
+          feature,
+          remove.getOldValue(),
+          null,
+          containment);
     }
     if (change instanceof ReplaceSingleValuedFeatureEChange<?, ?, ?> replace) {
       return new ModelEvent(

@@ -65,7 +65,9 @@ public final class OracleVerifier {
           "violation",
           incremental.records(),
           full.records(),
-          r -> new ViolationKey(new ViolationSet.InstanceKey(r.instance()), r.severity(), r.customMessage()),
+          r ->
+              new ViolationKey(
+                  new ViolationSet.InstanceKey(r.instance()), r.severity(), r.customMessage()),
           diff);
       compareMultisets(
           "skipped block",
@@ -125,7 +127,11 @@ public final class OracleVerifier {
 
   private static String describe(Object o) {
     if (o instanceof EvaluationVisitor.ViolationRecord r) {
-      return describeInstance(r.instance()) + " [" + r.severity() + "] " + Objects.toString(r.customMessage());
+      return describeInstance(r.instance())
+          + " ["
+          + r.severity()
+          + "] "
+          + Objects.toString(r.customMessage());
     }
     if (o instanceof CompileError e) {
       return e.getMessage();
@@ -134,7 +140,9 @@ public final class OracleVerifier {
   }
 
   private static String describeInstance(EObject instance) {
-    return instance.eClass().getName() + "@" + Integer.toHexString(System.identityHashCode(instance));
+    return instance.eClass().getName()
+        + "@"
+        + Integer.toHexString(System.identityHashCode(instance));
   }
 
   private static List<String> messages(List<CompileError> errors) {

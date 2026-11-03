@@ -102,8 +102,9 @@ class VsumTransactionConstraintTest {
 
   private void setupMockVsum(Collection<Resource> resources) {
     when(((ViewSource) mockVsum).getViewSourceModels()).thenReturn(resources);
-    when(mockVsum.getCorrespondenceModel()).thenReturn(mock(
-        tools.vitruv.change.correspondence.view.EditableCorrespondenceModelView.class));
+    when(mockVsum.getCorrespondenceModel())
+        .thenReturn(
+            mock(tools.vitruv.change.correspondence.view.EditableCorrespondenceModelView.class));
   }
 
   private EClass spacecraftClass() {
@@ -145,7 +146,8 @@ class VsumTransactionConstraintTest {
             "context spaceMission::Spacecraft post: self.mass@pre == 722", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
-    assertTrue(result.isSatisfied(), "Pre-state mass should be 722 (the value before the transaction)");
+    assertTrue(
+        result.isSatisfied(), "Pre-state mass should be 722 (the value before the transaction)");
   }
 
   @Test
@@ -205,10 +207,10 @@ class VsumTransactionConstraintTest {
 
   /**
    * Same proof as {@link #postOperator_withRealTransaction_reportsGenuineViolation}, but through
-   * the whole-file batch entry point ({@link VitruvOCL#evaluateConstraints(Path, List)}) instead
-   * of the single-constraint one. This is the path a Reaction-execution hook uses: it has a real
-   * transaction and a {@code .ocl} file with several {@code inv}/{@code pre}/{@code post} blocks
-   * to check after one commit, not one constraint string at a time.
+   * the whole-file batch entry point ({@link VitruvOCL#evaluateConstraints(Path, List)}) instead of
+   * the single-constraint one. This is the path a Reaction-execution hook uses: it has a real
+   * transaction and a {@code .ocl} file with several {@code inv}/{@code pre}/{@code post} blocks to
+   * check after one commit, not one constraint string at a time.
    */
   @Test
   void batchFileEvaluation_withRealTransaction_reportsGenuineViolationAlongsidePassingInv(
@@ -220,7 +222,7 @@ class VsumTransactionConstraintTest {
 
     ChangeRecorder recorder = record(rs);
     voyager.eSet(massFeature, 900);
-    List<EChange<EObject>> transaction = endRecording(recorder);
+    final List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
     VitruvOCL.registerVSUM(mockVsum);
@@ -322,7 +324,7 @@ class VsumTransactionConstraintTest {
     Resource resource = resources.iterator().next();
     ResourceSet rs = resource.getResourceSet();
 
-    ChangeRecorder recorder = record(rs);
+    final ChangeRecorder recorder = record(rs);
     EObject newSpacecraft = EcoreUtil.create(spacecraftClass());
     newSpacecraft.eSet(newSpacecraft.eClass().getEStructuralFeature("serialNumber"), "SC-002");
     newSpacecraft.eSet(newSpacecraft.eClass().getEStructuralFeature("mass"), 500);
@@ -364,7 +366,8 @@ class VsumTransactionConstraintTest {
             "context spaceMission::Spacecraft post: self.OCLisModified", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
-    assertTrue(result.isSatisfied(), "The only Spacecraft instance was modified in this transaction");
+    assertTrue(
+        result.isSatisfied(), "The only Spacecraft instance was modified in this transaction");
   }
 
   @Test
@@ -373,7 +376,7 @@ class VsumTransactionConstraintTest {
     Resource resource = resources.iterator().next();
     ResourceSet rs = resource.getResourceSet();
 
-    ChangeRecorder recorder = record(rs);
+    final ChangeRecorder recorder = record(rs);
     EObject newSpacecraft = EcoreUtil.create(spacecraftClass());
     newSpacecraft.eSet(newSpacecraft.eClass().getEStructuralFeature("serialNumber"), "SC-002");
     newSpacecraft.eSet(newSpacecraft.eClass().getEStructuralFeature("mass"), 500);
@@ -397,7 +400,8 @@ class VsumTransactionConstraintTest {
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied());
     assertTrue(
-        wrongValueResult.isSuccess(), "Should succeed: " + wrongValueResult.toDetailedErrorString());
+        wrongValueResult.isSuccess(),
+        "Should succeed: " + wrongValueResult.toDetailedErrorString());
     assertTrue(
         wrongValueResult.isSatisfied(),
         "OCLisNew(mass => 999) must be false — the new spacecraft's mass is 500, not 999");
@@ -417,10 +421,10 @@ class VsumTransactionConstraintTest {
   void oclIsDeleted_onSelfIsStructurallyAlwaysFalse() {
     Collection<Resource> resources = loadResources();
     Resource resource = resources.iterator().next();
-    EObject voyager = resource.getContents().get(0);
+    final EObject voyager = resource.getContents().get(0);
     ResourceSet rs = resource.getResourceSet();
 
-    ChangeRecorder recorder = record(rs);
+    final ChangeRecorder recorder = record(rs);
     EObject toDelete = EcoreUtil.create(spacecraftClass());
     toDelete.eSet(toDelete.eClass().getEStructuralFeature("serialNumber"), "SC-DOOMED");
     toDelete.eSet(toDelete.eClass().getEStructuralFeature("mass"), 1);

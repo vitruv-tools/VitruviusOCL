@@ -26,17 +26,17 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
- * The session answers every
- * correspondence check of a transaction's evaluations from its snapshot, so no constraint scans
- * the correspondence model again. Correctness of the snapshot-backed answers is checked by the
- * oracle (verify mode evaluates from scratch on the real wrapper).
+ * The session answers every correspondence check of a transaction's evaluations from its snapshot,
+ * so no constraint scans the correspondence model again. Correctness of the snapshot-backed answers
+ * is checked by the oracle (verify mode evaluates from scratch on the real wrapper).
  */
 class CorrespondenceSharedLookupTest {
 
   private static final List<String> CONSTRAINTS =
       List.of(
           "context edge::Item inv: edge::Other.allInstances().select(~).size() <= 1",
-          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 0)",
+          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount"
+              + " > 0)",
           "context edge::Item inv: edge::Other.allInstances().reject(~, Tag = \"t\").size() >= 1",
           "context edge::Item inv: self.value >= 0");
 
@@ -68,7 +68,10 @@ class CorrespondenceSharedLookupTest {
   @Test
   void evaluationsOfATransactionDoNotLookUpCorrespondencesInTheModel() {
     for (IncrementalLevel level :
-        List.of(IncrementalLevel.READ_SET, IncrementalLevel.POLARITY, IncrementalLevel.RELEVANT_INSTANCES)) {
+        List.of(
+            IncrementalLevel.READ_SET,
+            IncrementalLevel.POLARITY,
+            IncrementalLevel.RELEVANT_INSTANCES)) {
       EdgeFixture fx = fixture();
       VsumWrapper wrapper = spy(fx.model().wrapper());
       try (IncrementalSession session =
@@ -97,7 +100,10 @@ class CorrespondenceSharedLookupTest {
   @Test
   void snapshotBackedResultsEqualAFullEvaluation() {
     for (IncrementalLevel level :
-        List.of(IncrementalLevel.READ_SET, IncrementalLevel.POLARITY, IncrementalLevel.RELEVANT_INSTANCES)) {
+        List.of(
+            IncrementalLevel.READ_SET,
+            IncrementalLevel.POLARITY,
+            IncrementalLevel.RELEVANT_INSTANCES)) {
       EdgeFixture fx = fixture();
       try (IncrementalSession session =
           new IncrementalSession(
@@ -119,7 +125,9 @@ class CorrespondenceSharedLookupTest {
                         fx.model()
                             .correspondences()
                             .addCorrespondenceBetween(
-                                List.of(fx.find("a1"), fx.find("b1")), List.of(fx.find("y")), "t")));
+                                List.of(fx.find("a1"), fx.find("b1")),
+                                List.of(fx.find("y")),
+                                "t")));
       }
     }
   }
@@ -132,7 +140,9 @@ class CorrespondenceSharedLookupTest {
         new IncrementalSession(
             CONSTRAINTS,
             wrapper,
-            IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES).withThreads(4).withVerify(true))) {
+            IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES)
+                .withThreads(4)
+                .withVerify(true))) {
       session.initialize();
       clearInvocations(wrapper);
       session.onTransaction(fx.model().record(() -> correspond(fx, "a2", "y", null)));
@@ -156,7 +166,8 @@ class CorrespondenceSharedLookupTest {
       EdgeFixture fx = fixture();
       VsumWrapper wrapper = spy(fx.model().wrapper());
       try (IncrementalSession session =
-          new IncrementalSession(CONSTRAINTS, wrapper, IncrementalConfig.of(IncrementalLevel.READ_SET))) {
+          new IncrementalSession(
+              CONSTRAINTS, wrapper, IncrementalConfig.of(IncrementalLevel.READ_SET))) {
         session.initialize();
         assertTrue(pairLookups(wrapper) > 0, "switched off: evaluations ask the wrapper");
       }
@@ -175,7 +186,8 @@ class CorrespondenceSharedLookupTest {
         new IncrementalSession(
             List.of(idiom),
             wrapper,
-            IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES).withCorrespondenceIdiom(true))) {
+            IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES)
+                .withCorrespondenceIdiom(true))) {
       session.initialize();
       clearInvocations(wrapper);
       // a model event on a correspondent: resolved through the correspondents of x

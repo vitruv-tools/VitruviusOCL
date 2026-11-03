@@ -35,17 +35,19 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
  *
  * <p>The answers equal the wrapper's because the snapshot stores the wrapper's own per-tag lookups
  * and the untagged lookup is their union; {@link #correspondenceHasTag} is the two-way tagged
- * lookup, which is the contract of {@link MetamodelWrapperInterface#hasTaggedCorrespondenceLookup()}
- * that every wrapper with correspondence enumeration (the precondition for a snapshot) fulfils;
- * the session uses this view only for wrappers that declare it. The snapshot compares objects by
- * identity, Vitruvius by {@code equals}; both agree for EMF objects, which do not override it.
+ * lookup, which is the contract of {@link
+ * MetamodelWrapperInterface#hasTaggedCorrespondenceLookup()} that every wrapper with correspondence
+ * enumeration (the precondition for a snapshot) fulfils; the session uses this view only for
+ * wrappers that declare it. The snapshot compares objects by identity, Vitruvius by {@code equals};
+ * both agree for EMF objects, which do not override it.
  */
 final class SnapshotCorrespondenceWrapper implements MetamodelWrapperInterface {
 
   private final MetamodelWrapperInterface delegate;
   private final CorrespondenceSnapshot snapshot;
 
-  SnapshotCorrespondenceWrapper(MetamodelWrapperInterface delegate, CorrespondenceSnapshot snapshot) {
+  SnapshotCorrespondenceWrapper(
+      MetamodelWrapperInterface delegate, CorrespondenceSnapshot snapshot) {
     this.delegate = delegate;
     this.snapshot = snapshot;
   }

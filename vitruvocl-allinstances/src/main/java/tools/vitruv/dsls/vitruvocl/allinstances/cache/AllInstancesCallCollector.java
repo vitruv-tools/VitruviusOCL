@@ -29,6 +29,7 @@ public class AllInstancesCallCollector {
       switch (callSite.kind()) {
         case ALL_OF_KIND -> cacheConfig.addAllOfKind(callSite.targetType());
         case ALL_OF_TYPE -> cacheConfig.addAllOfType(callSite.targetType());
+        default -> throw new IllegalStateException("Unknown call site kind: " + callSite.kind());
       }
     }
     return cacheConfig;

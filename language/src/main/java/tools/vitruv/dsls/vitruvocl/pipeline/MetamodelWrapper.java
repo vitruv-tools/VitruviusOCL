@@ -628,7 +628,9 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     return allInstancesEngine;
   }
 
-  /** Builds a fresh {@link AllInstancesEngine} from the currently known metamodels and call sites. */
+  /**
+   * Builds a fresh {@link AllInstancesEngine} from the currently known metamodels and call sites.
+   */
   private AllInstancesEngine buildAllInstancesEngine() {
     List<AllInstancesCallSite> callSites = new ArrayList<>(queriedAllInstancesTypes.size());
     for (EClass type : queriedAllInstancesTypes) {

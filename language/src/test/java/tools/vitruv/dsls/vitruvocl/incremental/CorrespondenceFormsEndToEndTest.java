@@ -91,16 +91,20 @@ class CorrespondenceFormsEndToEndTest {
         "context incrb::BElem inv: incra::AElem.allInstances().forAll(a | a ~ self)",
         // F2: select(~) with and without options
         "context incra::AElem inv: incrb::BElem.allInstances().select(~).size() == 2",
-        "context incra::AElem inv: incrb::BElem.allInstances().select(~, Tag = \"multi\").size() == 1",
-        "context incra::AElem inv: incrb::BElem.allInstances().select(~, Tag = \"elem\").size() == 1",
+        "context incra::AElem inv: incrb::BElem.allInstances().select(~, Tag = \"multi\").size() =="
+            + " 1",
+        "context incra::AElem inv: incrb::BElem.allInstances().select(~, Tag = \"elem\").size() =="
+            + " 1",
         "context incra::AElem inv: incrb::BElem.allInstances().select(~, Tag = \"late\").isEmpty()",
         "context incra::AElem inv: incrb::BElem.allInstances()"
             + ".select(~, Type = incrb::BElem, Tag = \"multi\").size() == 1",
-        "context incra::ARoot inv: incrb::BElem.allInstances().select(~, Tag = \"multi\").size() == 1",
+        "context incra::ARoot inv: incrb::BElem.allInstances().select(~, Tag = \"multi\").size() =="
+            + " 1",
         "context incrb::BElem inv: incra::AElem.allInstances().select(~).size() == 1",
         // F3: reject(~)
         "context incra::AElem inv: incrb::BElem.allInstances().reject(~).isEmpty()",
-        "context incra::AElem inv: incrb::BElem.allInstances().reject(~, Tag = \"multi\").size() == 1",
+        "context incra::AElem inv: incrb::BElem.allInstances().reject(~, Tag = \"multi\").size() =="
+            + " 1",
         // F4: exists(~)
         "context incra::AElem inv: incrb::BElem.allInstances().exists(~, Tag = \"multi\")",
         "context incra::ARoot inv: incrb::BElem.allInstances().exists(~)",

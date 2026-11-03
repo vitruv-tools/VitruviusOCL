@@ -30,16 +30,16 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.change.atomic.eobject.EObjectExistenceEChange;
 import tools.vitruv.change.atomic.feature.FeatureEChange;
-import tools.vitruv.change.atomic.feature.reference.UpdateReferenceEChange;
-import tools.vitruv.change.atomic.root.InsertRootEObject;
-import tools.vitruv.change.atomic.root.RemoveRootEObject;
 import tools.vitruv.change.atomic.feature.list.InsertInListEChange;
 import tools.vitruv.change.atomic.feature.list.RemoveFromListEChange;
+import tools.vitruv.change.atomic.feature.reference.UpdateReferenceEChange;
 import tools.vitruv.change.atomic.feature.single.ReplaceSingleValuedFeatureEChange;
+import tools.vitruv.change.atomic.root.InsertRootEObject;
+import tools.vitruv.change.atomic.root.RemoveRootEObject;
+import tools.vitruv.change.atomic.uuid.Uuid;
 import tools.vitruv.change.composite.description.PropagatedChange;
 import tools.vitruv.change.composite.description.VitruviusChange;
 import tools.vitruv.change.composite.propagation.ChangePropagationListener;
-import tools.vitruv.change.atomic.uuid.Uuid;
 import tools.vitruv.change.correspondence.Correspondence;
 import tools.vitruv.dsls.vitruvocl.incremental.support.CorrespondingElementsSpecification;
 import tools.vitruv.dsls.vitruvocl.incremental.support.RealVsumFixture;
@@ -53,9 +53,9 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  * {@code finishedChangePropagation} delivers, and can a correspondence appear or disappear without
  * any observed event on its partner objects?
  *
- * <p>The assertions pin down the <em>observed</em> behaviour of Vitruvius {@code 4.0.1-SNAPSHOT}
- * so that a framework change that alters it makes this test fail (and the conservative
- * correspondence handling in the incremental evaluator must then be revisited).
+ * <p>The assertions pin down the <em>observed</em> behaviour of Vitruvius {@code 4.0.1-SNAPSHOT} so
+ * that a framework change that alters it makes this test fail (and the conservative correspondence
+ * handling in the incremental evaluator must then be revisited).
  */
 class CorrespondenceVisibilityExperimentTest {
 
@@ -212,7 +212,7 @@ class CorrespondenceVisibilityExperimentTest {
     assertTrue(
         vsum.getCorrespondenceModel().getCorrespondingEObjects(xa).contains(spare),
         "late correspondence xa ~ spare must exist after T3");
-    List<EChange<EObject>> t3 = transactions.get(transactions.size() - 1);
+    final List<EChange<EObject>> t3 = transactions.get(transactions.size() - 1);
 
     // T4: trigger := 2 -> spec removes xa ~ spare again
     commit(
@@ -220,7 +220,7 @@ class CorrespondenceVisibilityExperimentTest {
             named(elements(viewRootA(view)), "x")
                 .eSet(RealVsumFixture.elemA().getEStructuralFeature("trigger"), 2));
     assertFalse(vsum.getCorrespondenceModel().getCorrespondingEObjects(xa).contains(spare));
-    List<EChange<EObject>> t4 = transactions.get(transactions.size() - 1);
+    final List<EChange<EObject>> t4 = transactions.get(transactions.size() - 1);
 
     // T5: remove AElem 'x' -> spec removes x ~ x and deletes BElem 'x'
     commit(view -> elements(viewRootA(view)).remove(named(elements(viewRootA(view)), "x")));

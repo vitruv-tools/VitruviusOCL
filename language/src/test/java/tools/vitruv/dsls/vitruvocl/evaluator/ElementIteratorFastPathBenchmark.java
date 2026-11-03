@@ -27,16 +27,16 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  *
  * <ul>
  *   <li><b>Case A - already-materialized receiver</b> (e.g. a literal collection): both paths
- *       should be identical, since {@link Value#elementIterator()} has a direct fast path
- *       ({@code elements.iterator()}) for this case — see the code-analysis note below.
- *   <li><b>Case B - freshly-lazy receiver</b> (e.g. the result of a preceding {@code union()}
- *       that hasn't been consumed yet): both paths must drain the same {@code
- *       LazyOperations} combinator chain once; {@code getElements()} additionally copies the
- *       result into a new {@code ArrayList} that {@code elementIterator()} skips.
+ *       should be identical, since {@link Value#elementIterator()} has a direct fast path ({@code
+ *       elements.iterator()}) for this case — see the code-analysis note below.
+ *   <li><b>Case B - freshly-lazy receiver</b> (e.g. the result of a preceding {@code union()} that
+ *       hasn't been consumed yet): both paths must drain the same {@code LazyOperations} combinator
+ *       chain once; {@code getElements()} additionally copies the result into a new {@code
+ *       ArrayList} that {@code elementIterator()} skips.
  * </ul>
  *
- * <p><b>Code-analysis finding (Schritt 1 of this task) — this is what motivates running Case A
- * and B at all:</b> {@link Value#elementIterator()} (see {@code Value.java}) is:
+ * <p><b>Code-analysis finding (Schritt 1 of this task) — this is what motivates running Case A and
+ * B at all:</b> {@link Value#elementIterator()} (see {@code Value.java}) is:
  *
  * <pre>{@code
  * public Iterator<OCLElement> elementIterator() {
@@ -44,34 +44,34 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  * }
  * }</pre>
  *
- * This is a genuine, unconditional, zero-overhead fast path whenever {@code elements != null}
+ * <p>This is a genuine, unconditional, zero-overhead fast path whenever {@code elements != null}
  * (i.e. the {@link Value} is already materialized) — no {@code OCLElementSource}/{@code
- * LazyOperations} combinator involved, identical to what {@code getElements().iterator()} would
- * do. It covers every {@link Value} constructed via the eager constructors/{@code Value.of}/
- * {@code Value.empty}/{@code Value.singleton} (literal collections, {@code allInstances()}, and
- * every category-4 operation's result: {@code sortedBy}, {@code isUnique}, {@code one}, {@code
- * size}, {@code sum}, ...).
+ * LazyOperations} combinator involved, identical to what {@code getElements().iterator()} would do.
+ * It covers every {@link Value} constructed via the eager constructors/{@code Value.of}/ {@code
+ * Value.empty}/{@code Value.singleton} (literal collections, {@code allInstances()}, and every
+ * category-4 operation's result: {@code sortedBy}, {@code isUnique}, {@code one}, {@code size},
+ * {@code sum}, ...).
  *
  * <p>The fast path is <b>not</b> hit, however, for a {@link Value} freshly returned by any of the
  * operations that build a {@code Value.lazy(...)} result — {@code select}, {@code reject}, {@code
  * collect}, navigation, {@code merge}/{@code union}/{@code including}/{@code append}, {@code
  * excluding}, {@code intersection}, {@code removeDuplicates}, {@code flatten} — since those all
- * start with {@code elements == null} until something forces materialization. This is a genuine
- * gap relative to "fast path applies to every construction path", confirmed by grepping every
- * {@code return Value.lazy(...)} site in {@code Value.java} and {@code EvaluationVisitor.java}.
- * Case B below measures whether that gap actually costs anything for a single-pass consumer (it
+ * start with {@code elements == null} until something forces materialization. This is a genuine gap
+ * relative to "fast path applies to every construction path", confirmed by grepping every {@code
+ * return Value.lazy(...)} site in {@code Value.java} and {@code EvaluationVisitor.java}. Case B
+ * below measures whether that gap actually costs anything for a single-pass consumer (it
  * structurally shouldn't: both strategies drain the same combinator chain once, and {@code
  * elementIterator()} skips the extra destination-array copy {@code getElements()}'s {@code
  * materialize()} performs) — Case B is the empirical check, not just the structural argument.
  *
- * <p><b>Caveat this benchmark deliberately does not cover:</b> the two-variable (Cartesian
- * product) iterators consume the receiver <em>twice</em> (nested loop over the same collection).
- * Calling {@code elementIterator()} twice on a still-lazy {@link Value} would re-run the entire
- * upstream combinator chain a second time (no caching, by design, for correctness/replay reasons)
- * — a real, avoidable cost that this single-pass benchmark does not exercise and that any future
- * two-variable-method refactor must handle by materializing once (e.g. keep {@code
- * getElements()}, or drain {@code elementIterator()} into a local list once) rather than naively
- * calling {@code elementIterator()} per loop nesting.
+ * <p><b>Caveat this benchmark deliberately does not cover:</b> the two-variable (Cartesian product)
+ * iterators consume the receiver <em>twice</em> (nested loop over the same collection). Calling
+ * {@code elementIterator()} twice on a still-lazy {@link Value} would re-run the entire upstream
+ * combinator chain a second time (no caching, by design, for correctness/replay reasons) — a real,
+ * avoidable cost that this single-pass benchmark does not exercise and that any future
+ * two-variable-method refactor must handle by materializing once (e.g. keep {@code getElements()},
+ * or drain {@code elementIterator()} into a local list once) rather than naively calling {@code
+ * elementIterator()} per loop nesting.
  *
  * <p><b>This is a stopgap, not a rigorous benchmark:</b> no JMH is set up in this project (checked
  * {@code pom.xml} — no dependency, no plugin) and adding it is disproportionate for a single
@@ -83,16 +83,17 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 class ElementIteratorFastPathBenchmark {
 
   /**
-   * Sink for every measured result, standing in for JMH's {@code Blackhole}: without consuming
-   * the sum somewhere the JIT can't prove is dead, it is free to eliminate part or all of the
-   * summation loop, since the local {@code sum} variable would otherwise never escape the helper
-   * method. A {@code volatile} field forces a real write the JIT must honor.
+   * Sink for every measured result, standing in for JMH's {@code Blackhole}: without consuming the
+   * sum somewhere the JIT can't prove is dead, it is free to eliminate part or all of the summation
+   * loop, since the local {@code sum} variable would otherwise never escape the helper method. A
+   * {@code volatile} field forces a real write the JIT must honor.
    */
   private static volatile long sink;
 
   private static final int N = 2000;
   private static final int WARMUP_REPS = 2000;
-  private static final int MEASURED_BLOCKS = 11; // odd, so "median" is an actual element, not an average of two
+  private static final int MEASURED_BLOCKS =
+      11; // odd, so "median" is an actual element, not an average of two
   private static final int REPS_PER_BLOCK = 500;
 
   private static List<OCLElement> buildElements(int count) {

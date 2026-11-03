@@ -89,7 +89,8 @@ class ParallelBatchEvaluationTest {
             sat.serialNumber == self.serialNumber
           )
         """,
-        "context spaceMission::Spacecraft inv c6: satelliteSystem::Satellite.allInstances().size() == 2",
+        "context spaceMission::Spacecraft inv c6: satelliteSystem::Satellite.allInstances().size()"
+            + " == 2",
         """
         context spaceMission::Spacecraft inv c7:
           satelliteSystem::Satellite.allInstances().forAll(sat | sat.massKg > 0)
@@ -153,14 +154,16 @@ class ParallelBatchEvaluationTest {
         assertSameOutcome(sequential.getResults().get(i), parallel.getResults().get(i));
       }
       assertEquals(
-          sequential.getSummary(), parallel.getSummary(), "summary mismatch at pool size " + poolSize);
+          sequential.getSummary(),
+          parallel.getSummary(),
+          "summary mismatch at pool size " + poolSize);
     }
   }
 
   /**
    * Runs the mixed batch (which includes three distinct {@code allInstances()} call sites) at high
-   * parallelism repeatedly, comparing every run's violation/satisfaction outcome for the two
-   * {@code allInstances()}-based constraints against a sequential baseline. Before {@code
+   * parallelism repeatedly, comparing every run's violation/satisfaction outcome for the two {@code
+   * allInstances()}-based constraints against a sequential baseline. Before {@code
    * MetamodelWrapper}/{@code VsumWrapper} synchronized their cache bookkeeping, concurrent
    * first-time queries for {@code Satellite} from many parallel constraint-evaluation tasks could
    * race; running many repetitions makes such a race very likely to surface as a flaky mismatch if
@@ -190,8 +193,8 @@ class ParallelBatchEvaluationTest {
   }
 
   /**
-   * Builds a larger batch of uniquely-worded constraints and evaluates it with a worker count
-   * close to the batch size (encouraging genuine interleaving), asserting the returned {@link
+   * Builds a larger batch of uniquely-worded constraints and evaluates it with a worker count close
+   * to the batch size (encouraging genuine interleaving), asserting the returned {@link
    * ConstraintResult} list matches the input order index-for-index.
    */
   @Test
@@ -209,7 +212,9 @@ class ParallelBatchEvaluationTest {
       assertEquals(
           constraints.get(i),
           result.getResults().get(i).getConstraint(),
-          "result at index " + i + " does not correspond to the constraint submitted at that index");
+          "result at index "
+              + i
+              + " does not correspond to the constraint submitted at that index");
     }
   }
 
@@ -240,7 +245,8 @@ class ParallelBatchEvaluationTest {
   @Test
   void defaultThreadPoolSizeOverloadStillWorks() {
     List<String> constraints = mixedConstraintBatch();
-    BatchValidationResult result = VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS);
+    BatchValidationResult result =
+        VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS);
     assertEquals(constraints.size(), result.getResults().size());
   }
 

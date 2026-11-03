@@ -91,7 +91,7 @@ final class RelevantInstanceResolver {
   Relevance resolve(
       RelevancePlan plan, TransactionDelta delta, PseSet pse, boolean useCorrespondenceIdiom) {
     Map<EObject, Boolean> relevant = new IdentityHashMap<>();
-    Map<EObject, Boolean> removed = new IdentityHashMap<>();
+    final Map<EObject, Boolean> removed = new IdentityHashMap<>();
     if (plan.unknownExtension()
         && !(delta.structurallyInsertedObjects().isEmpty()
             && delta.structurallyRemovedObjects().isEmpty())) {

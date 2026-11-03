@@ -42,12 +42,12 @@ import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Manual benchmark: full
- * evaluation of {@code ~} constraints over the real Vitruvius correspondence model, with and
- * without the correspondence fast paths. The model has {@code n} {@code SubA} and {@code n} {@code
- * Other} objects; the first half of each corresponds 1:1, the second half takes part in no
- * correspondence. Disabled by default; run with {@code -Dvitruvocl.bench.corrFastPaths=true}
- * (optionally {@code -Dvitruvocl.bench.corrSizes=250,500,1000}).
+ * Manual benchmark: full evaluation of {@code ~} constraints over the real Vitruvius correspondence
+ * model, with and without the correspondence fast paths. The model has {@code n} {@code SubA} and
+ * {@code n} {@code Other} objects; the first half of each corresponds 1:1, the second half takes
+ * part in no correspondence. Disabled by default; run with {@code
+ * -Dvitruvocl.bench.corrFastPaths=true} (optionally {@code
+ * -Dvitruvocl.bench.corrSizes=250,500,1000}).
  */
 class CorrespondenceFastPathBenchmark {
 
@@ -58,9 +58,10 @@ class CorrespondenceFastPathBenchmark {
   private static final List<String> CONSTRAINTS =
       List.of(
           "context edge::SubA inv: edge::Other.allInstances().select(~).size() <= 1",
-          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 0)",
-          "context edge::SubA inv: edge::Other.allInstances()"
-              + ".forAll(o | self ~ o implies edge::Other.allInstances().select(p | p.amount > o.amount).size() >= 0)");
+          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount"
+              + " > 0)",
+          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies"
+              + " edge::Other.allInstances().select(p | p.amount > o.amount).size() >= 0)");
 
   @AfterEach
   void resetProperty() {
@@ -71,7 +72,9 @@ class CorrespondenceFastPathBenchmark {
   void measureFastPaths() {
     assumeTrue(Boolean.getBoolean("vitruvocl.bench.corrFastPaths"), "benchmark disabled");
     String sizes = System.getProperty("vitruvocl.bench.corrSizes", "250,500,1000");
-    System.out.println("| Constraint | n | Korrespondenzen | ohne Fast-Paths [ms] | mit Fast-Paths [ms] | Faktor |");
+    System.out.println(
+        "| Constraint | n | Korrespondenzen | ohne Fast-Paths [ms] | mit Fast-Paths [ms] | Faktor"
+            + " |");
     System.out.println("|---|---:|---:|---:|---:|---:|");
     for (String size : sizes.split(",")) {
       int n = Integer.parseInt(size.trim());
@@ -112,7 +115,9 @@ class CorrespondenceFastPathBenchmark {
 
   private static VsumWrapper model(int n) {
     ResourceSet rs = new ResourceSetImpl();
-    rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+    rs.getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("*", new XMIResourceFactoryImpl());
     Resource resource = rs.createResource(URI.createURI("memory:/bench.edge"));
     EObject root = EdgeFixture.create("Root");
     resource.getContents().add(root);

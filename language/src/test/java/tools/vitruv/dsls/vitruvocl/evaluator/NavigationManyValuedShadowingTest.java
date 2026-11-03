@@ -62,14 +62,14 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  * flatMap}); each {@code dummy3::Child} has a many-valued {@code EAttribute liste} (exercising the
  * {@code EAttribute} path, the one actually changed by the streaming fix).
  *
- * <p>Expression: {@code let x = 999 in self.children.select(c | let x = 20 in
- * c.liste.select(v | v == x).notEmpty()).size() == 1} - the inner {@code let x = 20} shadows the
- * outer {@code let x = 999} for the duration of each child's navigation+select. Child A's {@code
- * liste} contains no {@code 20} (so it is excluded from the outer select() only if {@code x}
- * resolves to the shadowed {@code 20}); Child B's does (so it is included only under the same
- * condition). Wrong resolution (to the outer {@code x = 999}, which no child's {@code liste}
- * contains) does not "self-heal" to the same answer - it collapses the outer {@code select()} to
- * empty ({@code size() == 0}), a definitively different, detectable result, not a lucky match.
+ * <p>Expression: {@code let x = 999 in self.children.select(c | let x = 20 in c.liste.select(v | v
+ * == x).notEmpty()).size() == 1} - the inner {@code let x = 20} shadows the outer {@code let x =
+ * 999} for the duration of each child's navigation+select. Child A's {@code liste} contains no
+ * {@code 20} (so it is excluded from the outer select() only if {@code x} resolves to the shadowed
+ * {@code 20}); Child B's does (so it is included only under the same condition). Wrong resolution
+ * (to the outer {@code x = 999}, which no child's {@code liste} contains) does not "self-heal" to
+ * the same answer - it collapses the outer {@code select()} to empty ({@code size() == 0}), a
+ * definitively different, detectable result, not a lucky match.
  */
 class NavigationManyValuedShadowingTest {
 
@@ -236,7 +236,8 @@ class NavigationManyValuedShadowingTest {
       throw new AssertionError("Pass 1 (Symbol Table) failed: " + errors.getErrors());
     }
 
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
+    TypeCheckVisitor typeChecker =
+        new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
     typeChecker.visit(tree);
     if (typeChecker.hasErrors()) {
       StringBuilder sb = new StringBuilder("Pass 2 (Type checking) failed:");
@@ -250,7 +251,8 @@ class NavigationManyValuedShadowingTest {
         new EvaluationVisitor(symbolTable, wrapper, errors, typeChecker.getNodeTypes());
     Value result = evaluator.visit(tree);
     if (evaluator.hasErrors()) {
-      throw new AssertionError("Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
+      throw new AssertionError(
+          "Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
     }
 
     assertEquals(1, result.size(), "Expected exactly one invariant result");
@@ -260,7 +262,7 @@ class NavigationManyValuedShadowingTest {
   }
 
   @Test
-  void navigationOnManyValuedFeatureResolvesShadowedVariableCorrectlyAcrossMultipleReceiverElements() {
+  void navigationOnManyValuedFeatureResolvesShadowedVariableAcrossReceiverElements() {
     // Child A: no "20" in liste -> excluded regardless (never matches, correct or wrong x).
     // Child B: has a "20" -> included ONLY if x correctly resolves to the inner shadowed 20.
     Child childA = new Child(List.of(1, 2, 3));

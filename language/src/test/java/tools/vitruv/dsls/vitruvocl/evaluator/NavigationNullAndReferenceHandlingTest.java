@@ -46,17 +46,16 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 /**
  * Targeted checks that the {@code navigateOne()} many-valued-feature streaming fix ({@link
  * EvaluationVisitor.SkipNullMappingIterator}) preserves two behaviors the old eager {@code for
- * (Object item : list) if (item != null) ...} loop had, now that pulling happens lazily one
- * element at a time instead of all at once up front:
+ * (Object item : list) if (item != null) ...} loop had, now that pulling happens lazily one element
+ * at a time instead of all at once up front.
  *
  * <ol>
  *   <li><b>Null-skipping</b>: {@code null} entries in the backing list must still be skipped, one
  *       at a time as encountered, not just when the whole list happens to be pre-scanned.
  *   <li><b>EReference vs. EAttribute</b>: a many-valued {@code EReference} (whose elements wrap to
  *       {@link OCLElement.MetaclassValue} via {@link EvaluationVisitor#wrapValue}) must work
- *       per-element exactly like a many-valued {@code EAttribute} - including when a reference
- *       slot is {@code null} (an unset/absent reference in the list) interspersed with EObject
- *       values.
+ *       per-element exactly like a many-valued {@code EAttribute} - including when a reference slot
+ *       is {@code null} (an unset/absent reference in the list) interspersed with EObject values.
  * </ol>
  */
 class NavigationNullAndReferenceHandlingTest {
@@ -236,7 +235,8 @@ class NavigationNullAndReferenceHandlingTest {
       throw new AssertionError("Pass 1 (Symbol Table) failed: " + errors.getErrors());
     }
 
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
+    TypeCheckVisitor typeChecker =
+        new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
     typeChecker.visit(tree);
     if (typeChecker.hasErrors()) {
       StringBuilder sb = new StringBuilder("Pass 2 (Type checking) failed:");
@@ -250,7 +250,8 @@ class NavigationNullAndReferenceHandlingTest {
         new EvaluationVisitor(symbolTable, wrapper, errors, typeChecker.getNodeTypes());
     Value result = evaluator.visit(tree);
     if (evaluator.hasErrors()) {
-      throw new AssertionError("Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
+      throw new AssertionError(
+          "Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
     }
 
     assertEquals(1, result.size(), "Expected exactly one invariant result");

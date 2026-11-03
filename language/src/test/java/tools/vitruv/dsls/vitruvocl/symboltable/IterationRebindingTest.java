@@ -61,7 +61,8 @@ class IterationRebindingTest {
 
       VariableSymbol resolvedAfter = scope.resolveVariable("x");
       assertSame(symbol, resolvedAfter, "rebinding must not change which symbol is registered");
-      assertEquals(i, ((OCLElement.IntValue) resolvedAfter.getValue().getElements().get(0)).value());
+      assertEquals(
+          i, ((OCLElement.IntValue) resolvedAfter.getValue().getElements().get(0)).value());
     }
   }
 
@@ -71,22 +72,31 @@ class IterationRebindingTest {
     // collect(x | ...)): each nesting level must get its OWN symbol instance registered in its OWN
     // scope - only *within* one level's own iteration is the same instance reused across elements.
     LocalScope outerScope = new LocalScope(new GlobalScope());
-    VariableSymbol outerSymbol = new VariableSymbol("x", Type.singleton(Type.INTEGER), outerScope, true);
+    VariableSymbol outerSymbol =
+        new VariableSymbol("x", Type.singleton(Type.INTEGER), outerScope, true);
     outerScope.defineVariable(outerSymbol);
     outerSymbol.setValue(new Value(List.of(v(1)), Type.singleton(Type.INTEGER)));
 
     LocalScope innerScope = new LocalScope(outerScope);
-    VariableSymbol innerSymbol = new VariableSymbol("x", Type.singleton(Type.INTEGER), innerScope, true);
+    VariableSymbol innerSymbol =
+        new VariableSymbol("x", Type.singleton(Type.INTEGER), innerScope, true);
     innerScope.defineVariable(innerSymbol);
     innerSymbol.setValue(new Value(List.of(v(100)), Type.singleton(Type.INTEGER)));
 
     assertNotSame(outerSymbol, innerSymbol);
     assertSame(innerSymbol, innerScope.resolveVariable("x"), "inner scope must resolve its own x");
-    assertSame(outerSymbol, outerScope.resolveVariable("x"), "outer scope must still resolve its own x");
+    assertSame(
+        outerSymbol, outerScope.resolveVariable("x"), "outer scope must still resolve its own x");
 
     // Rebinding the inner iteration's element must not disturb the outer iteration's own binding.
     innerSymbol.setValue(new Value(List.of(v(200)), Type.singleton(Type.INTEGER)));
-    assertEquals(1, ((OCLElement.IntValue) outerScope.resolveVariable("x").getValue().getElements().get(0)).value());
-    assertEquals(200, ((OCLElement.IntValue) innerScope.resolveVariable("x").getValue().getElements().get(0)).value());
+    assertEquals(
+        1,
+        ((OCLElement.IntValue) outerScope.resolveVariable("x").getValue().getElements().get(0))
+            .value());
+    assertEquals(
+        200,
+        ((OCLElement.IntValue) innerScope.resolveVariable("x").getValue().getElements().get(0))
+            .value());
   }
 }

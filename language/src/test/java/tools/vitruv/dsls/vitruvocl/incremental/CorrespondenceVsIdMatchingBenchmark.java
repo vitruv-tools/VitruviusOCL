@@ -47,10 +47,10 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  * once with ID-based matching ({@code o.label == self.name}), over the real Vitruvius
  * correspondence model. Model: {@code n} {@code SubA} and {@code n} {@code Other}; the first half
  * of each corresponds 1:1 <em>and</em> shares a key, so both formulations have the same results.
- * Measured: full evaluation (as in the batch evaluation) and an incremental session at level 3
- * (a transaction changing one {@code Other.amount}, and a "re-link" transaction: a new
- * correspondence for {@code ~}, a key change for ID matching). Disabled by default; run with
- * {@code -Dvitruvocl.bench.corrVsId=true} (optionally {@code -Dvitruvocl.bench.corrSizes=...}).
+ * Measured: full evaluation (as in the batch evaluation) and an incremental session at level 3 (a
+ * transaction changing one {@code Other.amount}, and a "re-link" transaction: a new correspondence
+ * for {@code ~}, a key change for ID matching). Disabled by default; run with {@code
+ * -Dvitruvocl.bench.corrVsId=true} (optionally {@code -Dvitruvocl.bench.corrSizes=...}).
  */
 class CorrespondenceVsIdMatchingBenchmark {
 
@@ -65,20 +65,25 @@ class CorrespondenceVsIdMatchingBenchmark {
           new Variant(
               "select",
               "context edge::SubA inv: edge::Other.allInstances().select(~).size() <= 1",
-              "context edge::SubA inv: edge::Other.allInstances().select(o | o.label == self.name).size() <= 1"),
+              "context edge::SubA inv: edge::Other.allInstances().select(o | o.label =="
+                  + " self.name).size() <= 1"),
           new Variant(
               "forAll-guard",
-              "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 0)",
-              "context edge::SubA inv: edge::Other.allInstances().forAll(o | o.label == self.name implies o.amount > 0)"),
+              "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies"
+                  + " o.amount > 0)",
+              "context edge::SubA inv: edge::Other.allInstances().forAll(o | o.label == self.name"
+                  + " implies o.amount > 0)"),
           new Variant(
               "exists",
-              "context edge::SubA inv: self.value >= 0 or edge::Other.allInstances().exists(o | self ~ o)",
-              "context edge::SubA inv: self.value >= 0 or edge::Other.allInstances().exists(o | o.label == self.name)"));
+              "context edge::SubA inv: self.value >= 0 or edge::Other.allInstances().exists(o |"
+                  + " self ~ o)",
+              "context edge::SubA inv: self.value >= 0 or edge::Other.allInstances().exists(o |"
+                  + " o.label == self.name)"));
 
   @Test
   void measure() {
     assumeTrue(Boolean.getBoolean("vitruvocl.bench.corrVsId"), "benchmark disabled");
-    String sizes = System.getProperty("vitruvocl.bench.corrSizes", "500,1000,2000");
+    final String sizes = System.getProperty("vitruvocl.bench.corrSizes", "500,1000,2000");
 
     System.out.println("Full evaluation [ms]");
     System.out.println("| Variante | n | Korrespondenzen | ~ | ID-Matching | ~ / ID |");
@@ -89,14 +94,16 @@ class CorrespondenceVsIdMatchingBenchmark {
       for (Variant v : VARIANTS) {
         double corr = timeFull(v.correspondence(), model.wrapper);
         double id = timeFull(v.idMatching(), model.wrapper);
-        System.out.printf("| %s | %d | %d | %.0f | %.0f | %.2f |%n", v.name(), n, n / 2, corr, id, corr / id);
+        System.out.printf(
+            "| %s | %d | %d | %.0f | %.0f | %.2f |%n", v.name(), n, n / 2, corr, id, corr / id);
       }
     }
 
     System.out.println();
     System.out.println("Incremental session, level 3 [ms per transaction]");
     System.out.println(
-        "| Variante | n | init ~ | init ID | Modell-Tx ~ | Modell-Tx ID | Relink-Tx ~ | Relink-Tx ID |");
+        "| Variante | n | init ~ | init ID | Modell-Tx ~ | Modell-Tx ID | Relink-Tx ~ | Relink-Tx"
+            + " ID |");
     System.out.println("|---|---:|---:|---:|---:|---:|---:|---:|");
     for (String size : sizes.split(",")) {
       int n = Integer.parseInt(size.trim());
@@ -131,7 +138,9 @@ class CorrespondenceVsIdMatchingBenchmark {
     Model model = new Model(n);
     try (IncrementalSession session =
         new IncrementalSession(
-            List.of(constraint), model.wrapper, IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES))) {
+            List.of(constraint),
+            model.wrapper,
+            IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES))) {
       long t0 = System.nanoTime();
       session.initialize();
       double init = (System.nanoTime() - t0) / 1e6;
@@ -156,7 +165,9 @@ class CorrespondenceVsIdMatchingBenchmark {
         } else {
           relink =
               model.record(
-                  () -> o.eSet(EdgeFixture.feature(o, "label"), a.eGet(EdgeFixture.feature(a, "name"))));
+                  () ->
+                      o.eSet(
+                          EdgeFixture.feature(o, "label"), a.eGet(EdgeFixture.feature(a, "name"))));
         }
         long t2 = System.nanoTime();
         session.onTransaction(relink);
@@ -176,7 +187,10 @@ class CorrespondenceVsIdMatchingBenchmark {
     final List<EObject> others = new ArrayList<>();
 
     Model(int n) {
-      resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+      resourceSet
+          .getResourceFactoryRegistry()
+          .getExtensionToFactoryMap()
+          .put("*", new XMIResourceFactoryImpl());
       resource = resourceSet.createResource(URI.createURI("memory:/vsid.edge"));
       EObject root = EdgeFixture.create("Root");
       resource.getContents().add(root);

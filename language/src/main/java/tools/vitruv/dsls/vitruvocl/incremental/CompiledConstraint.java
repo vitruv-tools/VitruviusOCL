@@ -72,7 +72,9 @@ final class CompiledConstraint {
     this.analysis = analysis;
   }
 
-  /** Same as {@link #compile(String, MetamodelWrapperInterface, FeatureIndex)} with a fresh index. */
+  /**
+   * Same as {@link #compile(String, MetamodelWrapperInterface, FeatureIndex)} with a fresh index.
+   */
   static CompiledConstraint compile(String text, MetamodelWrapperInterface wrapper) {
     return compile(text, wrapper, FeatureIndex.forWrapper(wrapper));
   }
@@ -80,7 +82,8 @@ final class CompiledConstraint {
   /** Runs passes 1 and 2 once and analyses the result; never throws for invalid constraints. */
   static CompiledConstraint compile(
       String text, MetamodelWrapperInterface wrapper, FeatureIndex features) {
-    CommonTokenStream tokens = new CommonTokenStream(new VitruvOCLLexer(CharStreams.fromString(text)));
+    CommonTokenStream tokens =
+        new CommonTokenStream(new VitruvOCLLexer(CharStreams.fromString(text)));
     VitruvOCLParser parser = new VitruvOCLParser(tokens);
     parser.removeErrorListeners();
     VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
@@ -132,7 +135,8 @@ final class CompiledConstraint {
 
   /** The static context class of a classifier context of this constraint, or {@code null}. */
   org.eclipse.emf.ecore.EClass contextClass(VitruvOCLParser.ClassifierContextCSContext ctx) {
-    tools.vitruv.dsls.vitruvocl.typechecker.Type type = nodeTypes == null ? null : nodeTypes.get(ctx);
+    tools.vitruv.dsls.vitruvocl.typechecker.Type type =
+        nodeTypes == null ? null : nodeTypes.get(ctx);
     return type == null ? null : type.getEClass();
   }
 

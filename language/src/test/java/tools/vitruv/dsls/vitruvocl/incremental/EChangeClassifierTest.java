@@ -40,7 +40,8 @@ class EChangeClassifierTest {
     EdgeFixture fx = EdgeFixture.create();
     EObject a1 = fx.find("a1");
     TransactionDelta delta =
-        EChangeClassifier.classify(fx.model().record(() -> a1.eSet(EdgeFixture.feature(a1, "value"), 8)));
+        EChangeClassifier.classify(
+            fx.model().record(() -> a1.eSet(EdgeFixture.feature(a1, "value"), 8)));
     assertEquals(List.of(ModelEvent.Kind.UPDATE_ATTRIBUTE), kinds(delta));
     assertTrue(delta.touchedFeatures().get("value").contains(cls("SubA")));
     assertTrue(delta.structurallyAffectedClasses().isEmpty());
@@ -51,7 +52,11 @@ class EChangeClassifierTest {
     EdgeFixture fx = EdgeFixture.create();
     TransactionDelta delta =
         EChangeClassifier.classify(
-            fx.model().record(() -> EdgeFixture.list(fx.root(2), "items").add(EdgeFixture.item("SubB", "n", 1))));
+            fx.model()
+                .record(
+                    () ->
+                        EdgeFixture.list(fx.root(2), "items")
+                            .add(EdgeFixture.item("SubB", "n", 1))));
     assertTrue(kinds(delta).contains(ModelEvent.Kind.INSERT_REFERENCE), kinds(delta).toString());
     assertTrue(delta.touchedFeatures().get("items").contains(cls("Root")));
     assertTrue(delta.structurallyAffectedClasses().contains(cls("SubB")));
@@ -87,12 +92,13 @@ class EChangeClassifierTest {
     EObject a1 = fx.find("a1");
     TransactionDelta delta =
         EChangeClassifier.classify(
-            fx.model().record(
-                () -> {
-                  List<Object> refs = EdgeFixture.list(b1, "refs");
-                  refs.add(a1);
-                  refs.remove(refs.size() - 1);
-                }));
+            fx.model()
+                .record(
+                    () -> {
+                      List<Object> refs = EdgeFixture.list(b1, "refs");
+                      refs.add(a1);
+                      refs.remove(refs.size() - 1);
+                    }));
     assertEquals(
         List.of(ModelEvent.Kind.INSERT_REFERENCE, ModelEvent.Kind.REMOVE_REFERENCE), kinds(delta));
   }
@@ -101,7 +107,8 @@ class EChangeClassifierTest {
   void multiValuedAttributeEvents() {
     EdgeFixture fx = EdgeFixture.create();
     TransactionDelta delta =
-        EChangeClassifier.classify(fx.model().record(() -> EdgeFixture.list(fx.root(1), "tags").add("t")));
+        EChangeClassifier.classify(
+            fx.model().record(() -> EdgeFixture.list(fx.root(1), "tags").add("t")));
     assertEquals(List.of(ModelEvent.Kind.INSERT_ATTRIBUTE_VALUE), kinds(delta));
   }
 }

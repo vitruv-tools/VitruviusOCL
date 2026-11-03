@@ -290,8 +290,7 @@ class VitruvOclCliTest {
   @Test
   void testEvalSkipsPostBlockAndReportsIt(@TempDir Path tempDir) throws java.io.IOException {
     Path oclFile = tempDir.resolve("test.ocl");
-    Files.writeString(
-        oclFile, "context spaceMission::Spacecraft post:\n  self.OCLisModified");
+    Files.writeString(oclFile, "context spaceMission::Spacecraft post:\n  self.OCLisModified");
 
     VitruvOclCli.main(
         new String[] {
@@ -306,7 +305,8 @@ class VitruvOclCliTest {
         out.contains("\"satisfied\":true"),
         "A skipped post block must not be reported as violated: " + out);
     assertTrue(
-        out.contains("PRE/POST SKIPPED:"), "Output should contain a PRE/POST SKIPPED warning: " + out);
+        out.contains("PRE/POST SKIPPED:"),
+        "Output should contain a PRE/POST SKIPPED warning: " + out);
     assertTrue(
         out.contains("spaceMission::Spacecraft"), "Skip notice should name the context: " + out);
   }
@@ -316,13 +316,13 @@ class VitruvOclCliTest {
   // ══════════════════════════════════════════════════════════════
 
   /**
-   * Tests that a shared {@code context} header followed by several {@code inv} blocks (a
-   * perfectly valid, idiomatic OCL style — one header, many invariants below it — distinct from
-   * this repo's own example-file convention of repeating the header per invariant) is split into
-   * independently evaluated units by eval-batch, exactly like separate header-per-inv blocks
-   * already are. Before this fix, a single broken invariant under a shared header silently
-   * discarded every sibling invariant under that same header — none of them appeared in the batch
-   * result at all, not even as a generic failure.
+   * Tests that a shared {@code context} header followed by several {@code inv} blocks (a perfectly
+   * valid, idiomatic OCL style — one header, many invariants below it — distinct from this repo's
+   * own example-file convention of repeating the header per invariant) is split into independently
+   * evaluated units by eval-batch, exactly like separate header-per-inv blocks already are. Before
+   * this fix, a single broken invariant under a shared header silently discarded every sibling
+   * invariant under that same header — none of them appeared in the batch result at all, not even
+   * as a generic failure.
    */
   @Test
   void testEvalBatchSharedContextHeaderIsolatesBrokenInvariant(@TempDir Path tempDir)
@@ -359,7 +359,8 @@ class VitruvOclCliTest {
         out.contains("\"name\":\"broken\",\"success\":false"),
         "broken should be reported as its own failed entry, not swallow its siblings: " + out);
     assertTrue(
-        out.contains("thisPropertyDoesNotExist"), "broken's own compiler error should appear: " + out);
+        out.contains("thisPropertyDoesNotExist"),
+        "broken's own compiler error should appear: " + out);
   }
 
   /**
@@ -514,8 +515,8 @@ class VitruvOclCliTest {
 
   /**
    * Tests that eval-batch also skips {@code post} blocks (same no-transaction-context reasoning as
-   * {@link #testEvalSkipsPostBlockAndReportsIt}), while still evaluating the {@code inv} in the same
-   * context normally.
+   * {@link #testEvalSkipsPostBlockAndReportsIt}), while still evaluating the {@code inv} in the
+   * same context normally.
    */
   @Test
   void testEvalBatchSkipsPostBlockAndReportsIt(@TempDir Path tempDir) throws java.io.IOException {
@@ -544,9 +545,9 @@ class VitruvOclCliTest {
   }
 
   /**
-   * Tests that eval-batch accepts the optional {@code --threads <N>} flag (passed through to
-   * {@code VitruvOCL.evaluateConstraints(..., threadPoolSize)}) without changing output shape or
-   * content compared to the default (no {@code --threads}) invocation.
+   * Tests that eval-batch accepts the optional {@code --threads <N>} flag (passed through to {@code
+   * VitruvOCL.evaluateConstraints(..., threadPoolSize)}) without changing output shape or content
+   * compared to the default (no {@code --threads}) invocation.
    */
   @Test
   void testEvalBatchWithThreadsFlag(@TempDir Path tempDir) throws java.io.IOException {
@@ -577,10 +578,10 @@ class VitruvOclCliTest {
 
   /**
    * Documents the (accepted) behavior change from switching {@code evalBatch} to the {@code
-   * evaluateConstraints(...)} batch path: byte-identical duplicate constraints within one batch file
-   * are now detected — the second (and any later) occurrence is reported as {@code satisfied:false}
-   * with a duplicate-constraint warning rather than being independently evaluated again, matching
-   * {@code evaluateConstraints}'s existing duplicate-detection pre-pass (see {@code
+   * evaluateConstraints(...)} batch path: byte-identical duplicate constraints within one batch
+   * file are now detected — the second (and any later) occurrence is reported as {@code
+   * satisfied:false} with a duplicate-constraint warning rather than being independently evaluated
+   * again, matching {@code evaluateConstraints}'s existing duplicate-detection pre-pass (see {@code
    * VitruvOclCliTest#testEvalBatchMultipleConstraints} and {@code ParallelBatchEvaluationTest
    * #duplicateConstraintDetectionStillWorksWithParallelEvaluation} for the underlying, unmodified
    * batch-path behavior this now surfaces through the CLI too).
@@ -687,8 +688,8 @@ class VitruvOclCliTest {
    * ConstraintResult#getCompilerErrors()}. When {@code SmartLoader} fails to load the batch's
    * metamodel/instance files, every {@link ConstraintResult} in the batch gets the load failure in
    * {@link ConstraintResult#getFileErrors()} instead — {@code compilerErrors} stays empty, so the
-   * old JSON had no {@code "errors"} field at all, making a genuine (and identical, batch-wide) file
-   * error indistinguishable from "every constraint happens to be individually broken."
+   * old JSON had no {@code "errors"} field at all, making a genuine (and identical, batch-wide)
+   * file error indistinguishable from "every constraint happens to be individually broken."
    */
   @Test
   void testEvalBatchSurfacesFileErrorsNotJustCompilerErrors(@TempDir Path tempDir)
@@ -706,7 +707,8 @@ class VitruvOclCliTest {
 
     String out = output();
     assertTrue(
-        out.contains("\"success\":false"), "The failed load should be reported as unsuccessful: " + out);
+        out.contains("\"success\":false"),
+        "The failed load should be reported as unsuccessful: " + out);
     assertTrue(
         out.contains("\"errors\":["),
         "The file-load failure must appear as an actual error, not silently: " + out);
@@ -720,7 +722,8 @@ class VitruvOclCliTest {
   void testEvalSurfacesFileErrorsNotJustCompilerErrors(@TempDir Path tempDir)
       throws java.io.IOException {
     Path oclFile = tempDir.resolve("test.ocl");
-    Files.writeString(oclFile, "context spaceMission::Spacecraft inv massIsPositive:\n  self.mass > 0");
+    Files.writeString(
+        oclFile, "context spaceMission::Spacecraft inv massIsPositive:\n  self.mass > 0");
 
     VitruvOclCli.main(
         new String[] {

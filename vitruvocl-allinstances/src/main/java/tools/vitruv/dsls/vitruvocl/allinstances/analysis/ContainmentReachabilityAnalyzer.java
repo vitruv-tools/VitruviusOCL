@@ -1,6 +1,5 @@
 package tools.vitruv.dsls.vitruvocl.allinstances.analysis;
 
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,6 +12,7 @@ import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EClassifier;
 import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EReference;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
 
 /**
  * Computes, for a given metamodel and {@link CacheConfiguration}, the minimal set of containment
@@ -144,7 +144,10 @@ public class ContainmentReachabilityAnalyzer {
         transitiveClosureOfSubtypes(r.getEReferenceType(), allClasses, subtypeMemo);
     boolean relevant =
         reachableTypes.stream()
-            .anyMatch(t -> cacheConfig.getAllOfKind().contains(t) || cacheConfig.getAllOfType().contains(t));
+            .anyMatch(
+                t ->
+                    cacheConfig.getAllOfKind().contains(t)
+                        || cacheConfig.getAllOfType().contains(t));
 
     boolean shouldTraverse = relevant;
     if (!relevant) {
@@ -201,7 +204,9 @@ public class ContainmentReachabilityAnalyzer {
     return result;
   }
 
-  /** Recursively collects every {@link EClass} classifier of {@code ePackage} and its subpackages. */
+  /**
+   * Recursively collects every {@link EClass} classifier of {@code ePackage} and its subpackages.
+   */
   private void collectClassifiersRecursively(EPackage ePackage, List<EClass> out) {
     for (EClassifier classifier : ePackage.getEClassifiers()) {
       if (classifier instanceof EClass eClass) {

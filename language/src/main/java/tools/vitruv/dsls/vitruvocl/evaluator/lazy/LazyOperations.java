@@ -65,7 +65,8 @@ public final class LazyOperations {
    *     traversal
    */
   public static OCLElementSource filterStateful(
-      OCLElementSource source, java.util.function.Supplier<Predicate<OCLElement>> predicateFactory) {
+      OCLElementSource source,
+      java.util.function.Supplier<Predicate<OCLElement>> predicateFactory) {
     return () -> new FilterIterator(source.newIterator(), predicateFactory.get());
   }
 
@@ -157,7 +158,9 @@ public final class LazyOperations {
    * @return a source yielding one element per pairwise match between the two sides
    */
   public static OCLElementSource intersect(
-      OCLElementSource left, OCLElementSource right, BiPredicate<OCLElement, OCLElement> semanticEquals) {
+      OCLElementSource left,
+      OCLElementSource right,
+      BiPredicate<OCLElement, OCLElement> semanticEquals) {
     return () -> new IntersectIterator(left.newIterator(), right.newIterator(), semanticEquals);
   }
 
@@ -211,7 +214,8 @@ public final class LazyOperations {
     private final Function<OCLElement, Iterator<OCLElement>> expand;
     private Iterator<OCLElement> current = java.util.Collections.emptyIterator();
 
-    FlatMapIterator(Iterator<OCLElement> upstream, Function<OCLElement, Iterator<OCLElement>> expand) {
+    FlatMapIterator(
+        Iterator<OCLElement> upstream, Function<OCLElement, Iterator<OCLElement>> expand) {
       this.upstream = upstream;
       this.expand = expand;
     }

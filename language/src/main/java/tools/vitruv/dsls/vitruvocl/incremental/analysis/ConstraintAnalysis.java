@@ -45,7 +45,9 @@ public final class ConstraintAnalysis {
     EVALUATE_UNKNOWN_CHANGE,
     /** Re-evaluate: the transaction touches the read set. */
     EVALUATE_READ_SET_HIT,
-    /** Re-evaluate: the transaction contains a potentially satisfaction-violating event (level 2). */
+    /**
+     * Re-evaluate: the transaction contains a potentially satisfaction-violating event (level 2).
+     */
     EVALUATE_PSE_HIT,
     /**
      * Skip (level 2): the read set is touched, but only by events that cannot turn a satisfied
@@ -77,6 +79,13 @@ public final class ConstraintAnalysis {
     return new ConstraintAnalysis(null, null, null);
   }
 
+  /**
+   * Creates the analysis of a compiled constraint.
+   *
+   * @param readSet the features and extensions the constraint reads
+   * @param pseSet the potentially satisfaction-affecting events of the constraint
+   * @param relevancePlan the level-3 plan for finding the relevant context instances
+   */
   public ConstraintAnalysis(ReadSet readSet, PseSet pseSet, RelevancePlan relevancePlan) {
     this.readSet = readSet;
     this.pseSet = pseSet;
@@ -162,7 +171,9 @@ public final class ConstraintAnalysis {
       // With the relation known to be unchanged, every ~ answers as before for the same operands,
       // so the read set (which covers the operands) decides.
       if (!correspondences.isKnownEmpty()
-          && !(correspondenceIdiom && relevancePlan != null && relevancePlan.correspondenceOnlyInIdiom())) {
+          && !(correspondenceIdiom
+              && relevancePlan != null
+              && relevancePlan.correspondenceOnlyInIdiom())) {
         return Decision.EVALUATE_CORRESPONDENCE;
       }
     }

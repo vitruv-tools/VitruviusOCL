@@ -52,6 +52,7 @@ public record ReadSet(
     boolean hasErrorNodes,
     boolean readsUnrecordedFeature) {
 
+  /** Copies the maps and sets, so the read set is immutable. */
   public ReadSet {
     Map<String, Set<EClass>> copy = new LinkedHashMap<>();
     typedFeatureReads.forEach(

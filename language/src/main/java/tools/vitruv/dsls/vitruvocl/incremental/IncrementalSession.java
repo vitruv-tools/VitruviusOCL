@@ -135,7 +135,8 @@ public final class IncrementalSession implements AutoCloseable {
 
   /** Compiles all constraints and performs the initial full evaluation. */
   public IncrementalResult initialize() {
-    IncrementalStats.Builder stats = new IncrementalStats.Builder().constraints(distinctConstraints.size());
+    final IncrementalStats.Builder stats =
+        new IncrementalStats.Builder().constraints(distinctConstraints.size());
     FeatureIndex features = FeatureIndex.forWrapper(wrapper);
     for (String constraint : distinctConstraints) {
       compiled.put(constraint, CompiledConstraint.compile(constraint, wrapper, features));
@@ -165,7 +166,8 @@ public final class IncrementalSession implements AutoCloseable {
    *     propagation: per propagated change, the original change followed by its consequential
    *     changes)
    * @return all current violations and what was re-evaluated
-   * @throws IncrementalMismatchException in oracle mode, if the result differs from a full evaluation
+   * @throws IncrementalMismatchException in oracle mode, if the result differs from a full
+   *     evaluation
    */
   public IncrementalResult onTransaction(List<EChange<EObject>> changes) {
     if (latest == null) {
@@ -176,7 +178,8 @@ public final class IncrementalSession implements AutoCloseable {
     forceFullEvaluation = true;
     TransactionDelta delta =
         EChangeClassifier.classify(transaction).withCorrespondenceDelta(observeCorrespondences());
-    IncrementalStats.Builder stats = new IncrementalStats.Builder().constraints(distinctConstraints.size());
+    IncrementalStats.Builder stats =
+        new IncrementalStats.Builder().constraints(distinctConstraints.size());
 
     if (config.level().atLeast(IncrementalLevel.RELEVANT_INSTANCES)) {
       reverseIndex.apply(delta);
@@ -250,8 +253,9 @@ public final class IncrementalSession implements AutoCloseable {
   /**
    * Diffs the correspondence relation against the previous transaction's. The snapshot is replaced
    * before evaluation, so a failure later in the transaction cannot leave it stale; the recovery
-   * flag then re-evaluates everything once. Without a baseline (see {@link #correspondenceSnapshot})
-   * the delta is unknown and the current relation becomes the new baseline.
+   * flag then re-evaluates everything once. Without a baseline (see {@link
+   * #correspondenceSnapshot}) the delta is unknown and the current relation becomes the new
+   * baseline.
    */
   private CorrespondenceDelta observeCorrespondences() {
     if (!observingCorrespondences) {
@@ -270,7 +274,9 @@ public final class IncrementalSession implements AutoCloseable {
   private MetamodelWrapperInterface viewOf(CorrespondenceSnapshot snapshot) {
     // The snapshot answers correspondenceHasTag as the two-way tagged lookup, which is only the
     // wrapper's own answer under that contract.
-    return snapshot == null || !sharedCorrespondenceLookup || !wrapper.hasTaggedCorrespondenceLookup()
+    return snapshot == null
+            || !sharedCorrespondenceLookup
+            || !wrapper.hasTaggedCorrespondenceLookup()
         ? wrapper
         : new SnapshotCorrespondenceWrapper(wrapper, snapshot);
   }
@@ -301,7 +307,8 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   private boolean useCorrespondenceIdiom() {
-    return config.correspondenceIdiom() && config.level().atLeast(IncrementalLevel.RELEVANT_INSTANCES);
+    return config.correspondenceIdiom()
+        && config.level().atLeast(IncrementalLevel.RELEVANT_INSTANCES);
   }
 
   /**
@@ -320,7 +327,10 @@ public final class IncrementalSession implements AutoCloseable {
     // Polarity may only filter events while the constraint has no violation (level 2 rule).
     boolean usePolarity = !violations.hasViolationsOrFailure(constraint);
     return resolver.resolve(
-        analysis.relevancePlan(), delta, usePolarity ? analysis.pseSet() : null, useCorrespondenceIdiom());
+        analysis.relevancePlan(),
+        delta,
+        usePolarity ? analysis.pseSet() : null,
+        useCorrespondenceIdiom());
   }
 
   private EvaluationOutcome evaluateSelected(
@@ -340,7 +350,9 @@ public final class IncrementalSession implements AutoCloseable {
               org.eclipse.emf.ecore.EClass type = compiled.get(constraint).contextClass(ctx);
               return type == null
                   ? List.of()
-                  : instances.stream().filter(o -> TransactionDelta.conforms(o.eClass(), type)).toList();
+                  : instances.stream()
+                      .filter(o -> TransactionDelta.conforms(o.eClass(), type))
+                      .toList();
             });
   }
 
@@ -379,7 +391,8 @@ public final class IncrementalSession implements AutoCloseable {
     StringBuilder diffs = new StringBuilder();
     for (String constraint : distinctConstraints) {
       EvaluationOutcome full =
-          ConstraintEvaluations.evaluateFresh(constraint, wrapper, transaction, transactionSupported);
+          ConstraintEvaluations.evaluateFresh(
+              constraint, wrapper, transaction, transactionSupported);
       String diff =
           OracleVerifier.diff(
               constraint,
@@ -432,7 +445,8 @@ public final class IncrementalSession implements AutoCloseable {
         Thread.currentThread().interrupt();
         throw new IllegalStateException("Interrupted while evaluating constraints", e);
       } catch (ExecutionException e) {
-        throw new IllegalStateException("Constraint evaluation failed: " + e.getCause(), e.getCause());
+        throw new IllegalStateException(
+            "Constraint evaluation failed: " + e.getCause(), e.getCause());
       }
     }
     return results;

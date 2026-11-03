@@ -204,7 +204,8 @@ public class VitruvOCL {
    *     at least 1
    * @return the validation result; never {@code null}
    */
-  public static BatchValidationResult evaluateConstraints(Path constraintsFile, int threadPoolSize) {
+  public static BatchValidationResult evaluateConstraints(
+      Path constraintsFile, int threadPoolSize) {
     return evaluateConstraintsFromPath(constraintsFile, threadPoolSize, List.of(), false);
   }
 
@@ -229,38 +230,6 @@ public class VitruvOCL {
       Path constraintsFile, List<EChange<EObject>> transaction) {
     return evaluateConstraintsFromPath(
         constraintsFile, DEFAULT_THREAD_POOL_SIZE, transaction, true);
-  }
-
-  private static BatchValidationResult evaluateConstraintsFromPath(
-      Path constraintsFile,
-      int threadPoolSize,
-      List<EChange<EObject>> transaction,
-      boolean transactionSupported) {
-    List<String> constraints;
-    try {
-      constraints = parseConstraintsFile(constraintsFile);
-    } catch (IOException e) {
-      return new BatchValidationResult(
-          List.of(
-              new ConstraintResult(
-                  constraintsFile.toString(),
-                  false,
-                  List.of(
-                      new CompileError(
-                          1,
-                          0,
-                          "Could not read constraints file: "
-                              + constraintsFile.getFileName()
-                              + " ("
-                              + e.getMessage()
-                              + ")",
-                          ErrorSeverity.ERROR,
-                          constraintsFile.toString())),
-                  List.of(),
-                  List.of())));
-    }
-    return evaluateConstraints(
-        constraints, getVsumWrapper(), threadPoolSize, transaction, transactionSupported);
   }
 
   /**
@@ -414,6 +383,38 @@ public class VitruvOCL {
     }
 
     return new BatchValidationResult(results);
+  }
+
+  private static BatchValidationResult evaluateConstraintsFromPath(
+      Path constraintsFile,
+      int threadPoolSize,
+      List<EChange<EObject>> transaction,
+      boolean transactionSupported) {
+    List<String> constraints;
+    try {
+      constraints = parseConstraintsFile(constraintsFile);
+    } catch (IOException e) {
+      return new BatchValidationResult(
+          List.of(
+              new ConstraintResult(
+                  constraintsFile.toString(),
+                  false,
+                  List.of(
+                      new CompileError(
+                          1,
+                          0,
+                          "Could not read constraints file: "
+                              + constraintsFile.getFileName()
+                              + " ("
+                              + e.getMessage()
+                              + ")",
+                          ErrorSeverity.ERROR,
+                          constraintsFile.toString())),
+                  List.of(),
+                  List.of())));
+    }
+    return evaluateConstraints(
+        constraints, getVsumWrapper(), threadPoolSize, transaction, transactionSupported);
   }
 
   /**

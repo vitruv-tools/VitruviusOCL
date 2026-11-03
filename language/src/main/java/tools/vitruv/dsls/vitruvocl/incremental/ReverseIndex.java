@@ -133,13 +133,15 @@ final class ReverseIndex {
     return value == null ? List.of() : List.of(value);
   }
 
-  private static void add(Map<EObject, Map<EObject, Integer>> byTarget, Object target, EObject holder) {
+  private static void add(
+      Map<EObject, Map<EObject, Integer>> byTarget, Object target, EObject holder) {
     if (target instanceof EObject t) {
       byTarget.computeIfAbsent(t, k -> new IdentityHashMap<>()).merge(holder, 1, Integer::sum);
     }
   }
 
-  private static void remove(Map<EObject, Map<EObject, Integer>> byTarget, Object target, EObject holder) {
+  private static void remove(
+      Map<EObject, Map<EObject, Integer>> byTarget, Object target, EObject holder) {
     if (!(target instanceof EObject t)) {
       return;
     }

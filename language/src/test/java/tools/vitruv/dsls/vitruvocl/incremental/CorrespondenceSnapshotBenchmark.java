@@ -35,15 +35,14 @@ import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Manual benchmark: the cost of
- * capturing and diffing a {@link CorrespondenceSnapshot} over the real Vitruvius correspondence
- * model ({@code PersistableCorrespondenceModelImpl}) through {@link VsumWrapper}, for growing
- * numbers of 1:1 correspondences.
+ * Manual benchmark: the cost of capturing and diffing a {@link CorrespondenceSnapshot} over the
+ * real Vitruvius correspondence model ({@code PersistableCorrespondenceModelImpl}) through {@link
+ * VsumWrapper}, for growing numbers of 1:1 correspondences.
  *
  * <p>For comparison it also measures one lookup per object, which is what a full evaluation of a
  * single {@code Y.allInstances()->select(~)} constraint costs with the cached correspondence
- * lookup. Disabled by default; run with {@code -Dvitruvocl.bench.corrSnapshot=true} (optionally {@code
- * -Dvitruvocl.bench.corrSizes=500,1000,2000,4000}).
+ * lookup. Disabled by default; run with {@code -Dvitruvocl.bench.corrSnapshot=true} (optionally
+ * {@code -Dvitruvocl.bench.corrSizes=500,1000,2000,4000}).
  */
 class CorrespondenceSnapshotBenchmark {
 
@@ -56,7 +55,8 @@ class CorrespondenceSnapshotBenchmark {
     String sizes = System.getProperty("vitruvocl.bench.corrSizes", "500,1000,2000,4000");
 
     System.out.println(
-        "| Korrespondenzen | Objekte | Capture [ms] | Diff [ms] | Capture+Diff [ms] | Lookups allein [ms] |");
+        "| Korrespondenzen | Objekte | Capture [ms] | Diff [ms] | Capture+Diff [ms] | Lookups"
+            + " allein [ms] |");
     System.out.println("|---:|---:|---:|---:|---:|---:|");
     for (String size : sizes.split(",")) {
       measure(Integer.parseInt(size.trim()));
@@ -65,7 +65,10 @@ class CorrespondenceSnapshotBenchmark {
 
   private void measure(int pairs) {
     var resourceSet = new ResourceSetImpl();
-    resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+    resourceSet
+        .getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("*", new XMIResourceFactoryImpl());
     Resource resource = resourceSet.createResource(URI.createURI("memory:/bench.xmi"));
     EditableCorrespondenceModelView<Correspondence> view =
         CorrespondenceModelViewFactory.createEditableCorrespondenceModelView(
@@ -89,17 +92,17 @@ class CorrespondenceSnapshotBenchmark {
     double diff = 0;
     double lookups = 0;
     for (int run = 0; run < WARMUP + RUNS; run++) {
-      long t0 = System.nanoTime();
+      final long t0 = System.nanoTime();
       CorrespondenceSnapshot before = CorrespondenceSnapshot.capture(wrapper).orElseThrow();
-      long t1 = System.nanoTime();
+      final long t1 = System.nanoTime();
       // one silent change, as a consistency-preservation rule would make
       view.addCorrespondenceBetween(objects.get(0), objects.get(3), "late");
       CorrespondenceSnapshot after = CorrespondenceSnapshot.capture(wrapper).orElseThrow();
-      long t2 = System.nanoTime();
+      final long t2 = System.nanoTime();
       CorrespondenceDelta delta = before.diff(after);
-      long t3 = System.nanoTime();
+      final long t3 = System.nanoTime();
       view.removeCorrespondencesBetween(objects.get(0), objects.get(3), "late");
-      long t4 = System.nanoTime();
+      final long t4 = System.nanoTime();
       int found = 0;
       for (EObject o : objects) {
         found += wrapper.getCorrespondingObjects(o).size();

@@ -39,7 +39,8 @@ class DependencyAnalyzerOperationHeaderTest {
   @Test
   void plainQualifiedContextStillDetectsPackage() {
     Set<String> packages =
-        DependencyAnalyzer.analyzeConstraint("context brakesystem::BrakeDisk inv: self.diameterInMM > 0");
+        DependencyAnalyzer.analyzeConstraint(
+            "context brakesystem::BrakeDisk inv: self.diameterInMM > 0");
 
     assertThat(packages).containsExactly("brakesystem");
   }
@@ -48,8 +49,7 @@ class DependencyAnalyzerOperationHeaderTest {
   void enumLiteralAfterEqualsIsStillExcluded() {
     Set<String> packages =
         DependencyAnalyzer.analyzeConstraint(
-            "context brakesystem::BrakeDisk::inspect() pre: true"
-                + " post: self.unit == Unit::MM");
+            "context brakesystem::BrakeDisk::inspect() pre: true" + " post: self.unit == Unit::MM");
 
     assertThat(packages).containsExactly("brakesystem");
   }

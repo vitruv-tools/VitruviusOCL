@@ -37,18 +37,19 @@ import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * End-to-end: a session attached to a real VSUM via {@link
- * VitruvOCL#attachIncrementalSession}, one transaction per {@code commitChanges()}, with
- * consistency preservation ({@link CorrespondingElementsSpecification}) changing the second model
- * and the correspondence model — including a correspondence created without any event on its
- * partner. Every transaction is checked by the oracle.
+ * End-to-end: a session attached to a real VSUM via {@link VitruvOCL#attachIncrementalSession}, one
+ * transaction per {@code commitChanges()}, with consistency preservation ({@link
+ * CorrespondingElementsSpecification}) changing the second model and the correspondence model —
+ * including a correspondence created without any event on its partner. Every transaction is checked
+ * by the oracle.
  */
 class IncrementalVsumListenerTest {
 
   private static final List<String> CONSTRAINTS =
       List.of(
           "context incrb::BElem inv bName: self.name != \"bad\"",
-          "context incra::AElem inv oneCorrespondent: incrb::BElem.allInstances().select(~).size() <= 1",
+          "context incra::AElem inv oneCorrespondent: incrb::BElem.allInstances().select(~).size()"
+              + " <= 1",
           "context incra::AElem inv smallTrigger: self.trigger < 5",
           "context incrb::BRoot inv fewElements: self.elements.size() <= 3");
 
@@ -128,7 +129,9 @@ class IncrementalVsumListenerTest {
     // late correspondence x ~ spare: no event on any BElem, only the trigger update on x
     commit(
         view ->
-            elements(rootA(view)).get(0).eSet(RealVsumFixture.elemA().getEStructuralFeature("trigger"), 1));
+            elements(rootA(view))
+                .get(0)
+                .eSet(RealVsumFixture.elemA().getEStructuralFeature("trigger"), 1));
     assertTrue(violated(results.get(results.size() - 1), "oneCorrespondent"));
 
     commit(view -> elements(rootA(view)).add(newElem("bad")));
@@ -138,7 +141,9 @@ class IncrementalVsumListenerTest {
 
     commit(
         view ->
-            elements(rootA(view)).get(0).eSet(RealVsumFixture.elemA().getEStructuralFeature("trigger"), 2));
+            elements(rootA(view))
+                .get(0)
+                .eSet(RealVsumFixture.elemA().getEStructuralFeature("trigger"), 2));
     assertFalse(violated(results.get(results.size() - 1), "oneCorrespondent"));
 
     commit(view -> elements(rootA(view)).remove(elements(rootA(view)).size() - 1));

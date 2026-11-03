@@ -52,13 +52,13 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *
  * <h2>History (read before trusting the numbers)</h2>
  *
- * <p>This test originally found that navigation ({@code self.liste}) pulled all 10,000 raw
- * elements regardless of match position, because {@link EvaluationVisitor#navigateOne}'s
- * many-valued-feature branch used to eagerly copy the entire feature value into a fresh {@code
- * ArrayList} before {@code select()}/{@code notEmpty()} ever got a chance to run. That was fixed
- * by replacing the eager copy with {@link EvaluationVisitor.SkipNullMappingIterator}, a lazy,
- * lookahead-based mapping iterator over the feature's own {@code list.iterator()} - see the
- * "early match" test below for the now-genuine early-termination result.
+ * <p>This test originally found that navigation ({@code self.liste}) pulled all 10,000 raw elements
+ * regardless of match position, because {@link EvaluationVisitor#navigateOne}'s many-valued-feature
+ * branch used to eagerly copy the entire feature value into a fresh {@code ArrayList} before {@code
+ * select()}/{@code notEmpty()} ever got a chance to run. That was fixed by replacing the eager copy
+ * with {@link EvaluationVisitor.SkipNullMappingIterator}, a lazy, lookahead-based mapping iterator
+ * over the feature's own {@code list.iterator()} - see the "early match" test below for the
+ * now-genuine early-termination result.
  *
  * <p>A second, independent bug was found and fixed while verifying the above: {@code
  * visitPropertyAccessWithReceiver} used to look up the navigation's Ctype under the wrong parse
@@ -71,11 +71,11 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  * fixes in place, the early-match count below is the fully-explained {@code 2}, not the naively
  * expected {@code 1} - see that test's comment for exactly where the two lookahead pulls come from.
  *
- * <p>This does not contradict the {@code lazy} package's Category 1 classification of navigation
- * as "fully lazy" - that classification is about not needing to visit more <em>receiver</em>
- * elements than necessary (e.g. {@code allObjects.select(...).collect(o | o.p)}, where {@code
- * allObjects} has many elements). It says nothing about the internal size of a single many-valued
- * feature access on one receiver element, and that case was never previously exercised by a
+ * <p>This does not contradict the {@code lazy} package's Category 1 classification of navigation as
+ * "fully lazy" - that classification is about not needing to visit more <em>receiver</em> elements
+ * than necessary (e.g. {@code allObjects.select(...).collect(o | o.p)}, where {@code allObjects}
+ * has many elements). It says nothing about the internal size of a single many-valued feature
+ * access on one receiver element, and that case was never previously exercised by a
  * consumption-counting test - every prior lazy chain test used collection literals or a receiver
  * with multiple elements, never a single object's own many-valued feature.
  */
@@ -101,18 +101,19 @@ class NavigationSelectNotEmptyStreamingTest {
     LISTE_FEATURE.setEType(EcorePackage.Literals.EINT);
     LISTE_FEATURE.setUpperBound(-1); // many-valued
     LISTE_FEATURE.setOrdered(true);
-    LISTE_FEATURE.setUnique(false); // avoid the incremental-dedupe lazy layer; not what's tested here
+    LISTE_FEATURE.setUnique(
+        false); // avoid the incremental-dedupe lazy layer; not what's tested here
     CONTAINER_CLASS.getEStructuralFeatures().add(LISTE_FEATURE);
   }
 
   /**
-   * A many-valued feature's raw backing list, instrumented to count how many elements are
-   * actually pulled via {@link #iterator()}. This is the same "count real pulls, not logical
-   * results" technique {@code LazyOperationsTest}'s {@code CountingSource} uses one layer up (on
-   * {@code OCLElementSource} directly) - it could not be reused verbatim here because the
-   * boundary this test needs to instrument is one layer further down: the raw {@code
-   * java.util.List} that {@code EObject.eGet()} returns for a many-valued feature, which is what
-   * {@link EvaluationVisitor#navigateOne} actually touches.
+   * A many-valued feature's raw backing list, instrumented to count how many elements are actually
+   * pulled via {@link #iterator()}. This is the same "count real pulls, not logical results"
+   * technique {@code LazyOperationsTest}'s {@code CountingSource} uses one layer up (on {@code
+   * OCLElementSource} directly) - it could not be reused verbatim here because the boundary this
+   * test needs to instrument is one layer further down: the raw {@code java.util.List} that {@code
+   * EObject.eGet()} returns for a many-valued feature, which is what {@link
+   * EvaluationVisitor#navigateOne} actually touches.
    */
   private static final class CountingIntFeatureList extends AbstractList<Object> {
     private final int size;
@@ -135,7 +136,8 @@ class NavigationSelectNotEmptyStreamingTest {
 
     @Override
     public Object get(int index) {
-      throw new UnsupportedOperationException("expected navigateOne() to use iterator(), not get(int)");
+      throw new UnsupportedOperationException(
+          "expected navigateOne() to use iterator(), not get(int)");
     }
 
     @Override
@@ -258,7 +260,8 @@ class NavigationSelectNotEmptyStreamingTest {
       throw new AssertionError("Pass 1 (Symbol Table) failed: " + errors.getErrors());
     }
 
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
+    TypeCheckVisitor typeChecker =
+        new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
     typeChecker.visit(tree);
     if (typeChecker.hasErrors()) {
       StringBuilder sb = new StringBuilder("Pass 2 (Type checking) failed:");
@@ -272,7 +275,8 @@ class NavigationSelectNotEmptyStreamingTest {
         new EvaluationVisitor(symbolTable, wrapper, errors, typeChecker.getNodeTypes());
     Value result = evaluator.visit(tree);
     if (evaluator.hasErrors()) {
-      throw new AssertionError("Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
+      throw new AssertionError(
+          "Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
     }
 
     // visitClassifierContextCS returns Value.of(allResults, Type.bag(Type.BOOLEAN)): one element
@@ -306,10 +310,10 @@ class NavigationSelectNotEmptyStreamingTest {
     //     raw element (its own advance()) to keep its own hasNext() cheap - mirroring
     //     LazyOperations.FilterIterator's identical one-ahead lookahead pattern used elsewhere in
     //     this codebase (see isUnique()/one()'s consumption-counting tests for the same +1).
-    // Before the nodeTypes fix this was 3: the wrongly-applied dedupe() added its own FilterIterator
-    // wrapping FlatMapIterator, contributing a THIRD, independent one-ahead lookahead pull (verified
-    // via a stack trace showing LazyOperations.lambda$filterStateful$1 in the call chain). Removing
-    // the spurious dedupe layer removed that third pull, dropping 3 -> 2.
+    // Before the nodeTypes fix this was 3: the wrongly-applied dedupe() added its own
+    // FilterIterator wrapping FlatMapIterator, contributing a THIRD, independent one-ahead
+    // lookahead pull (verified via a stack trace showing LazyOperations.lambda$filterStateful$1 in
+    // the call chain). Removing the spurious dedupe layer removed that third pull, dropping 3 -> 2.
     assertEquals(
         2,
         liste.pullCount(),

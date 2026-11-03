@@ -43,16 +43,17 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  * Correctness proof for the {@code nodeTypes} key-mismatch fix in {@link
  * EvaluationVisitor#visitPropertyAccessWithReceiver}.
  *
- * <p><b>The bug:</b> {@link tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor#visitPropertyNav}
- * stores the combined Ctype for a navigation {@code e.p} keyed by the outer {@code
- * PropertyNavContext} ({@code nodeTypes.put(ctx, resultType)}). {@code
- * visitPropertyAccessWithReceiver} used to look the type back up keyed by the <em>inner</em>
- * {@code PropertyAccessContext} - a different parse tree node - so the lookup always missed and
- * silently fell back to {@code Type.set(Type.ANY)}, which is always {@code unique=true}. That made
- * {@code LazyOperations#dedupe} run unconditionally on every {@code e.p} navigation regardless of
- * the feature's real {@code unique} flag, silently dropping genuine duplicates from the result of
- * any many-valued, non-unique (Bag/Sequence) feature access. Order was never affected (dedupe does
- * not reorder), which is why no prior test caught this - none of them used duplicate-valued data.
+ * <p><b>The bug:</b> {@link
+ * tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor#visitPropertyNav} stores the combined
+ * Ctype for a navigation {@code e.p} keyed by the outer {@code PropertyNavContext} ({@code
+ * nodeTypes.put(ctx, resultType)}). {@code visitPropertyAccessWithReceiver} used to look the type
+ * back up keyed by the <em>inner</em> {@code PropertyAccessContext} - a different parse tree node -
+ * so the lookup always missed and silently fell back to {@code Type.set(Type.ANY)}, which is always
+ * {@code unique=true}. That made {@code LazyOperations#dedupe} run unconditionally on every {@code
+ * e.p} navigation regardless of the feature's real {@code unique} flag, silently dropping genuine
+ * duplicates from the result of any many-valued, non-unique (Bag/Sequence) feature access. Order
+ * was never affected (dedupe does not reorder), which is why no prior test caught this - none of
+ * them used duplicate-valued data.
  *
  * <p>{@code liste} here is a many-valued {@code EInt} attribute with {@code unique=false, ordered=
  * true} (Sequence semantics: duplicates allowed, order preserved), populated with real duplicates
@@ -180,7 +181,8 @@ class NavigationDedupeKeyMismatchTest {
       throw new AssertionError("Pass 1 (Symbol Table) failed: " + errors.getErrors());
     }
 
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
+    TypeCheckVisitor typeChecker =
+        new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
     typeChecker.visit(tree);
     if (typeChecker.hasErrors()) {
       StringBuilder sb = new StringBuilder("Pass 2 (Type checking) failed:");
@@ -194,7 +196,8 @@ class NavigationDedupeKeyMismatchTest {
         new EvaluationVisitor(symbolTable, wrapper, errors, typeChecker.getNodeTypes());
     Value result = evaluator.visit(tree);
     if (evaluator.hasErrors()) {
-      throw new AssertionError("Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
+      throw new AssertionError(
+          "Pass 3 (Evaluation) failed: " + evaluator.getErrorCollector().getErrors());
     }
 
     assertTrue(result.size() == 1, "Expected exactly one invariant result");

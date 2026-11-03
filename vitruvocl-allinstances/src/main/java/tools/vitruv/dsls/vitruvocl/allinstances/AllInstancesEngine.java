@@ -1,10 +1,5 @@
 package tools.vitruv.dsls.vitruvocl.allinstances;
 
-import tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallCollector;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
-import tools.vitruv.dsls.vitruvocl.allinstances.collect.SinglePassInstanceCollector;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +8,11 @@ import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EReference;
+import tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallCollector;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
+import tools.vitruv.dsls.vitruvocl.allinstances.collect.SinglePassInstanceCollector;
 
 /**
  * High-level facade implementing the full allInstances() computation strategy of Wei &amp;
@@ -75,7 +75,8 @@ public class AllInstancesEngine {
    *     {@link SinglePassInstanceCollector#collectInstances}
    */
   public Map<EClass, List<EObject>> compute(Collection<? extends EObject> modelRoots) {
-    return new SinglePassInstanceCollector().collectInstances(modelRoots, cacheConfig, traversableRefs);
+    return new SinglePassInstanceCollector()
+        .collectInstances(modelRoots, cacheConfig, traversableRefs);
   }
 
   /** Returns the query analysis result this engine was built with, mainly useful for testing. */

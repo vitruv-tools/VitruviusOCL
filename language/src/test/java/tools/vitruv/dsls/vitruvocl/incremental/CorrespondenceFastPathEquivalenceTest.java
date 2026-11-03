@@ -30,9 +30,9 @@ import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
 
 /**
- * Differential check of the correspondence fast paths: every
- * corpus constraint gives the same outcome (failure flag, errors and violation records in order)
- * with and without the correspondence fast paths, on every model set.
+ * Differential check of the correspondence fast paths: every corpus constraint gives the same
+ * outcome (failure flag, errors and violation records in order) with and without the correspondence
+ * fast paths, on every model set.
  */
 class CorrespondenceFastPathEquivalenceTest {
 
@@ -69,7 +69,13 @@ class CorrespondenceFastPathEquivalenceTest {
       if (fast.failed() != plain.failed()
           || !describe(fast.errors()).equals(describe(plain.errors()))
           || !fast.records().equals(plain.records())) {
-        diffs.append("\n").append(constraint).append("\n  fast:  ").append(fast).append("\n  plain: ").append(plain);
+        diffs
+            .append("\n")
+            .append(constraint)
+            .append("\n  fast:  ")
+            .append(fast)
+            .append("\n  plain: ")
+            .append(plain);
       }
     }
     assertEquals("", diffs.toString(), "outcomes differ on " + set);

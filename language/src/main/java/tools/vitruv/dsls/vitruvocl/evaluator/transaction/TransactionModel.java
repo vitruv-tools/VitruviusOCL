@@ -46,6 +46,12 @@ public final class TransactionModel {
 
   private final List<EChange<EObject>> changes;
 
+  /**
+   * Creates a view over the given transaction.
+   *
+   * @param changes the atomic changes of the transaction in order; {@code null} for an empty
+   *     transaction
+   */
   public TransactionModel(List<EChange<EObject>> changes) {
     this.changes = changes == null ? List.of() : changes;
   }
@@ -54,7 +60,10 @@ public final class TransactionModel {
     return changes.isEmpty();
   }
 
-  /** Returns {@code true} if {@code obj} was created (as a new object, or inserted as a resource root) during this transaction. */
+  /**
+   * Returns {@code true} if {@code obj} was created (as a new object, or inserted as a resource
+   * root) during this transaction.
+   */
   public boolean wasCreated(EObject obj) {
     for (EChange<EObject> c : changes) {
       if (c instanceof CreateEObject<?> ce && (Object) ce.getAffectedElement() == obj) {
@@ -67,7 +76,10 @@ public final class TransactionModel {
     return false;
   }
 
-  /** Returns {@code true} if {@code obj} was deleted (or removed as a resource root) during this transaction. */
+  /**
+   * Returns {@code true} if {@code obj} was deleted (or removed as a resource root) during this
+   * transaction.
+   */
   public boolean wasDeleted(EObject obj) {
     for (EChange<EObject> c : changes) {
       if (c instanceof DeleteEObject<?> de && (Object) de.getAffectedElement() == obj) {
@@ -80,7 +92,10 @@ public final class TransactionModel {
     return false;
   }
 
-  /** Returns {@code true} if any feature (attribute or reference, single- or multi-valued) of {@code obj} changed during this transaction. */
+  /**
+   * Returns {@code true} if any feature (attribute or reference, single- or multi-valued) of {@code
+   * obj} changed during this transaction.
+   */
   public boolean wasModified(EObject obj) {
     for (EChange<EObject> c : changes) {
       if (c instanceof FeatureEChange<?, ?> fc && (Object) fc.getAffectedElement() == obj) {
@@ -100,7 +115,8 @@ public final class TransactionModel {
    * @param currentValue the feature's current (post-state) value, returned unchanged if no
    *     matching change exists in this transaction
    */
-  public Object getPreStateSingleValue(EObject obj, EStructuralFeature feature, Object currentValue) {
+  public Object getPreStateSingleValue(
+      EObject obj, EStructuralFeature feature, Object currentValue) {
     for (EChange<EObject> c : changes) {
       if (c instanceof ReplaceSingleValuedFeatureEChange<?, ?, ?> rc
           && (Object) rc.getAffectedElement() == obj

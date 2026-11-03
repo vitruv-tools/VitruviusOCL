@@ -185,7 +185,7 @@ class SmartLoaderMemoryTradeoffTest {
         SmartLoader.loadForConstraint(HETEROGENEOUS_CONSTRAINTS.get(0), ALL_ECORES, ALL_XMIS);
     assertFalse(single.hasErrors());
     long afterSingle = heapUsedBytes();
-    long singleDelta = afterSingle - beforeSingle;
+    final long singleDelta = afterSingle - beforeSingle;
     // Keep a strong reference until after the measurement so it can't be collected early.
     assertTrue(countLoadedElements(single.wrapper) > 0);
 

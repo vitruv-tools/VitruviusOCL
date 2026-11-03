@@ -194,7 +194,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private final CorrespondenceLookup correspondences;
 
-  /** Whether the correspondence fast paths are on (see {@link #PROP_NO_CORRESPONDENCE_FAST_PATHS}). */
+  /**
+   * Whether the correspondence fast paths are on (see {@link #PROP_NO_CORRESPONDENCE_FAST_PATHS}).
+   */
   private final boolean correspondenceFastPaths;
 
   /** Result of {@link #cannotReportErrors} per constraint (parse-tree root). */
@@ -460,7 +462,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /** Best-effort display name for a context header, used only in skip notices. */
-  private static String describeContextForSkipNotice(VitruvOCLParser.ClassifierContextCSContext ctx) {
+  private static String describeContextForSkipNotice(
+      VitruvOCLParser.ClassifierContextCSContext ctx) {
     if (ctx.metamodel != null && ctx.className != null) {
       return ctx.metamodel.getText() + "::" + ctx.className.getText();
     }
@@ -1474,7 +1477,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       // once around the whole loop): visit(ctx.body) may itself materialize an unrelated lazy
       // Value bound elsewhere, whose own scope dance restores symbolTable.currentScope to *its*
       // parent, not to iterScope - re-entering iterScope per element is what keeps that safe.
-      Value bodyResult = evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      Value bodyResult =
+          evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
       Boolean condition = bodyResult.getElements().get(0).tryGetBool();
       if (condition != null && condition) {
         count++;
@@ -1652,7 +1656,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     for (OCLElement elem : elements) {
       // Keys are compared later, outside this loop, after iterSymbol has been rebound many more
       // times - must materialize now, not defer.
-      keys.add(evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body)));
+      keys.add(
+          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body)));
     }
 
     List<Integer> indices = new ArrayList<>();
@@ -1771,8 +1776,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     // an iteration step. The accumulator itself is still forced to materialize each step (see
     // evalInScopeMaterialized) - iterate() remains structurally strict, only its source streams.
     //
-    // Verified empirically in both directions (see LazyChainRegressionTest's
-    // iterateBodyResolvesAShadowedOuterVariableCorrectlyOnEveryStepWhilePullingFromALazySelectReceiver):
+    // Verified empirically in both directions (see the LazyChainRegressionTest of an iterate body
+    // that resolves a shadowed outer variable on every step while pulling from a lazy select):
     // streaming via elementIterator() and the previous getElements()-based materialization produce
     // identical results for a targeted shadowing/gap construction - this change fixes no
     // correctness bug (there wasn't one), it is a pure memory/streaming optimization.
@@ -2065,7 +2070,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     };
   }
 
-  /** Rebinds both iterator-variable symbols of a two-var iteration (from {@link #defineTwoVars}). */
+  /**
+   * Rebinds both iterator-variable symbols of a two-var iteration (from {@link #defineTwoVars}).
+   */
   private static void rebindTwoVars(
       VariableSymbol[] symbols, Type iterVarType, OCLElement elem1, OCLElement elem2) {
     rebindIterVar(symbols[0], iterVarType, elem1);
@@ -2196,7 +2203,11 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * @param iterSymbol the already-registered symbol to rebind (from {@link #defineIterVar})
    */
   private <T> T evalInScope(
-      LocalScope scope, VariableSymbol iterSymbol, Type iterVarType, OCLElement elem, Supplier<T> body) {
+      LocalScope scope,
+      VariableSymbol iterSymbol,
+      Type iterVarType,
+      OCLElement elem,
+      Supplier<T> body) {
     symbolTable.enterScope(scope);
     try {
       rebindIterVar(iterSymbol, iterVarType, elem);
@@ -2243,7 +2254,11 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * expansion before the next upstream pull rebinds the symbol.)
    */
   private Value evalInScopeMaterialized(
-      LocalScope scope, VariableSymbol iterSymbol, Type iterVarType, OCLElement elem, Supplier<Value> body) {
+      LocalScope scope,
+      VariableSymbol iterSymbol,
+      Type iterVarType,
+      OCLElement elem,
+      Supplier<Value> body) {
     Value result = evalInScope(scope, iterSymbol, iterVarType, elem, body);
     result.getElements(); // force + cache materialization now, before the symbol is rebound again
     return result;
@@ -3437,9 +3452,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * element's feature value as it existed at transaction start (via {@link TransactionModel}),
    * instead of the current live value. Used for the {@code self.attr@pre} navigation form.
    *
-   * <p>Unlike the live path, this eagerly materializes the receiver ({@code receiver.getElements()})
-   * rather than staying lazy — {@code @pre} is a comparatively rare, non-hot-path construct, so the
-   * added simplicity outweighs the lazy-pipeline benefits that matter for large collection chains.
+   * <p>Unlike the live path, this eagerly materializes the receiver ({@code
+   * receiver.getElements()}) rather than staying lazy — {@code @pre} is a comparatively rare,
+   * non-hot-path construct, so the added simplicity outweighs the lazy-pipeline benefits that
+   * matter for large collection chains.
    *
    * @param navCtx the property navigation node the {@code @pre} step is attached to
    * @param receiver the receiver value (must contain metaclass instances)
@@ -3483,7 +3499,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Value.of(results, finalType);
   }
 
-  /** Navigates {@code propertyName} on a single receiver element; used by {@link #visitPropertyAccessWithReceiver}. */
+  /**
+   * Navigates {@code propertyName} on a single receiver element; used by {@link
+   * #visitPropertyAccessWithReceiver}.
+   */
   private Iterator<OCLElement> navigateOne(OCLElement elem, String propertyName) {
     EObject instance = elem.tryGetInstance();
     if (instance == null) {
@@ -4323,8 +4342,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * evaluated {@code let} values from outside can be forced inside it. It requires: no {@code
    * append}/{@code iterate} (result types not trusted, as in the incremental analysis), no node
    * typed {@code OclAny} or erroneous (an {@code OclAny} may hold a collection), every comparison
-   * operand of a non-collection type, and every integer literal within {@code int} range. Exceptions
-   * from the model access itself (the wrapper) are infrastructure failures and are not considered.
+   * operand of a non-collection type, and every integer literal within {@code int} range.
+   * Exceptions from the model access itself (the wrapper) are infrastructure failures and are not
+   * considered.
    */
   private boolean cannotReportErrors(ParserRuleContext operand) {
     return errorFreeConstraints.computeIfAbsent(root(operand), this::isErrorFree);
@@ -4347,7 +4367,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         }
       }
     }
-    if (node instanceof VitruvOCLParser.NumberLitContext literal && !fitsLiteral(literal.getText())) {
+    if (node instanceof VitruvOCLParser.NumberLitContext literal
+        && !fitsLiteral(literal.getText())) {
       return false;
     }
     if (node instanceof VitruvOCLParser.SubstringOpContext substring
@@ -4516,7 +4537,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitNavigationChainCS(VitruvOCLParser.NavigationChainCSContext ctx) {
     if (ctx.navigationTargetCS() == null) {
-      return Value.empty(Type.ANY); // '@pre' reached without receiver context — see visitPrimaryWithNav
+      // '@pre' reached without receiver context — see visitPrimaryWithNav
+      return Value.empty(Type.ANY);
     }
     return visit(ctx.navigationTargetCS());
   }

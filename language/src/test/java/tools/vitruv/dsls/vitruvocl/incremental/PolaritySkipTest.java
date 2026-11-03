@@ -24,9 +24,9 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 
 /**
  * Level-2 skip tests (task item 4): with the statistics counters, show that a transaction that
- * touches the read set only in the "safe" direction is evaluated at level 1 but skipped at level
- * 2, and that events in the violating direction (and constraints with current violations) are
- * still evaluated. All sessions run in oracle mode.
+ * touches the read set only in the "safe" direction is evaluated at level 1 but skipped at level 2,
+ * and that events in the violating direction (and constraints with current violations) are still
+ * evaluated. All sessions run in oracle mode.
  */
 class PolaritySkipTest {
 
@@ -38,7 +38,9 @@ class PolaritySkipTest {
     IncrementalStats last = null;
     try (IncrementalSession session =
         new IncrementalSession(
-            List.of(constraint), fx.model().wrapper(), IncrementalConfig.of(level).withVerify(true))) {
+            List.of(constraint),
+            fx.model().wrapper(),
+            IncrementalConfig.of(level).withVerify(true))) {
       session.initialize();
       for (Consumer<EdgeFixture> edit : edits) {
         last = session.onTransaction(fx.model().record(() -> edit.accept(fx))).stats();
@@ -49,7 +51,8 @@ class PolaritySkipTest {
 
   /** Evaluated at level 1, skipped at level 2. */
   @SafeVarargs
-  private static void assertSkippedOnlyByPolarity(String constraint, Consumer<EdgeFixture>... edits) {
+  private static void assertSkippedOnlyByPolarity(
+      String constraint, Consumer<EdgeFixture>... edits) {
     IncrementalStats l1 = statsAfter(constraint, IncrementalLevel.READ_SET, edits);
     assertEquals(1, l1.constraintsEvaluated(), "level 1 must evaluate: " + l1);
     IncrementalStats l2 = statsAfter(constraint, IncrementalLevel.POLARITY, edits);
@@ -63,11 +66,13 @@ class PolaritySkipTest {
   }
 
   private static final String AT_MOST_THREE = "context edge::Root inv: self.items.size() <= 3";
-  private static final String REFS_FORALL = "context edge::Item inv: self.refs.forAll(r | r.value >= 0)";
+  private static final String REFS_FORALL =
+      "context edge::Item inv: self.refs.forAll(r | r.value >= 0)";
   // b2 has no refs; the disjunct keeps the initial state free of violations
   private static final String REFS_NOT_EMPTY =
       "context edge::SubB inv: self.refs.notEmpty() or self.name == \"b2\"";
-  private static final String FEW_OTHERS = "context edge::Root inv: edge::Other.allInstances().size() <= 5";
+  private static final String FEW_OTHERS =
+      "context edge::Root inv: edge::Other.allInstances().size() <= 5";
   private static final String VALUE = "context edge::Item inv: self.value >= 0";
   private static final String NEXT_VALUE = "context edge::Item inv: self.next.value > 0";
 
@@ -92,7 +97,8 @@ class PolaritySkipTest {
   @Test
   void aCurrentViolationDisablesThePolarityFilter() {
     // first transaction violates (4 items), second removes one: must be re-evaluated to repair
-    assertEvaluatedAtLevelTwo(AT_MOST_THREE, PolaritySkipTest::addItem, PolaritySkipTest::removeItem);
+    assertEvaluatedAtLevelTwo(
+        AT_MOST_THREE, PolaritySkipTest::addItem, PolaritySkipTest::removeItem);
   }
 
   @Test
@@ -127,7 +133,8 @@ class PolaritySkipTest {
 
   @Test
   void attributeChangesAreAlwaysPses() {
-    assertEvaluatedAtLevelTwo(VALUE, fx -> fx.find("a1").eSet(EdgeFixture.feature(fx.find("a1"), "value"), 9));
+    assertEvaluatedAtLevelTwo(
+        VALUE, fx -> fx.find("a1").eSet(EdgeFixture.feature(fx.find("a1"), "value"), 9));
   }
 
   @Test

@@ -31,7 +31,8 @@ import tools.vitruv.change.correspondence.view.EditableCorrespondenceModelView;
  * one, and — like the real VSUM (see {@code CorrespondenceVisibilityExperimentTest}) — editable
  * without producing any recorded model change.
  */
-public final class FakeCorrespondenceModel implements EditableCorrespondenceModelView<Correspondence> {
+public final class FakeCorrespondenceModel
+    implements EditableCorrespondenceModelView<Correspondence> {
 
   private record Entry(List<EObject> left, List<EObject> right, String tag) {}
 
@@ -111,7 +112,9 @@ public final class FakeCorrespondenceModel implements EditableCorrespondenceMode
     Map<String, Set<EObject>> result = new LinkedHashMap<>();
     for (Entry e : entries) {
       List<EObject> other =
-          sameObjects(e.left(), eObjects) ? e.right() : sameObjects(e.right(), eObjects) ? e.left() : null;
+          sameObjects(e.left(), eObjects)
+              ? e.right()
+              : sameObjects(e.right(), eObjects) ? e.left() : null;
       if (other != null) {
         result.computeIfAbsent(e.tag(), k -> new LinkedHashSet<>()).addAll(other);
       }
@@ -148,7 +151,8 @@ public final class FakeCorrespondenceModel implements EditableCorrespondenceMode
   }
 
   @Override
-  public <V extends Correspondence> CorrespondenceModelView<V> getView(Class<V> correspondenceType) {
+  public <V extends Correspondence> CorrespondenceModelView<V> getView(
+      Class<V> correspondenceType) {
     throw new UnsupportedOperationException("not needed by the tests");
   }
 

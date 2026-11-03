@@ -37,9 +37,9 @@ import org.junit.jupiter.api.Test;
  * <p>This cache is the one piece of state that {@link ConstraintListEvaluator}-driven parallel
  * constraint evaluation genuinely shares across worker threads (every {@link
  * tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler} instance is otherwise independent — see
- * {@link ConstraintListEvaluatorTest}). Before {@link MetamodelWrapper#getAllInstances} synchronized
- * its cache bookkeeping, concurrent first-time queries for different {@link EClass}es could race on
- * the shared {@code LinkedHashSet} and the lazily-rebuilt engine reference.
+ * {@link ConstraintListEvaluatorTest}). Before {@link MetamodelWrapper#getAllInstances}
+ * synchronized its cache bookkeeping, concurrent first-time queries for different {@link EClass}es
+ * could race on the shared {@code LinkedHashSet} and the lazily-rebuilt engine reference.
  */
 class MetamodelWrapperConcurrencyTest {
 

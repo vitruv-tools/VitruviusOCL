@@ -33,8 +33,8 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 /**
  * Random atomic model mutations with a fixed seed, for the incremental oracle tests: attribute
  * set/unset (single- and multi-valued), reference add/remove/replace, permutation within a list,
- * containment move, create, delete (with and without removing dangling cross references) and
- * silent correspondence edits.
+ * containment move, create, delete (with and without removing dangling cross references) and silent
+ * correspondence edits.
  *
  * <p>Every mutation is a legal EMF edit; mutations that do not apply to the current model are
  * retried with another kind. Values are drawn mostly from values already present in the model, so
@@ -60,6 +60,12 @@ public final class ModelMutator {
   private final Random random;
   private final List<String> log = new ArrayList<>();
 
+  /**
+   * Creates a mutator.
+   *
+   * @param model the model to mutate
+   * @param seed the seed of the random choices, so a failing sequence can be replayed
+   */
   public ModelMutator(LiveModel model, long seed) {
     this.model = model;
     this.random = new Random(seed);
@@ -266,7 +272,9 @@ public final class ModelMutator {
     EObject o = (EObject) pick[0];
     EReference r = (EReference) pick[1];
     List<EObject> targets =
-        model.allObjects().stream().filter(t -> r.getEReferenceType().isSuperTypeOf(t.eClass())).toList();
+        model.allObjects().stream()
+            .filter(t -> r.getEReferenceType().isSuperTypeOf(t.eClass()))
+            .toList();
     if (r.isMany()) {
       EList<EObject> values = (EList<EObject>) o.eGet(r);
       if (!values.isEmpty() && (targets.isEmpty() || random.nextBoolean())) {
@@ -284,9 +292,16 @@ public final class ModelMutator {
       return "link " + label(target) + " to " + label(o) + "." + r.getName();
     }
     EObject target =
-        targets.isEmpty() || random.nextInt(4) == 0 ? null : targets.get(random.nextInt(targets.size()));
+        targets.isEmpty() || random.nextInt(4) == 0
+            ? null
+            : targets.get(random.nextInt(targets.size()));
     o.eSet(r, target);
-    return "set " + label(o) + "." + r.getName() + " := " + (target == null ? "null" : label(target));
+    return "set "
+        + label(o)
+        + "."
+        + r.getName()
+        + " := "
+        + (target == null ? "null" : label(target));
   }
 
   @SuppressWarnings("unchecked")
@@ -319,7 +334,8 @@ public final class ModelMutator {
 
   @SuppressWarnings("unchecked")
   private String move() {
-    List<EObject> movable = model.allObjects().stream().filter(o -> o.eContainer() != null).toList();
+    List<EObject> movable =
+        model.allObjects().stream().filter(o -> o.eContainer() != null).toList();
     if (movable.isEmpty()) {
       return null;
     }
@@ -330,7 +346,8 @@ public final class ModelMutator {
         continue;
       }
       for (EReference r : c.eClass().getEAllContainments()) {
-        if (r.isChangeable() && r.getEReferenceType().isSuperTypeOf(o.eClass())
+        if (r.isChangeable()
+            && r.getEReferenceType().isSuperTypeOf(o.eClass())
             && (r.isMany() || c.eGet(r) == null)
             && !(c == o.eContainer() && r == o.eContainmentFeature())) {
           targets.add(new Object[] {c, r});
@@ -372,7 +389,10 @@ public final class ModelMutator {
     EReference r = (EReference) pick[1];
     EObject created = EcoreUtil.create((EClass) pick[2]);
     for (EAttribute a : created.eClass().getEAllAttributes()) {
-      if (!a.isMany() && a.isChangeable() && !a.isDerived() && supported(a.getEAttributeType())
+      if (!a.isMany()
+          && a.isChangeable()
+          && !a.isDerived()
+          && supported(a.getEAttributeType())
           && random.nextBoolean()) {
         created.eSet(a, randomValue(a));
       }
@@ -395,7 +415,10 @@ public final class ModelMutator {
     Set<EClass> result = new LinkedHashSet<>();
     for (EPackage p : packages) {
       for (EClassifier classifier : p.getEClassifiers()) {
-        if (classifier instanceof EClass c && !c.isAbstract() && !c.isInterface() && type.isSuperTypeOf(c)) {
+        if (classifier instanceof EClass c
+            && !c.isAbstract()
+            && !c.isInterface()
+            && type.isSuperTypeOf(c)) {
           result.add(c);
         }
       }
@@ -404,7 +427,8 @@ public final class ModelMutator {
   }
 
   private String delete(boolean removeReferences) {
-    List<EObject> deletable = model.allObjects().stream().filter(o -> o.eContainer() != null).toList();
+    List<EObject> deletable =
+        model.allObjects().stream().filter(o -> o.eContainer() != null).toList();
     if (deletable.isEmpty()) {
       return null;
     }
@@ -442,7 +466,9 @@ public final class ModelMutator {
   private static String label(EObject o) {
     EStructuralFeature name = o.eClass().getEStructuralFeature("name");
     Object value = name == null ? null : o.eGet(name);
-    return o.eClass().getName() + (value == null ? "" : "('" + value + "')")
-        + "@" + Integer.toHexString(System.identityHashCode(o));
+    return o.eClass().getName()
+        + (value == null ? "" : "('" + value + "')")
+        + "@"
+        + Integer.toHexString(System.identityHashCode(o));
   }
 }

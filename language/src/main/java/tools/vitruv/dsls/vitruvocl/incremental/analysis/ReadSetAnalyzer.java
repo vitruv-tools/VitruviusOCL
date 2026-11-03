@@ -302,7 +302,9 @@ public final class ReadSetAnalyzer {
     return spineType(nodeTypes, node, depth);
   }
 
-  /** Static form of {@link #spineType(ParserRuleContext, int)}, shared with the polarity analysis. */
+  /**
+   * Static form of {@link #spineType(ParserRuleContext, int)}, shared with the polarity analysis.
+   */
   static Type spineType(ParseTreeProperty<Type> nodeTypes, ParserRuleContext node, int depth) {
     Type type = nodeTypes.get(node);
     if (type != null || depth == 0) {

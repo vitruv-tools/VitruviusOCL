@@ -19,7 +19,9 @@ public record AllInstancesCallSite(EClass targetType, Kind kind) {
 
   /** Distinguishes OCL's {@code allInstances()} semantics from an exact-type-only query. */
   public enum Kind {
-    /** Include instances of {@code targetType} and all of its subtypes (OCL {@code allInstances()}). */
+    /**
+     * Include instances of {@code targetType} and all of its subtypes (OCL {@code allInstances()}).
+     */
     ALL_OF_KIND,
     /** Include only instances whose exact metaclass is {@code targetType}. */
     ALL_OF_TYPE

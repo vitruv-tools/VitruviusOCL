@@ -129,7 +129,8 @@ class ValueLazyTest {
     Value set2 = Value.of(List.of(v(2), v(3), v(4)), Type.set(Type.INTEGER));
 
     Value merged = set1.merge(set2);
-    List<Integer> values = merged.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
+    List<Integer> values =
+        merged.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
     assertEquals(List.of(1, 2, 3, 4), values);
   }
 
@@ -139,7 +140,8 @@ class ValueLazyTest {
     Value bag2 = Value.of(List.of(v(2), v(2)), Type.bag(Type.INTEGER));
 
     Value merged = bag1.merge(bag2);
-    List<Integer> values = merged.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
+    List<Integer> values =
+        merged.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
     assertEquals(List.of(1, 2, 2, 2), values);
   }
 
@@ -147,7 +149,8 @@ class ValueLazyTest {
   void excludingOnSetRemovesAllOccurrences() {
     Value set = Value.of(List.of(v(1), v(2), v(3)), Type.set(Type.INTEGER));
     Value result = set.excluding(v(2));
-    List<Integer> values = result.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
+    List<Integer> values =
+        result.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
     assertEquals(List.of(1, 3), values);
   }
 
@@ -185,7 +188,8 @@ class ValueLazyTest {
     Value set2 = Value.of(ints(10, 30), Type.set(Type.INTEGER));
 
     Value result = set1.intersection(set2);
-    List<Integer> values = result.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
+    List<Integer> values =
+        result.getElements().stream().map(ValueLazyTest::intOf).sorted().toList();
     assertEquals(List.of(10, 11, 12, 13, 14, 15, 16, 17, 18, 19), values);
   }
 

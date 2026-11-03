@@ -39,6 +39,7 @@ public record EvaluationOutcome(
     List<EvaluationVisitor.SkippedConstraint> skipped,
     int evaluatedInstances) {
 
+  /** Copies the lists, so the outcome is immutable. */
   public EvaluationOutcome {
     errors = List.copyOf(errors);
     records = List.copyOf(records);

@@ -77,7 +77,9 @@ public final class PathAnalyzer {
    * types.
    */
   public static RelevancePlan analyze(
-      VitruvOCLParser.ContextDeclCSContext tree, ParseTreeProperty<Type> nodeTypes, ReadSet readSet) {
+      VitruvOCLParser.ContextDeclCSContext tree,
+      ParseTreeProperty<Type> nodeTypes,
+      ReadSet readSet) {
     PathAnalyzer analyzer =
         new PathAnalyzer(nodeTypes, ReadSetAnalyzer.containsUntrustedTypeProducer(tree));
     for (VitruvOCLParser.ClassifierContextCSContext ctx : tree.classifierContextCS()) {
@@ -100,7 +102,8 @@ public final class PathAnalyzer {
         .forEach(
             (name, classes) -> {
               for (EClass c : classes) {
-                if (reads.stream().noneMatch(r -> r.feature().equals(name) && r.receiverClass() == c)) {
+                if (reads.stream()
+                    .noneMatch(r -> r.feature().equals(name) && r.receiverClass() == c)) {
                   reads.add(new RelevancePlan.Read(name, c, Origin.CLASS));
                 }
               }
@@ -397,7 +400,9 @@ public final class PathAnalyzer {
         bodyOrigin = walk(arg, body);
       } else if (child instanceof VitruvOCLParser.IterateVarSpecContext spec) {
         walk(spec.accInit, scope);
-        body = body.bind(spec.iterVar.getText(), Origin.CLASS).bind(spec.accVar.getText(), Origin.CLASS);
+        body =
+            body.bind(spec.iterVar.getText(), Origin.CLASS)
+                .bind(spec.accVar.getText(), Origin.CLASS);
       } else if (child instanceof ParserRuleContext other
           && !(child instanceof VitruvOCLParser.IteratorVarListContext)) {
         walkChildren(other, scope);
@@ -493,7 +498,9 @@ public final class PathAnalyzer {
         || node instanceof VitruvOCLParser.ExistsCorrespondenceContext;
   }
 
-  /** Records a use of {@code ~}; value and (with untrusted types) all origins count as untraceable. */
+  /**
+   * Records a use of {@code ~}; value and (with untrusted types) all origins count as untraceable.
+   */
   private void recordCorrespondence(Origin left, Origin right) {
     correspondenceReads.add(
         new RelevancePlan.CorrespondenceRead(partnerOrigin(left), partnerOrigin(right)));

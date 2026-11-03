@@ -215,12 +215,12 @@ public class VsumWrapper implements MetamodelWrapperInterface {
    * are included.
    *
    * <p><b>Implementation:</b> delegates to an {@link AllInstancesEngine} (Wei &amp; Kolovos,
-   * "An Efficient Computation Strategy for allInstances()", BigMDE 2015) instead of an unconditional
-   * {@code eAllContents()} walk over every view source model on every call. The traversal root list
-   * is {@link #getAllRootObjects()} — exactly the same source the previous implementation walked
-   * (all view source model roots; the correspondence model is a separate structure never touched by
-   * either implementation) — so results are read live just as before; only the engine's query
-   * analysis and containment-reachability pruning are cached (see {@link
+   * "An Efficient Computation Strategy for allInstances()", BigMDE 2015) instead of an
+   * unconditional {@code eAllContents()} walk over every view source model on every call. The
+   * traversal root list is {@link #getAllRootObjects()} — exactly the same source the previous
+   * implementation walked (all view source model roots; the correspondence model is a separate
+   * structure never touched by either implementation) — so results are read live just as before;
+   * only the engine's query analysis and containment-reachability pruning are cached (see {@link
    * #queriedAllInstancesTypes} and {@link #allInstancesEngine}).
    *
    * @param eClass the metaclass whose instances should be retrieved
@@ -263,7 +263,9 @@ public class VsumWrapper implements MetamodelWrapperInterface {
     return allInstancesEngine;
   }
 
-  /** Builds a fresh {@link AllInstancesEngine} from the currently known metamodels and call sites. */
+  /**
+   * Builds a fresh {@link AllInstancesEngine} from the currently known metamodels and call sites.
+   */
   private AllInstancesEngine buildAllInstancesEngine() {
     List<AllInstancesCallSite> callSites = new ArrayList<>(queriedAllInstancesTypes.size());
     for (EClass type : queriedAllInstancesTypes) {
@@ -362,6 +364,20 @@ public class VsumWrapper implements MetamodelWrapperInterface {
   }
 
   /**
+   * Returns all objects corresponding to the given source object that are instances of the given
+   * target type.
+   *
+   * @param source the source object to look up correspondences for
+   * @param targetType the EClass to filter corresponding objects by
+   * @return set of corresponding objects that are instances of {@code targetType}; empty if none
+   */
+  public Set<EObject> getCorrespondingObjects(EObject source, EClass targetType) {
+    return correspondenceModel.getCorrespondingEObjects(source).stream()
+        .filter(obj -> targetType.isSuperTypeOf(obj.eClass()))
+        .collect(Collectors.toSet());
+  }
+
+  /**
    * {@inheritDoc}
    *
    * <p>One tagged lookup in the correspondence model instead of one tag check per correspondent.
@@ -389,20 +405,6 @@ public class VsumWrapper implements MetamodelWrapperInterface {
   @Override
   public Map<String, Set<EObject>> getCorrespondingObjectsByTag(EObject source) {
     return correspondenceModel.getCorrespondingEObjectsWithTag(source);
-  }
-
-  /**
-   * Returns all objects corresponding to the given source object that are instances of the given
-   * target type.
-   *
-   * @param source the source object to look up correspondences for
-   * @param targetType the EClass to filter corresponding objects by
-   * @return set of corresponding objects that are instances of {@code targetType}; empty if none
-   */
-  public Set<EObject> getCorrespondingObjects(EObject source, EClass targetType) {
-    return correspondenceModel.getCorrespondingEObjects(source).stream()
-        .filter(obj -> targetType.isSuperTypeOf(obj.eClass()))
-        .collect(Collectors.toSet());
   }
 
   // ---------------------------------------------------------------------------

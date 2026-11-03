@@ -114,8 +114,8 @@ public class SmartLoader {
    * handed to the executor afterwards.
    *
    * <p>{@link #loadForConstraint(String, Path[], Path[])} delegates here with a singleton list, so
-   * single-constraint evaluation is unaffected — the union of one constraint's packages is just that
-   * constraint's own packages.
+   * single-constraint evaluation is unaffected — the union of one constraint's packages is just
+   * that constraint's own packages.
    *
    * @param constraints OCL constraint expressions to analyze, in any order
    * @param ecoreFiles Metamodel files (absolute or relative paths)

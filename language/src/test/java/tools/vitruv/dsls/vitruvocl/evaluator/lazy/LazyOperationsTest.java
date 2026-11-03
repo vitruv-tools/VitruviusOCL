@@ -27,8 +27,8 @@ import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 /**
  * Unit tests for {@link LazyOperations}, proving — via a pull-counting spy source — that each of
  * the four laziness categories from the {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy package
- * documentation} behaves as classified: category 1 never over-consumes, category 2 stops as soon
- * as the result is decided (worst case strict), category 3 grows its buffer only with confirmed
+ * documentation} behaves as classified: category 1 never over-consumes, category 2 stops as soon as
+ * the result is decided (worst case strict), category 3 grows its buffer only with confirmed
  * elements, and a chain feeding a structurally-strict (category 4) consumer is still drained from
  * its ultimate source exactly once, regardless of how many lazy steps sit in between.
  *
@@ -120,8 +120,7 @@ class LazyOperationsTest {
     // Each upstream element expands to 3 elements; consuming 5 result elements should need only
     // 2 upstream pulls (ceil(5/3)), not all of upstream.
     CountingSource source = new CountingSource(ints(0, 100));
-    OCLElementSource expanded =
-        LazyOperations.flatMap(source, e -> List.of(e, e, e).iterator());
+    OCLElementSource expanded = LazyOperations.flatMap(source, e -> List.of(e, e, e).iterator());
 
     Iterator<OCLElement> it = expanded.newIterator();
     for (int i = 0; i < 5; i++) {
@@ -267,7 +266,8 @@ class LazyOperationsTest {
     CountingSource left = new CountingSource(ints(0, 1000));
     CountingSource right = new CountingSource(List.of(v(0), v(999)));
 
-    OCLElementSource intersected = LazyOperations.intersect(left, right, OCLElement::semanticEquals);
+    OCLElementSource intersected =
+        LazyOperations.intersect(left, right, OCLElement::semanticEquals);
 
     // newIterator() eagerly looks ahead to the first match (same "hasNext() is O(1)" lookahead
     // pattern as FilterIterator), so pull counts are measured here, before calling next() - next()
@@ -289,7 +289,8 @@ class LazyOperationsTest {
   void intersectFindsAllMatchesForSetLikeInputsWithoutDuplicates() {
     CountingSource left = new CountingSource(ints(0, 10));
     CountingSource right = new CountingSource(ints(5, 15));
-    OCLElementSource intersected = LazyOperations.intersect(left, right, OCLElement::semanticEquals);
+    OCLElementSource intersected =
+        LazyOperations.intersect(left, right, OCLElement::semanticEquals);
     assertEquals(List.of(5, 6, 7, 8, 9), drain(intersected).stream().sorted().toList());
   }
 
@@ -297,11 +298,13 @@ class LazyOperationsTest {
   void intersectReturnsEmptyForDisjointInputs() {
     CountingSource left = new CountingSource(ints(0, 5));
     CountingSource right = new CountingSource(ints(100, 105));
-    OCLElementSource intersected = LazyOperations.intersect(left, right, OCLElement::semanticEquals);
+    OCLElementSource intersected =
+        LazyOperations.intersect(left, right, OCLElement::semanticEquals);
     assertTrue(drain(intersected).isEmpty());
   }
 
-  // ==================== Category 4: strict consumers still benefit from a lazy chain ====================
+  // ==================== Category 4: strict consumers still benefit from a lazy chain
+  // ====================
 
   @Test
   void aFullDrainOfAChainedPipelineTouchesTheSourceExactlyOnce() {
@@ -338,24 +341,25 @@ class LazyOperationsTest {
    * below are the same list-growth behavior the production code exhibits, not a stand-in metaphor.
    *
    * <p><b>Honest corroboration note:</b> an end-to-end run through the real OCL text pipeline (20
-   *000-element {@code Set} literal, {@code select().collect().iterate()}, both strategies measured
-   * by temporarily reverting {@code visitIterateOp} and re-running, then restoring) did <em>not</em>
-   * show a clear signal: streaming measured ~1456 ms / +31.4 MB heap delta vs. the materializing
-   * version's ~1197 ms / +29.2 MB in a single run — within JVM GC/JIT noise, and if anything the
-   * materializing version looked faster that run. Parsing and evaluating a 20 000-token literal
-   * dominates the wall-clock cost at that scale, swamping the one avoided ~25 000-element
-   * intermediate {@code ArrayList}. The structural measurement below is the one to trust: it isolates
-   * exactly the allocation this change avoids, without everything else a full pipeline run does
-   * alongside it. The real-world benefit is real (avoiding an O(n) intermediate copy is never
-   * negative) but only becomes visible against JVM noise at a scale or under memory pressure this
-   * quick check did not reach.
+   * 000-element {@code Set} literal, {@code select().collect().iterate()}, both strategies measured
+   * by temporarily reverting {@code visitIterateOp} and re-running, then restoring) did
+   * <em>not</em> show a clear signal: streaming measured ~1456 ms / +31.4 MB heap delta vs. the
+   * materializing version's ~1197 ms / +29.2 MB in a single run — within JVM GC/JIT noise, and if
+   * anything the materializing version looked faster that run. Parsing and evaluating a 20
+   * 000-token literal dominates the wall-clock cost at that scale, swamping the one avoided ~25
+   * 000-element intermediate {@code ArrayList}. The structural measurement below is the one to
+   * trust: it isolates exactly the allocation this change avoids, without everything else a full
+   * pipeline run does alongside it. The real-world benefit is real (avoiding an O(n) intermediate
+   * copy is never negative) but only becomes visible against JVM noise at a scale or under memory
+   * pressure this quick check did not reach.
    */
   @Test
   void iterateStreamingHoldsAtMostOneElementResidentInsteadOfTheFullFilteredChain() {
     int n = 50_000;
     CountingSource source = new CountingSource(ints(0, n));
     OCLElementSource selected = LazyOperations.filter(source, e -> intOf(e) % 2 == 0); // select()
-    OCLElementSource collected = LazyOperations.flatMap(selected, e -> List.of(e).iterator()); // collect()
+    OCLElementSource collected =
+        LazyOperations.flatMap(selected, e -> List.of(e).iterator()); // collect()
 
     // OLD strategy (pre-streaming visitIterateOp): receiver.getElements() drains the *entire*
     // select()->collect() chain into one ArrayList before the iterate loop even starts.
@@ -379,21 +383,23 @@ class LazyOperationsTest {
     }
 
     assertEquals(n / 2, oldStrategyPeakResidentElements); // old: 25,000 elements held at once
-    assertEquals(n / 2, processedCount); // same total work either way - no element skipped/duplicated
+    assertEquals(
+        n / 2, processedCount); // same total work either way - no element skipped/duplicated
     assertEquals(1, newStrategyPeakResidentElements); // new: never more than a single element
   }
 
-  // ==================== isUnique() streaming: measured early-termination effect ====================
+  // ==================== isUnique() streaming: measured early-termination effect
+  // ====================
 
   /**
-   * Mirrors {@code EvaluationVisitor#visitIsUniqueOp}'s consumption pattern directly against
-   * {@link LazyOperations}: a {@code select()}-shaped pass-through filter feeding an {@code
+   * Mirrors {@code EvaluationVisitor#visitIsUniqueOp}'s consumption pattern directly against {@link
+   * LazyOperations}: a {@code select()}-shaped pass-through filter feeding an {@code
    * isUnique()}-style "seen buffer, stop on first collision" consumer. {@code visitIsUniqueOp}
    * always had this early return - the fix was switching its receiver access from {@code
-   * getElements()} (forces the whole upstream chain to materialize before this loop, and its
-   * early return, ever runs) to {@code elementIterator()}. This test proves the early return now
-   * actually reduces how much of the upstream chain gets pulled, not just how many loop iterations
-   * happen after an already-complete materialization.
+   * getElements()} (forces the whole upstream chain to materialize before this loop, and its early
+   * return, ever runs) to {@code elementIterator()}. This test proves the early return now actually
+   * reduces how much of the upstream chain gets pulled, not just how many loop iterations happen
+   * after an already-complete materialization.
    */
   @Test
   void isUniqueLikeConsumerStopsAtFirstDuplicateInsteadOfConsumingTheFullUpstreamChain() {
@@ -445,14 +451,14 @@ class LazyOperationsTest {
 
   /**
    * Mirrors {@code EvaluationVisitor#visitOneOp}'s consumption pattern: a {@code select()}-shaped
-   * pass-through filter feeding a "count matches, stop as soon as a second one is found"
-   * consumer. Unlike {@code isUnique()}, {@code visitOneOp} did <em>not</em> have this early
-   * return before this change at all - it always counted every match across the whole receiver
-   * and only checked {@code count == 1} at the end. Both additions (the early return itself, and
-   * switching from {@code getElements()} to {@code elementIterator()}) were required together:
-   * without the early return, streaming the receiver would have made no difference (the loop
-   * would still visit every element); without streaming, the early return would have run only
-   * after {@code getElements()} had already forced full upstream materialization.
+   * pass-through filter feeding a "count matches, stop as soon as a second one is found" consumer.
+   * Unlike {@code isUnique()}, {@code visitOneOp} did <em>not</em> have this early return before
+   * this change at all - it always counted every match across the whole receiver and only checked
+   * {@code count == 1} at the end. Both additions (the early return itself, and switching from
+   * {@code getElements()} to {@code elementIterator()}) were required together: without the early
+   * return, streaming the receiver would have made no difference (the loop would still visit every
+   * element); without streaming, the early return would have run only after {@code getElements()}
+   * had already forced full upstream materialization.
    */
   @Test
   void oneLikeConsumerStopsAtSecondMatchInsteadOfConsumingTheFullUpstreamChain() {
@@ -508,7 +514,8 @@ class LazyOperationsTest {
     // OLD strategy: materialize once (receiver's own cache) ...
     List<OCLElement> receiverOwnCache = new ArrayList<>();
     selected.newIterator().forEachRemaining(receiverOwnCache::add);
-    // ... then copy that into sortedBy()'s own local list, as `new ArrayList<>(receiver.getElements())` did.
+    // ... then copy that into sortedBy()'s own local list, as `new
+    // ArrayList<>(receiver.getElements())` did.
     List<OCLElement> oldStrategySortedBysCopy = new ArrayList<>(receiverOwnCache);
 
     // NEW strategy: drain straight into sortedBy()'s own local list, no separate receiver cache.
@@ -523,14 +530,14 @@ class LazyOperationsTest {
   // ==================== collectNested() streaming: honest effect assessment ====================
 
   /**
-   * Unlike {@code sortedBy()}, {@code visitCollectNestedOp} never allocated a second, separate
-   * copy of the receiver's elements - it used {@code receiver.getElements()} directly as the loop
+   * Unlike {@code sortedBy()}, {@code visitCollectNestedOp} never allocated a second, separate copy
+   * of the receiver's elements - it used {@code receiver.getElements()} directly as the loop
    * source, no extra {@code new ArrayList<>(...)}. So switching to {@code elementIterator()} does
    * not avoid a double-copy here; it is exactly the single-materialization {@code getElements()}
    * vs. {@code elementIterator()} comparison already measured as ~1% (noise-level) in the
    * elementIterator()-fast-path investigation (see {@code ElementIteratorFastPathBenchmark}'s Case
-   * B). This test exists to make that assessment explicit and verified, not to claim a win that
-   * was not actually measured: the real, load-bearing reason to make this change was the
+   * B). This test exists to make that assessment explicit and verified, not to claim a win that was
+   * not actually measured: the real, load-bearing reason to make this change was the
    * iterScope-construction-order correctness bug found and fixed alongside it (see {@code
    * EvaluationVisitor#visitCollectNestedOp} and {@code LazyChainRegressionTest}'s shadowing test),
    * not a performance win.
@@ -545,6 +552,7 @@ class LazyOperationsTest {
     selected.newIterator().forEachRemaining(drained::add);
 
     assertEquals(n / 2, drained.size());
-    assertEquals(n, source.totalPulls.get()); // every source element visited exactly once either way
+    assertEquals(
+        n, source.totalPulls.get()); // every source element visited exactly once either way
   }
 }

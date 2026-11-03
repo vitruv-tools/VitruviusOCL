@@ -39,8 +39,8 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
- * Tests for {@code visitIncludingOp}'s cardinality-bound computation (the χ case system for
- * {@code including()}): the element case (argument conforms to the declared element type) vs. the
+ * Tests for {@code visitIncludingOp}'s cardinality-bound computation (the χ case system for {@code
+ * including()}): the element case (argument conforms to the declared element type) vs. the
  * collection case (argument conforms to the receiver's full collection type), and the
  * element-case-first priority used to resolve the (specification-underdetermined) overlap between
  * them.
@@ -152,7 +152,8 @@ class IncludingBoundsTypeTest {
     new SymbolTableBuilder(symbolTable, WRAPPER, errors, scopeAnnotator).visit(tree);
     assertFalse(errors.hasErrors(), "Symbol table build failed: " + errors.getErrors());
 
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, WRAPPER, errors, scopeAnnotator);
+    TypeCheckVisitor typeChecker =
+        new TypeCheckVisitor(symbolTable, WRAPPER, errors, scopeAnnotator);
     typeChecker.visit(tree);
 
     ParseTree includingNode = findIncludingOp(tree);
@@ -194,16 +195,16 @@ class IncludingBoundsTypeTest {
 
   /**
    * {@code Sequence{5,6}.first()} has type {@code !Integer!} (Singleton). A Singleton conforms to
-   * both the receiver's element type (Integer) and, via the Singleton-conforms-to-anything rule,
-   * to the receiver's full collection type — so both the element case and the collection case
-   * apply simultaneously here.
+   * both the receiver's element type (Integer) and, via the Singleton-conforms-to-anything rule, to
+   * the receiver's full collection type — so both the element case and the collection case apply
+   * simultaneously here.
    *
-   * <p>Note: for a Singleton argument, L2 = U2 = 1 always, which makes the collection-case
-   * formula (L1+L2 / U1+U2) numerically coincide with the element-case formula (L1+1 / U1+1) —
-   * so this test cannot distinguish the two cases by the resulting numbers alone. What it does
-   * verify is the thing item 2 of the task actually cares about: no exclusivity/ambiguity check
-   * rejects this overlap, and the first (element-case) branch runs to completion producing a
-   * valid, non-ERROR result.
+   * <p>Note: for a Singleton argument, L2 = U2 = 1 always, which makes the collection-case formula
+   * (L1+L2 / U1+U2) numerically coincide with the element-case formula (L1+1 / U1+1) — so this test
+   * cannot distinguish the two cases by the resulting numbers alone. What it does verify is the
+   * thing item 2 of the task actually cares about: no exclusivity/ambiguity check rejects this
+   * overlap, and the first (element-case) branch runs to completion producing a valid, non-ERROR
+   * result.
    */
   @Test
   void bothCasesApplicable_elementCaseRunsWithoutAmbiguityError() {

@@ -287,7 +287,8 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
     // codebase's evaluator, so at evaluation time these are bound to an empty value rather than a
     // real argument — see EvaluationVisitor.
     if (ctx.operationParamListCS() != null) {
-      for (VitruvOCLParser.OperationParamCSContext param : ctx.operationParamListCS().operationParamCS()) {
+      for (VitruvOCLParser.OperationParamCSContext param :
+          ctx.operationParamListCS().operationParamCS()) {
         Type paramType = resolveTypeExpression(param.paramType);
         symbolTable.defineVariable(
             new VariableSymbol(param.paramName.getText(), paramType, contextScope, false));

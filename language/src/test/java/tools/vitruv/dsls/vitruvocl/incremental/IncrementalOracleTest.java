@@ -38,11 +38,12 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
  *
  * <ul>
  *   <li>{@code compiledPathEqualsFreshCompilation}: building block A — evaluating the once-compiled
- *       constraint equals compiling it from scratch (oracle of {@link IncrementalSession#initialize}).
- *   <li>{@code buildAsOneTransaction} (strategy 2a): start from empty resources, add the whole model
- *       as one recorded transaction.
- *   <li>{@code randomMutations} (strategy 2b): sequences of random atomic mutations, one and several
- *       per transaction, compared after every transaction.
+ *       constraint equals compiling it from scratch (oracle of {@link
+ *       IncrementalSession#initialize}).
+ *   <li>{@code buildAsOneTransaction} (strategy 2a): start from empty resources, add the whole
+ *       model as one recorded transaction.
+ *   <li>{@code randomMutations} (strategy 2b): sequences of random atomic mutations, one and
+ *       several per transaction, compared after every transaction.
  * </ul>
  *
  * <p>Every session runs in oracle mode, so any difference throws {@link
@@ -126,7 +127,8 @@ class IncrementalOracleTest {
     List<String> constraints = ConstraintCorpus.forModelSet(set);
     LiveModel source = LiveModel.load(set);
     LiveModel target = LiveModel.empty(set);
-    try (IncrementalSession session = new IncrementalSession(constraints, target.wrapper(), oracle(level))) {
+    try (IncrementalSession session =
+        new IncrementalSession(constraints, target.wrapper(), oracle(level))) {
       session.initialize();
       List<EChange<EObject>> transaction = target.addAllContentOf(source);
       assertFalse(transaction.isEmpty());
@@ -140,7 +142,8 @@ class IncrementalOracleTest {
     List<String> constraints = ConstraintCorpus.forModelSet(set);
     LiveModel model = LiveModel.load(set);
     ModelMutator mutator = new ModelMutator(model, seed);
-    try (IncrementalSession session = new IncrementalSession(constraints, model.wrapper(), oracle(level))) {
+    try (IncrementalSession session =
+        new IncrementalSession(constraints, model.wrapper(), oracle(level))) {
       session.initialize();
       for (int step = 0; step < MUTATIONS; step++) {
         int perTransaction = step < MUTATIONS / 2 ? 1 : 1 + (step % 4);

@@ -42,16 +42,25 @@ public final class CorrespondenceDelta {
     private final EObject second;
     private final String tag;
 
+    /**
+     * Creates a pair; the order of the objects does not matter.
+     *
+     * @param first one of the corresponding objects
+     * @param second the other corresponding object
+     * @param tag the tag of the correspondence, or {@code null} if it is untagged
+     */
     public Pair(EObject first, EObject second, String tag) {
       this.first = first;
       this.second = second;
       this.tag = tag;
     }
 
+    /** One of the corresponding objects. */
     public EObject first() {
       return first;
     }
 
+    /** The other corresponding object. */
     public EObject second() {
       return second;
     }
@@ -70,7 +79,9 @@ public final class CorrespondenceDelta {
 
     @Override
     public int hashCode() {
-      return System.identityHashCode(first) + System.identityHashCode(second) + 31 * Objects.hashCode(tag);
+      return System.identityHashCode(first)
+          + System.identityHashCode(second)
+          + 31 * Objects.hashCode(tag);
     }
 
     @Override
@@ -79,7 +90,8 @@ public final class CorrespondenceDelta {
     }
   }
 
-  private static final CorrespondenceDelta UNKNOWN = new CorrespondenceDelta(false, Set.of(), Set.of());
+  private static final CorrespondenceDelta UNKNOWN =
+      new CorrespondenceDelta(false, Set.of(), Set.of());
 
   private final boolean known;
   private final Set<Pair> added;
@@ -139,6 +151,8 @@ public final class CorrespondenceDelta {
 
   @Override
   public String toString() {
-    return known ? "CorrespondenceDelta[added=" + added + ", removed=" + removed + "]" : "CorrespondenceDelta[unknown]";
+    return known
+        ? "CorrespondenceDelta[added=" + added + ", removed=" + removed + "]"
+        : "CorrespondenceDelta[unknown]";
   }
 }

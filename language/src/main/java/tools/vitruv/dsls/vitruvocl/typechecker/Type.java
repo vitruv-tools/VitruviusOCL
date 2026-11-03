@@ -696,10 +696,15 @@ public abstract class Type {
     private final int upperBound;
 
     public CollectionType(Type elementType, Multiplicity multiplicity) {
-      this(elementType, multiplicity, defaultLowerBound(multiplicity), defaultUpperBound(multiplicity));
+      this(
+          elementType,
+          multiplicity,
+          defaultLowerBound(multiplicity),
+          defaultUpperBound(multiplicity));
     }
 
-    public CollectionType(Type elementType, Multiplicity multiplicity, int lowerBound, int upperBound) {
+    public CollectionType(
+        Type elementType, Multiplicity multiplicity, int lowerBound, int upperBound) {
       this.elementType = elementType;
       this.multiplicity = multiplicity;
       this.lowerBound = lowerBound;

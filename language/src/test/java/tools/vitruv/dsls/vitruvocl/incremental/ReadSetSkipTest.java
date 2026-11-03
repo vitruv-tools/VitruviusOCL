@@ -22,9 +22,9 @@ import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 
 /**
- * Level-1 skip tests (task item 4): with the statistics counters, show that a constraint is
- * skipped when the transaction touches nothing it reads and evaluated when it does. Every session
- * also runs in oracle mode.
+ * Level-1 skip tests (task item 4): with the statistics counters, show that a constraint is skipped
+ * when the transaction touches nothing it reads and evaluated when it does. Every session also runs
+ * in oracle mode.
  */
 class ReadSetSkipTest {
 
@@ -33,7 +33,9 @@ class ReadSetSkipTest {
     EdgeFixture fx = EdgeFixture.create();
     try (IncrementalSession session =
         new IncrementalSession(
-            List.of(constraint), fx.model().wrapper(), IncrementalConfig.of(level).withVerify(true))) {
+            List.of(constraint),
+            fx.model().wrapper(),
+            IncrementalConfig.of(level).withVerify(true))) {
       session.initialize();
       List<EChange<EObject>> tx = fx.model().record(() -> edit.accept(fx));
       return session.onTransaction(tx).stats();
@@ -51,42 +53,52 @@ class ReadSetSkipTest {
   }
 
   private static void assertEvaluated(IncrementalStats stats) {
-    assertEquals(0, stats.constraintsSkipped(), "expected the constraint to be evaluated: " + stats);
+    assertEquals(
+        0, stats.constraintsSkipped(), "expected the constraint to be evaluated: " + stats);
     assertEquals(1, stats.constraintsEvaluated(), stats.toString());
   }
 
   private static final String OTHER_LABEL = "context edge::Other inv: self.label != \"z\"";
-  private static final String POLY = "context edge::Item inv: self.oclIsKindOf(edge::SubA) implies self.oclAsType(edge::SubA).extra >= 0";
+  private static final String POLY =
+      "context edge::Item inv: self.oclIsKindOf(edge::SubA) implies"
+          + " self.oclAsType(edge::SubA).extra >= 0";
   private static final String ITEM_COUNT = "context edge::Root inv: self.items.size() <= 3";
   private static final String VALUE = "context edge::Item inv: self.value >= 0";
   private static final String POST = "context edge::Item post: self.value >= self.value@pre";
-  private static final String CORR = "context edge::Item inv: edge::Other.allInstances().select(~).size() <= 1";
+  private static final String CORR =
+      "context edge::Item inv: edge::Other.allInstances().select(~).size() <= 1";
 
   @Test
   void unrelatedAttributeChangeIsSkipped() {
-    assertSkipped(statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> set(fx.find("a1"), "value", 9)));
+    assertSkipped(
+        statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> set(fx.find("a1"), "value", 9)));
   }
 
   @Test
   void readAttributeChangeIsEvaluated() {
-    assertEvaluated(statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> set(fx.find("x"), "label", "q")));
+    assertEvaluated(
+        statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> set(fx.find("x"), "label", "q")));
   }
 
   @Test
   void sameFeatureNameOnUnrelatedClassIsSkipped() {
     // 'label' of SubB is not read by a constraint on Other.label (typed read, Other only)
-    assertSkipped(statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> set(fx.find("b1"), "label", "q")));
+    assertSkipped(
+        statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> set(fx.find("b1"), "label", "q")));
   }
 
   @Test
   void featureOfSubclassIsMatchedThroughStaticSupertype() {
-    assertEvaluated(statsAfter(POLY, IncrementalLevel.READ_SET, fx -> set(fx.find("a1"), "extra", 4)));
-    assertSkipped(statsAfter(POLY, IncrementalLevel.READ_SET, fx -> set(fx.find("b1"), "label", "q")));
+    assertEvaluated(
+        statsAfter(POLY, IncrementalLevel.READ_SET, fx -> set(fx.find("a1"), "extra", 4)));
+    assertSkipped(
+        statsAfter(POLY, IncrementalLevel.READ_SET, fx -> set(fx.find("b1"), "label", "q")));
   }
 
   @Test
   void attributeChangeDoesNotTouchContainmentList() {
-    assertSkipped(statsAfter(ITEM_COUNT, IncrementalLevel.READ_SET, fx -> set(fx.find("a1"), "value", 9)));
+    assertSkipped(
+        statsAfter(ITEM_COUNT, IncrementalLevel.READ_SET, fx -> set(fx.find("a1"), "value", 9)));
   }
 
   @Test
@@ -127,7 +139,11 @@ class ReadSetSkipTest {
 
   @Test
   void correspondenceConstraintIsSkippedWhenNeitherItsReadsNorAnyCorrespondenceChange() {
-    for (IncrementalLevel level : List.of(IncrementalLevel.READ_SET, IncrementalLevel.POLARITY, IncrementalLevel.RELEVANT_INSTANCES)) {
+    for (IncrementalLevel level :
+        List.of(
+            IncrementalLevel.READ_SET,
+            IncrementalLevel.POLARITY,
+            IncrementalLevel.RELEVANT_INSTANCES)) {
       assertSkipped(statsAfter(CORR, level, fx -> EdgeFixture.list(fx.root(1), "tags").add("t")));
       assertSkipped(statsAfter(CORR, level, fx -> {}));
     }
@@ -135,7 +151,11 @@ class ReadSetSkipTest {
 
   @Test
   void correspondenceConstraintIsEvaluatedWhenACorrespondenceChangesSilently() {
-    for (IncrementalLevel level : List.of(IncrementalLevel.READ_SET, IncrementalLevel.POLARITY, IncrementalLevel.RELEVANT_INSTANCES)) {
+    for (IncrementalLevel level :
+        List.of(
+            IncrementalLevel.READ_SET,
+            IncrementalLevel.POLARITY,
+            IncrementalLevel.RELEVANT_INSTANCES)) {
       // no model event at all: only the correspondence model changes
       IncrementalStats silent = statsAfter(CORR, level, fx -> correspond(fx, "a1", "x"));
       assertEvaluated(silent);
@@ -156,7 +176,8 @@ class ReadSetSkipTest {
 
   @Test
   void correspondenceChangeDoesNotForceConstraintsWithoutCorrespondence() {
-    assertSkipped(statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> correspond(fx, "a1", "x")));
+    assertSkipped(
+        statsAfter(OTHER_LABEL, IncrementalLevel.READ_SET, fx -> correspond(fx, "a1", "x")));
   }
 
   private static void correspond(EdgeFixture fx, String left, String right) {
@@ -167,7 +188,8 @@ class ReadSetSkipTest {
 
   @Test
   void levelZeroEvaluatesEverything() {
-    IncrementalStats stats = statsAfter(OTHER_LABEL, IncrementalLevel.FULL, fx -> set(fx.find("a1"), "value", 9));
+    IncrementalStats stats =
+        statsAfter(OTHER_LABEL, IncrementalLevel.FULL, fx -> set(fx.find("a1"), "value", 9));
     assertEvaluated(stats);
     assertEquals(2, stats.instancesEvaluated(), "both Other instances");
   }

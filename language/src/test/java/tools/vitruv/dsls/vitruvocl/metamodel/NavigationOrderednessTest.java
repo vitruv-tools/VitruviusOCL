@@ -23,8 +23,8 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 
 /**
- * Regression tests for the Ctype combination rule of implicit-collect navigation ({@code e.p}
- * where {@code e} is itself a collection).
+ * Regression tests for the Ctype combination rule of implicit-collect navigation ({@code e.p} where
+ * {@code e} is itself a collection).
  *
  * <p>{@code Spacecraft.payloads} is an {@code EReference} with {@code upperBound="-1"} and no
  * explicit {@code ordered}/{@code unique} overrides, so it defaults to EMF's {@code ordered=true,
@@ -51,12 +51,13 @@ class NavigationOrderednessTest {
   }
 
   /**
-   * {@code payloads} is ordered (EMF default) → {@code .name} must stay ordered, so {@code
-   * first()} type-checks and returns the first payload's name in XMI document order ("Camera").
+   * {@code payloads} is ordered (EMF default) → {@code .name} must stay ordered, so {@code first()}
+   * type-checks and returns the first payload's name in XMI document order ("Camera").
    */
   @Test
   void testNavigationOverOrderedCollectionPreservesOrderForFirst() {
-    ConstraintResult r = eval("context spaceMission::Spacecraft inv: self.payloads.name.first() == \"Camera\"");
+    ConstraintResult r =
+        eval("context spaceMission::Spacecraft inv: self.payloads.name.first() == \"Camera\"");
     assertTrue(r.isSuccess(), "Expected no type errors: " + r.getCompilerErrors());
     assertTrue(r.isSatisfied(), "Expected self.payloads.name.first() to be \"Camera\"");
   }
@@ -64,7 +65,8 @@ class NavigationOrderednessTest {
   /** Same reasoning for {@code last()} — the second (and last) payload is "Antenna". */
   @Test
   void testNavigationOverOrderedCollectionPreservesOrderForLast() {
-    ConstraintResult r = eval("context spaceMission::Spacecraft inv: self.payloads.name.last() == \"Antenna\"");
+    ConstraintResult r =
+        eval("context spaceMission::Spacecraft inv: self.payloads.name.last() == \"Antenna\"");
     assertTrue(r.isSuccess(), "Expected no type errors: " + r.getCompilerErrors());
     assertTrue(r.isSatisfied(), "Expected self.payloads.name.last() to be \"Antenna\"");
   }

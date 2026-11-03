@@ -30,19 +30,21 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 
 /**
- * A small dynamic metamodel {@code edge} for targeted edge-case tests, with inheritance, a
- * feature name shared by unrelated classes, ordered non-unique references and containment:
+ * A small dynamic metamodel {@code edge} for targeted edge-case tests, with inheritance, a feature
+ * name shared by unrelated classes, ordered non-unique references and containment:
  *
  * <pre>
- * Root  { items: Item[*] (containment), others: Other[*] (containment), tags: EString[*] (non-unique) }
- * Item  (abstract) { name: EString, value: EInt, next: Item[0..1], refs: Item[*] (ordered, non-unique),
- *                    owner: Root[0..1] (container, opposite of Root.items), cache: EInt (transient) }
+ * Root  { items: Item[*] (containment), others: Other[*] (containment), tags: EString[*]
+ * (non-unique) } Item  (abstract) { name: EString, value: EInt, next: Item[0..1], refs: Item[*]
+ * (ordered, non-unique),
+ *                    owner: Root[0..1] (container, opposite of Root.items), cache: EInt (transient)
+ *                    }
  * SubA  extends Item { extra: EInt }
  * SubB  extends Item { label: EString }
  * Other { label: EString, amount: EInt }
  * </pre>
  *
- * Initial model: {@code edge1.edge} with {@code Root r1 { items: a1(SubA, value 5, extra 1, next
+ * <p>Initial model: {@code edge1.edge} with {@code Root r1 { items: a1(SubA, value 5, extra 1, next
  * b1), b1(SubB, value 3, label "lb1", refs [a1, a2]), a2(SubA, value 7, extra 2); others: o1(label
  * "x", amount 1), o2(label "y", amount 2) }} and {@code edge2.edge} with {@code Root r2 { items:
  * b2(SubB, value 9) }}.
@@ -59,11 +61,13 @@ public final class EdgeFixture {
 
   private EdgeFixture() {
     ResourceSet rs = new ResourceSetImpl();
-    rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
-    Resource r1 = rs.createResource(URI.createURI("memory:/edge1.edge"));
-    Resource r2 = rs.createResource(URI.createURI("memory:/edge2.edge"));
+    rs.getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("*", new XMIResourceFactoryImpl());
+    final Resource r1 = rs.createResource(URI.createURI("memory:/edge1.edge"));
+    final Resource r2 = rs.createResource(URI.createURI("memory:/edge2.edge"));
 
-    EObject root1 = create("Root");
+    final EObject root1 = create("Root");
     EObject a1 = item("SubA", "a1", 5);
     a1.eSet(feature(a1, "extra"), 1);
     EObject b1 = item("SubB", "b1", 3);
@@ -94,6 +98,12 @@ public final class EdgeFixture {
     return new EdgeFixture();
   }
 
+  /** Creates an instance of the class {@code className} of the edge metamodel. */
+  public static EObject create(String className) {
+    return EcoreUtil.create((EClass) PACKAGE.getEClassifier(className));
+  }
+
+  /** The live model of this fixture. */
   public LiveModel model() {
     return model;
   }
@@ -103,7 +113,9 @@ public final class EdgeFixture {
     return model.modelResources().get(n - 1).getContents().get(0);
   }
 
-  /** The object (item or other) whose {@code name} or {@code label} attribute equals {@code key}. */
+  /**
+   * The object (item or other) whose {@code name} or {@code label} attribute equals {@code key}.
+   */
   public EObject find(String key) {
     for (EObject o : model.allObjects()) {
       for (String f : List.of("name", "label")) {
@@ -115,10 +127,7 @@ public final class EdgeFixture {
     throw new IllegalArgumentException("no object " + key);
   }
 
-  public static EObject create(String className) {
-    return EcoreUtil.create((EClass) PACKAGE.getEClassifier(className));
-  }
-
+  /** Creates an instance of the item class {@code className} with the given name and value. */
   public static EObject item(String className, String name, int value) {
     EObject o = create(className);
     o.eSet(feature(o, "name"), name);
@@ -126,10 +135,12 @@ public final class EdgeFixture {
     return o;
   }
 
+  /** The feature {@code name} of the class of {@code o}. */
   public static org.eclipse.emf.ecore.EStructuralFeature feature(EObject o, String name) {
     return o.eClass().getEStructuralFeature(name);
   }
 
+  /** The value of the many-valued feature {@code name} of {@code o}. */
   @SuppressWarnings("unchecked")
   public static List<Object> list(EObject o, String name) {
     return (List<Object>) o.eGet(feature(o, name));
@@ -148,8 +159,8 @@ public final class EdgeFixture {
     subA.getESuperTypes().add(item);
     EClass subB = eClass(pkg, "SubB");
     subB.getESuperTypes().add(item);
-    EClass other = eClass(pkg, "Other");
-    EClass root = eClass(pkg, "Root");
+    final EClass other = eClass(pkg, "Other");
+    final EClass root = eClass(pkg, "Root");
 
     attribute(item, "name", EcorePackage.Literals.ESTRING, false, true);
     attribute(item, "value", EcorePackage.Literals.EINT, false, true);
@@ -181,7 +192,8 @@ public final class EdgeFixture {
     return c;
   }
 
-  private static void attribute(EClass owner, String name, EDataType type, boolean many, boolean unique) {
+  private static void attribute(
+      EClass owner, String name, EDataType type, boolean many, boolean unique) {
     EAttribute a = EcoreFactory.eINSTANCE.createEAttribute();
     a.setName(name);
     a.setEType(type);

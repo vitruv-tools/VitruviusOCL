@@ -22,17 +22,20 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 
 /**
- * An observed correspondence change
- * {@code (a, b)} re-evaluates only the context instances that reach {@code a} or {@code b} through a
- * traceable operand of some {@code ~} (binary in either operand order, {@code select/reject/
- * exists(~)}), instead of forcing the whole extension. Every session runs in oracle mode, so each
- * test also checks that the narrowed result equals a full evaluation.
+ * An observed correspondence change {@code (a, b)} re-evaluates only the context instances that
+ * reach {@code a} or {@code b} through a traceable operand of some {@code ~} (binary in either
+ * operand order, {@code select/reject/ exists(~)}), instead of forcing the whole extension. Every
+ * session runs in oracle mode, so each test also checks that the narrowed result equals a full
+ * evaluation.
  */
 class CorrespondenceRelevanceTest {
 
   @SafeVarargs
   private static IncrementalStats statsAfter(
-      String constraint, IncrementalLevel level, Consumer<EdgeFixture> setup, Consumer<EdgeFixture>... edits) {
+      String constraint,
+      IncrementalLevel level,
+      Consumer<EdgeFixture> setup,
+      Consumer<EdgeFixture>... edits) {
     return statsAfter(constraint, level, false, setup, edits);
   }
 
@@ -96,14 +99,16 @@ class CorrespondenceRelevanceTest {
   @Test
   void binaryWithSelfOnTheLeft() {
     String c =
-        "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 1)";
+        "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount >"
+            + " 1)";
     assertPartial(level3(c, fx -> correspond(fx, "a1", "x", null)), 1);
   }
 
   @Test
   void binaryWithSelfOnTheRight() {
     String c =
-        "context edge::SubA inv: edge::Other.allInstances().forAll(o | o ~ self implies o.amount > 1)";
+        "context edge::SubA inv: edge::Other.allInstances().forAll(o | o ~ self implies o.amount >"
+            + " 1)";
     assertPartial(level3(c, fx -> correspond(fx, "x", "a1", null)), 1);
   }
 
@@ -141,14 +146,16 @@ class CorrespondenceRelevanceTest {
 
   @Test
   void taggedRejectReevaluatesOnlyThePartner() {
-    String c = "context edge::Item inv: edge::Other.allInstances().reject(~, Tag = \"t\").size() == 2";
+    String c =
+        "context edge::Item inv: edge::Other.allInstances().reject(~, Tag = \"t\").size() == 2";
     assertPartial(level3(c, fx -> correspond(fx, "b1", "x", "t")), 1);
   }
 
   @Test
   void correspondenceAndModelEventsInOneTransactionAreUnited() {
     String c =
-        "context edge::SubA inv: self.value < 100 and edge::Other.allInstances().select(~).isEmpty()";
+        "context edge::SubA inv: self.value < 100 and"
+            + " edge::Other.allInstances().select(~).isEmpty()";
     assertPartial(
         level3(
             c,
@@ -198,7 +205,8 @@ class CorrespondenceRelevanceTest {
   void belowLevelThreeACorrespondenceChangeEvaluatesTheWholeExtensionUnforced() {
     String c = "context edge::Item inv: edge::Other.allInstances().select(~).size() <= 1";
     for (IncrementalLevel level : List.of(IncrementalLevel.READ_SET, IncrementalLevel.POLARITY)) {
-      IncrementalStats stats = statsAfter(c, level, fx -> {}, fx -> correspond(fx, "a1", "x", null));
+      IncrementalStats stats =
+          statsAfter(c, level, fx -> {}, fx -> correspond(fx, "a1", "x", null));
       assertEquals(0, stats.forcedEvaluations(), stats.toString());
       assertEquals(1, stats.constraintsEvaluated(), stats.toString());
       assertEquals(4, stats.instancesEvaluated(), "all four items: " + stats);

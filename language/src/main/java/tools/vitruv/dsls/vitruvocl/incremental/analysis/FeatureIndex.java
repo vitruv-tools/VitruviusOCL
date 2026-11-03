@@ -84,7 +84,9 @@ public final class FeatureIndex {
     return new FeatureIndex(packages);
   }
 
-  /** All resolutions of {@code name} on classes conforming to {@code staticType} (or all, if null). */
+  /**
+   * All resolutions of {@code name} on classes conforming to {@code staticType} (or all, if null).
+   */
   public List<Resolution> resolve(String name, EClass staticType) {
     List<Resolution> result = new ArrayList<>();
     for (Resolution r : byName.getOrDefault(name, List.of())) {

@@ -58,7 +58,10 @@ public final class LiveModel {
   private final FakeCorrespondenceModel correspondences;
   private final VsumWrapper wrapper;
 
-  private LiveModel(ResourceSet resourceSet, List<Resource> modelResources, FakeCorrespondenceModel correspondences) {
+  private LiveModel(
+      ResourceSet resourceSet,
+      List<Resource> modelResources,
+      FakeCorrespondenceModel correspondences) {
     this.resourceSet = resourceSet;
     this.modelResources = modelResources;
     this.correspondences = correspondences;
@@ -72,11 +75,15 @@ public final class LiveModel {
 
   /** Wraps programmatically built resources (all in {@code resourceSet}) as a live model. */
   public static LiveModel of(
-      ResourceSet resourceSet, List<Resource> modelResources, FakeCorrespondenceModel correspondences) {
+      ResourceSet resourceSet,
+      List<Resource> modelResources,
+      FakeCorrespondenceModel correspondences) {
     return new LiveModel(resourceSet, new ArrayList<>(modelResources), correspondences);
   }
 
-  /** Loads all models of {@code set} (metamodels are registered globally, as in the existing tests). */
+  /**
+   * Loads all models of {@code set} (metamodels are registered globally, as in the existing tests).
+   */
   public static LiveModel load(ModelSet set) {
     registerMetamodels(set);
     ResourceSet rs = newResourceSet();
@@ -111,9 +118,9 @@ public final class LiveModel {
   }
 
   /**
-   * Copies the complete content (including cross-resource references and correspondences) of
-   * {@code source} into this (empty) model, inside one recorded transaction, and returns the
-   * recorded changes.
+   * Copies the complete content (including cross-resource references and correspondences) of {@code
+   * source} into this (empty) model, inside one recorded transaction, and returns the recorded
+   * changes.
    */
   public List<EChange<EObject>> addAllContentOf(LiveModel source) {
     EcoreUtil.Copier copier = new EcoreUtil.Copier();
@@ -151,14 +158,17 @@ public final class LiveModel {
     }
   }
 
+  /** The wrapper that evaluates constraints on this model. */
   public VsumWrapper wrapper() {
     return wrapper;
   }
 
+  /** The resources holding the models. */
   public List<Resource> modelResources() {
     return modelResources;
   }
 
+  /** The correspondences between the models. */
   public FakeCorrespondenceModel correspondences() {
     return correspondences;
   }
@@ -180,7 +190,9 @@ public final class LiveModel {
 
   private static ResourceSet newResourceSet() {
     ResourceSet rs = new ResourceSetImpl();
-    rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+    rs.getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("*", new XMIResourceFactoryImpl());
     // The test metamodel correspondence.ecore shares its nsURI with Vitruvius' own correspondence
     // package. Register it only locally, so that a real VSUM in the same JVM is not affected.
     rs.getPackageRegistry().put(CORRESPONDENCE_NS_URI, correspondencePackage());
@@ -189,7 +201,9 @@ public final class LiveModel {
 
   private static EPackage correspondencePackage() {
     ResourceSet rs = new ResourceSetImpl();
-    rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+    rs.getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("*", new XMIResourceFactoryImpl());
     Resource r = rs.getResource(fileUri(METAMODELS.resolve("correspondence.ecore")), true);
     return (EPackage) r.getContents().get(0);
   }
@@ -197,7 +211,9 @@ public final class LiveModel {
   private static synchronized void registerMetamodels(ModelSet set) {
     for (String ecore : set.ecores()) {
       ResourceSet rs = new ResourceSetImpl();
-      rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+      rs.getResourceFactoryRegistry()
+          .getExtensionToFactoryMap()
+          .put("*", new XMIResourceFactoryImpl());
       Resource r = rs.getResource(fileUri(METAMODELS.resolve(ecore)), true);
       EPackage pkg = (EPackage) r.getContents().get(0);
       if (!(EPackage.Registry.INSTANCE.get(pkg.getNsURI()) instanceof EPackage)) {
@@ -214,11 +230,14 @@ public final class LiveModel {
         continue;
       }
       for (EObject c : (Collection<EObject>) root.eGet(list)) {
-        List<EObject> left = (List<EObject>) c.eGet(c.eClass().getEStructuralFeature("leftEObjects"));
-        List<EObject> right = (List<EObject>) c.eGet(c.eClass().getEStructuralFeature("rightEObjects"));
+        List<EObject> left =
+            (List<EObject>) c.eGet(c.eClass().getEStructuralFeature("leftEObjects"));
+        List<EObject> right =
+            (List<EObject>) c.eGet(c.eClass().getEStructuralFeature("rightEObjects"));
         EStructuralFeature tagFeature = c.eClass().getEStructuralFeature("tag");
         String tag = tagFeature == null ? null : (String) c.eGet(tagFeature);
-        if (left.stream().noneMatch(EObject::eIsProxy) && right.stream().noneMatch(EObject::eIsProxy)) {
+        if (left.stream().noneMatch(EObject::eIsProxy)
+            && right.stream().noneMatch(EObject::eIsProxy)) {
           corr.addCorrespondenceBetween(List.copyOf(left), List.copyOf(right), tag);
         }
       }

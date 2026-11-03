@@ -3,11 +3,11 @@ package tools.vitruv.dsls.vitruvocl.allinstances.cache;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
-import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
+import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
 
 class AllInstancesCallCollectorTest {
 
@@ -23,7 +23,9 @@ class AllInstancesCallCollectorTest {
 
     assertEquals(Set.of(fixture.memberClass), cacheConfig.getAllOfKind());
     assertEquals(Set.of(fixture.webPageClass), cacheConfig.getAllOfType());
-    assertTrue(cacheConfig.getTraverse().isEmpty(), "traverse is only populated by the reachability analyzer");
+    assertTrue(
+        cacheConfig.getTraverse().isEmpty(),
+        "traverse is only populated by the reachability analyzer");
   }
 
   @Test

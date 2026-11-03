@@ -71,11 +71,20 @@ class IncrementalCliTest {
         context spaceMission::Spacecraft post grown:
           self.mass >= self.mass@pre
         """);
-    String baseline = run("eval-batch", ocl.toString(), "--ecore", ECORE, "--xmi", XMI, "--threads", "1");
+    String baseline =
+        run("eval-batch", ocl.toString(), "--ecore", ECORE, "--xmi", XMI, "--threads", "1");
     String incremental =
         run(
-            "eval-batch", ocl.toString(), "--ecore", ECORE, "--xmi", XMI, "--threads", "1",
-            "--incremental-level", level);
+            "eval-batch",
+            ocl.toString(),
+            "--ecore",
+            ECORE,
+            "--xmi",
+            XMI,
+            "--threads",
+            "1",
+            "--incremental-level",
+            level);
     assertTrue(baseline.contains("\"success\":true"), baseline);
     assertEquals(baseline, incremental);
   }

@@ -49,6 +49,7 @@ public record PseSet(
     Set<EClass> deleteSensitiveTypes,
     boolean unknownExtension) {
 
+  /** Copies the maps and sets, so the PSE set is immutable. */
   public PseSet {
     Map<String, Map<EClass, Polarity>> copy = new LinkedHashMap<>();
     typedReads.forEach((k, v) -> copy.put(k, Collections.unmodifiableMap(new LinkedHashMap<>(v))));
@@ -107,7 +108,10 @@ public record PseSet(
     };
   }
 
-  /** Join of the annotations of all reads of {@code name} that apply to runtime class {@code runtime}. */
+  /**
+   * Join of the annotations of all reads of {@code name} that apply to runtime class {@code
+   * runtime}.
+   */
   private Polarity polarityOf(String name, EClass runtime) {
     Polarity result = untypedReads.get(name);
     Map<EClass, Polarity> typed = typedReads.get(name);

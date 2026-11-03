@@ -9,7 +9,9 @@ public final class ModelBuilding {
 
   private ModelBuilding() {}
 
-  /** Appends {@code children} to the many-valued containment feature {@code ref} of {@code owner}. */
+  /**
+   * Appends {@code children} to the many-valued containment feature {@code ref} of {@code owner}.
+   */
   @SuppressWarnings("unchecked")
   public static void addMany(EObject owner, EReference ref, EObject... children) {
     List<EObject> list = (List<EObject>) owner.eGet(ref);

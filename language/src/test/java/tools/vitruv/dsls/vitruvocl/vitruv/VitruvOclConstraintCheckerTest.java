@@ -320,7 +320,8 @@ class VitruvOclConstraintCheckerTest {
   @DisplayName("empty and comment-only content has no constraints")
   void emptyContent() {
     assertTrue(VitruvOclConstraintChecker.fromString("").getConstraints().isEmpty());
-    assertTrue(VitruvOclConstraintChecker.fromString("-- nothing yet\n").getConstraints().isEmpty());
+    assertTrue(
+        VitruvOclConstraintChecker.fromString("-- nothing yet\n").getConstraints().isEmpty());
   }
 
   @Test

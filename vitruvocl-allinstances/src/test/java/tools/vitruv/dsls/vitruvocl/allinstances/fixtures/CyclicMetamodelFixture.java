@@ -9,15 +9,15 @@ import org.eclipse.emf.ecore.EcoreFactory;
 
 /**
  * A minimal, artificially cyclic metamodel used to prove that {@link
- * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} terminates on cyclic
- * containment structures: {@code A} containment-references {@code B} via {@code b}, and {@code B}
- * containment-references {@code A} back via {@code a}.
+ * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} terminates on
+ * cyclic containment structures: {@code A} containment-references {@code B} via {@code b}, and
+ * {@code B} containment-references {@code A} back via {@code a}.
  *
  * <p>Note this does not describe a valid *instance* model (EMF would reject actually containing an
  * object within its own containment ancestry at runtime) — it only needs to exist at the
  * metamodel/type level, since {@link
- * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} operates purely on {@link
- * EClass}/{@link EReference} declarations, never on instance data.
+ * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} operates
+ * purely on {@link EClass}/{@link EReference} declarations, never on instance data.
  */
 public final class CyclicMetamodelFixture {
 
@@ -27,6 +27,7 @@ public final class CyclicMetamodelFixture {
   public final EReference aToB;
   public final EReference bToA;
 
+  /** Builds the metamodel. */
   public CyclicMetamodelFixture() {
     EcoreFactory ecoreFactory = EcoreFactory.eINSTANCE;
 

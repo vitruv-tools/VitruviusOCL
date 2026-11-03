@@ -25,8 +25,8 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 /**
  * Level-3 tests (task item 4 for level 3): with the statistics counters, show that only the
  * relevant context instances are re-evaluated — via self paths, containment, the reverse index,
- * {@code eOpposite}, inserted and removed instances — and that untraceable reads fall back to
- * the whole extension (class event). All sessions run in oracle mode.
+ * {@code eOpposite}, inserted and removed instances — and that untraceable reads fall back to the
+ * whole extension (class event). All sessions run in oracle mode.
  *
  * <p>The edge model has four {@code Item}s (a1, b1, a2 in r1; b2 in r2) and two {@code Root}s.
  */
@@ -34,12 +34,16 @@ class RelevantInstanceTest {
 
   @SafeVarargs
   private static IncrementalStats statsAfter(
-      String constraint, IncrementalConfig config, Consumer<EdgeFixture> setup, Consumer<EdgeFixture>... edits) {
+      String constraint,
+      IncrementalConfig config,
+      Consumer<EdgeFixture> setup,
+      Consumer<EdgeFixture>... edits) {
     EdgeFixture fx = EdgeFixture.create();
     setup.accept(fx);
     IncrementalStats last = null;
     try (IncrementalSession session =
-        new IncrementalSession(List.of(constraint), fx.model().wrapper(), config.withVerify(true))) {
+        new IncrementalSession(
+            List.of(constraint), fx.model().wrapper(), config.withVerify(true))) {
       session.initialize();
       for (Consumer<EdgeFixture> edit : edits) {
         last = session.onTransaction(fx.model().record(() -> edit.accept(fx))).stats();
@@ -50,7 +54,8 @@ class RelevantInstanceTest {
 
   @SafeVarargs
   private static IncrementalStats level3(String constraint, Consumer<EdgeFixture>... edits) {
-    return statsAfter(constraint, IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES), fx -> {}, edits);
+    return statsAfter(
+        constraint, IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES), fx -> {}, edits);
   }
 
   private static void set(EdgeFixture fx, String object, String feature, Object value) {
@@ -69,7 +74,11 @@ class RelevantInstanceTest {
     String c = "context edge::Item inv: self.value >= 0";
     assertPartial(level3(c, fx -> set(fx, "a1", "value", 9)), 1);
     IncrementalStats l2 =
-        statsAfter(c, IncrementalConfig.of(IncrementalLevel.POLARITY), fx -> {}, fx -> set(fx, "a1", "value", 9));
+        statsAfter(
+            c,
+            IncrementalConfig.of(IncrementalLevel.POLARITY),
+            fx -> {},
+            fx -> set(fx, "a1", "value", 9));
     assertEquals(4, l2.instancesEvaluated(), "level 2 evaluates the whole extension: " + l2);
   }
 
@@ -108,7 +117,9 @@ class RelevantInstanceTest {
   void insertedContextInstanceIsEvaluatedAlone() {
     String c = "context edge::Item inv: self.value >= 0";
     assertPartial(
-        level3(c, fx -> EdgeFixture.list(fx.root(2), "items").add(EdgeFixture.item("SubA", "n", 1))), 1);
+        level3(
+            c, fx -> EdgeFixture.list(fx.root(2), "items").add(EdgeFixture.item("SubA", "n", 1))),
+        1);
   }
 
   @Test
@@ -121,7 +132,8 @@ class RelevantInstanceTest {
 
   @Test
   void readThroughAllInstancesIsAClassEvent() {
-    String c = "context edge::Item inv: edge::Item.allInstances().select(i | i.value > 100).isEmpty()";
+    String c =
+        "context edge::Item inv: edge::Item.allInstances().select(i | i.value > 100).isEmpty()";
     IncrementalStats stats = level3(c, fx -> set(fx, "a1", "value", 9));
     assertEquals(1, stats.classEventFallbacks(), stats.toString());
     assertEquals(4, stats.instancesEvaluated(), stats.toString());
@@ -130,9 +142,12 @@ class RelevantInstanceTest {
   @Test
   void insertionIntoAnAllInstancesExtensionIsAClassEvent() {
     // the new item violates the constraint for every existing item, not only for itself
-    String c = "context edge::Item inv: edge::Item.allInstances().select(i | i.value > 100).isEmpty()";
+    String c =
+        "context edge::Item inv: edge::Item.allInstances().select(i | i.value > 100).isEmpty()";
     IncrementalStats stats =
-        level3(c, fx -> EdgeFixture.list(fx.root(2), "items").add(EdgeFixture.item("SubA", "big", 500)));
+        level3(
+            c,
+            fx -> EdgeFixture.list(fx.root(2), "items").add(EdgeFixture.item("SubA", "big", 500)));
     assertEquals(1, stats.classEventFallbacks(), stats.toString());
     assertEquals(5, stats.instancesEvaluated(), stats.toString());
   }
@@ -153,14 +168,17 @@ class RelevantInstanceTest {
       "context edge::SubA inv: edge::Other.allInstances().select(~).forAll(o | o.amount > 0)";
 
   private static void correspond(EdgeFixture fx, String a, String b) {
-    fx.model().correspondences().addCorrespondenceBetween(List.of(fx.find(a)), List.of(fx.find(b)), null);
+    fx.model()
+        .correspondences()
+        .addCorrespondenceBetween(List.of(fx.find(a)), List.of(fx.find(b)), null);
   }
 
   @Test
   void idiomRuleNarrowsToCorrespondentsWhenEnabled() {
     IncrementalConfig on =
         IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES).withCorrespondenceIdiom(true);
-    IncrementalStats stats = statsAfter(IDIOM, on, fx -> correspond(fx, "a1", "x"), fx -> set(fx, "x", "amount", -1));
+    IncrementalStats stats =
+        statsAfter(IDIOM, on, fx -> correspond(fx, "a1", "x"), fx -> set(fx, "x", "amount", -1));
     assertPartial(stats, 1);
   }
 
@@ -196,9 +214,10 @@ class RelevantInstanceTest {
 
   @Test
   void idiomRuleSeesSilentCorrespondenceChangesOnceTheyAreObserved() {
-    // Without the snapshot diff the idiom rule missed this (CorrespondenceVisibilityExperimentTest):
-    // a correspondence added silently together with an unrelated change. The observed
-    // correspondence delta now makes a2 relevant; verify mode checks the result.
+    // Without the snapshot diff the idiom rule missed this
+    // (CorrespondenceVisibilityExperimentTest): a correspondence added silently together with an
+    // unrelated change. The observed correspondence delta now makes a2 relevant; verify mode checks
+    // the result.
     IncrementalConfig on =
         IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES).withCorrespondenceIdiom(true);
     IncrementalStats stats =

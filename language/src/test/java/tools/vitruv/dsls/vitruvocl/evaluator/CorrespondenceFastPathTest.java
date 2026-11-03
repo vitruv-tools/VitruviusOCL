@@ -25,10 +25,9 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
- * In {@code G and R} and {@code G
- * implies R} with a correspondence guard {@code G}, the right side {@code R} is not evaluated when
- * {@code G} is false, if {@code R} cannot report a runtime error (the only observable effect of
- * evaluating it). The result is unchanged in every case.
+ * In {@code G and R} and {@code G implies R} with a correspondence guard {@code G}, the right side
+ * {@code R} is not evaluated when {@code G} is false, if {@code R} cannot report a runtime error
+ * (the only observable effect of evaluating it). The result is unchanged in every case.
  */
 class CorrespondenceFastPathTest {
 
@@ -40,7 +39,8 @@ class CorrespondenceFastPathTest {
   private static EvaluationVisitor evaluate(EdgeFixture fx, String constraint) {
     VitruvOCLCompiler compiler = new VitruvOCLCompiler(fx.model().wrapper(), null);
     compiler.compile(constraint);
-    assertFalse(compiler.hasErrors(), () -> "unexpected errors: " + compiler.getErrors().getErrors());
+    assertFalse(
+        compiler.hasErrors(), () -> "unexpected errors: " + compiler.getErrors().getErrors());
     return compiler.getLastEvaluator();
   }
 
@@ -57,7 +57,8 @@ class CorrespondenceFastPathTest {
     EvaluationVisitor ev =
         evaluate(
             correspondingA1AndX(),
-            "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 0)");
+            "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies"
+                + " o.amount > 0)");
     // 2 SubA × 2 Other, only (a1, x) corresponds
     assertEquals(3, ev.getCorrespondenceShortCircuits());
     assertTrue(ev.getViolationRecords().isEmpty());
@@ -68,7 +69,8 @@ class CorrespondenceFastPathTest {
     EvaluationVisitor ev =
         evaluate(
             correspondingA1AndX(),
-            "context edge::SubA inv: edge::Other.allInstances().exists(o | o ~ self and o.amount > 5)");
+            "context edge::SubA inv: edge::Other.allInstances().exists(o | o ~ self and o.amount >"
+                + " 5)");
     assertEquals(3, ev.getCorrespondenceShortCircuits());
     assertEquals(2, ev.getViolationRecords().size(), "no Other has amount > 5");
   }
@@ -77,12 +79,15 @@ class CorrespondenceFastPathTest {
   void rightSideThatMayReportAnErrorIsAlwaysEvaluated() {
     // i.refs is a collection: == on it can report "Comparison requires singleton operands"
     String c =
-        "context edge::Other inv: edge::Item.allInstances().forAll(i | self ~ i implies i.refs == i.refs)";
-    VitruvOCLCompiler compiler = new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
+        "context edge::Other inv: edge::Item.allInstances().forAll(i | self ~ i implies i.refs =="
+            + " i.refs)";
+    VitruvOCLCompiler compiler =
+        new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
     compiler.compile(c);
     assertEquals(0, compiler.getLastEvaluator().getCorrespondenceShortCircuits());
     System.setProperty(EvaluationVisitor.PROP_NO_CORRESPONDENCE_FAST_PATHS, "true");
-    VitruvOCLCompiler reference = new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
+    VitruvOCLCompiler reference =
+        new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
     reference.compile(c);
     assertEquals(
         describe(reference.getErrors().getErrors()),
@@ -109,12 +114,15 @@ class CorrespondenceFastPathTest {
       System.setProperty(EvaluationVisitor.PROP_NO_CORRESPONDENCE_FAST_PATHS, "true");
     }
     try {
-      VitruvOCLCompiler compiler = new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
+      VitruvOCLCompiler compiler =
+          new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
       Object result = compiler.compile(constraint);
       EvaluationVisitor ev = compiler.getLastEvaluator();
       return describe(compiler.getErrors().getErrors())
-          + " result=" + result
-          + " violations=" + (ev == null ? "-" : ev.getViolationRecords().size());
+          + " result="
+          + result
+          + " violations="
+          + (ev == null ? "-" : ev.getViolationRecords().size());
     } catch (RuntimeException e) {
       return "exception " + e.getClass().getName();
     } finally {
@@ -128,13 +136,14 @@ class CorrespondenceFastPathTest {
         // a let typed OclAny holds a collection: the comparison reports an error (review H1)
         "context edge::SubA inv: edge::Other.allInstances()"
             + ".forAll(o | self ~ o implies (let x : OclAny = Set{1,2} in x == 1))",
-        "context edge::SubA inv: edge::Other.allInstances()"
-            + ".forAll(o | self ~ o implies (let x : OclAny = edge::Other.allInstances() in x == o))",
+        "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies (let x :"
+            + " OclAny = edge::Other.allInstances() in x == o))",
         // an outer lazy let is forced inside the skipped side; its comparison errors (review H2)
         "context edge::SubA inv: let xs = edge::Item.allInstances().select(i | i.refs == i) in"
             + " edge::Other.allInstances().forAll(o | self ~ o implies xs.size() == 0)",
         // an integer literal that does not fit an int throws (review M1); o ~ o is always false
-        "context edge::SubA inv: edge::Other.allInstances().forAll(o | o ~ o implies o.amount > 99999999999)"
+        "context edge::SubA inv: edge::Other.allInstances().forAll(o | o ~ o implies o.amount >"
+            + " 99999999999)"
       })
   void skippingNeverChangesErrorsOrExceptions(String constraint) {
     assertEquals(outcome(constraint, false), outcome(constraint, true), constraint);
@@ -146,7 +155,8 @@ class CorrespondenceFastPathTest {
     EvaluationVisitor ev =
         evaluate(
             correspondingA1AndX(),
-            "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 0)");
+            "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies"
+                + " o.amount > 0)");
     assertEquals(0, ev.getCorrespondenceShortCircuits());
   }
 }

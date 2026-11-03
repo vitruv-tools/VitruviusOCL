@@ -1,6 +1,5 @@
 package tools.vitruv.dsls.vitruvocl.allinstances.collect;
 
-import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -12,20 +11,22 @@ import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
+import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
 
 /**
  * Performs the single top-down traversal described in Wei &amp; Kolovos (BigMDE 2015, Section
  * 3.4): walk the in-memory containment tree exactly once, classify every visited {@link EObject}
  * against the requested types, and descend only into containment references that {@link
- * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} has determined are needed.
+ * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} has determined
+ * are needed.
  *
  * <p>This is where the strategy's performance win is realized: references outside {@code
  * traversableRefs} are skipped entirely (including everything below them), instead of being
  * walked and discarded, or requiring a separate full-model index of every type up front.
  *
  * <p>The traversal assumes the model is not mutated concurrently with a {@link #collectInstances}
- * call (see {@link tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine} for how this interacts with reusing
- * a {@link CacheConfiguration} across multiple calls).
+ * call (see {@link tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine} for how this
+ * interacts with reusing a {@link CacheConfiguration} across multiple calls).
  */
 public class SinglePassInstanceCollector {
 

@@ -111,24 +111,31 @@ class SessionRecoveryTest {
             "context edge::Other inv: self.label != \"z\"");
     try (IncrementalSession session =
         new IncrementalSession(
-            constraints, wrapper, IncrementalConfig.of(IncrementalLevel.READ_SET).withVerify(true))) {
+            constraints,
+            wrapper,
+            IncrementalConfig.of(IncrementalLevel.READ_SET).withVerify(true))) {
       session.initialize();
       EObject a1 = fx.find("a1");
       wrapper.fail = true;
-      List<EChange<EObject>> lost = fx.model().record(() -> a1.eSet(EdgeFixture.feature(a1, "value"), -1));
+      List<EChange<EObject>> lost =
+          fx.model().record(() -> a1.eSet(EdgeFixture.feature(a1, "value"), -1));
       assertThrows(IllegalStateException.class, () -> session.onTransaction(lost));
       wrapper.fail = false;
 
       // touches only Other.label, but the Item constraint missed the lost transaction
       EObject x = fx.find("x");
       IncrementalStats stats =
-          session.onTransaction(fx.model().record(() -> x.eSet(EdgeFixture.feature(x, "label"), "q"))).stats();
+          session
+              .onTransaction(fx.model().record(() -> x.eSet(EdgeFixture.feature(x, "label"), "q")))
+              .stats();
       assertEquals(2, stats.constraintsEvaluated(), stats.toString());
       assertEquals(2, stats.forcedEvaluations(), stats.toString());
 
       // afterwards, filtering resumes
       IncrementalStats next =
-          session.onTransaction(fx.model().record(() -> x.eSet(EdgeFixture.feature(x, "label"), "r"))).stats();
+          session
+              .onTransaction(fx.model().record(() -> x.eSet(EdgeFixture.feature(x, "label"), "r")))
+              .stats();
       assertEquals(1, next.constraintsSkipped(), next.toString());
     }
   }

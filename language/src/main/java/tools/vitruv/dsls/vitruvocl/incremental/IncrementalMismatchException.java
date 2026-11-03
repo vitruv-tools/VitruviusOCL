@@ -21,6 +21,11 @@ public class IncrementalMismatchException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * Creates the exception.
+   *
+   * @param diff the difference between the incremental and the full result
+   */
   public IncrementalMismatchException(String diff) {
     super(diff);
   }

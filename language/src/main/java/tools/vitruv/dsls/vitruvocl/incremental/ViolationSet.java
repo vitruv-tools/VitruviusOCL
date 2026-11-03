@@ -33,7 +33,10 @@ import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
  */
 final class ViolationSet {
 
-  /** Identity wrapper: two distinct EObjects are distinct keys even if {@code equals} says otherwise. */
+  /**
+   * Identity wrapper: two distinct EObjects are distinct keys even if {@code equals} says
+   * otherwise.
+   */
   record InstanceKey(EObject instance) {
     @Override
     public boolean equals(Object o) {
@@ -109,7 +112,9 @@ final class ViolationSet {
 
   /** The instances currently violating {@code constraint}, in record order. */
   List<EObject> violatingInstances(String constraint) {
-    return requireState(constraint).violations.keySet().stream().map(InstanceKey::instance).toList();
+    return requireState(constraint).violations.keySet().stream()
+        .map(InstanceKey::instance)
+        .toList();
   }
 
   /** The current outcome of {@code constraint}, assembled from the stored state. */
@@ -121,7 +126,8 @@ final class ViolationSet {
     }
     List<ViolationRecord> records = new ArrayList<>();
     state.violations.values().forEach(records::addAll);
-    return new EvaluationOutcome(false, List.of(), records, full.skipped(), full.evaluatedInstances());
+    return new EvaluationOutcome(
+        false, List.of(), records, full.skipped(), full.evaluatedInstances());
   }
 
   /**

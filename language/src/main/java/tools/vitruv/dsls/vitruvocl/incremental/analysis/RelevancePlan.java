@@ -78,6 +78,7 @@ public record RelevancePlan(
    */
   public record CorrespondenceRead(Origin left, Origin right) {}
 
+  /** Copies the lists and sets, so the plan is immutable. */
   public RelevancePlan {
     reads = List.copyOf(reads);
     correspondenceReads = List.copyOf(correspondenceReads);

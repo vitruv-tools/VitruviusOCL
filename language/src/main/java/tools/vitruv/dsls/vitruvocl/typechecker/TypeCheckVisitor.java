@@ -1658,7 +1658,8 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
     if (!previousNavWasPropertyAccess(ctx)) {
       reportError(
-          ctx.AT_PRE().getSymbol(), "'@pre' must directly follow a property access, e.g. 'self.attr@pre'");
+          ctx.AT_PRE().getSymbol(),
+          "'@pre' must directly follow a property access, e.g. 'self.attr@pre'");
       nodeTypes.put(ctx, Type.ERROR);
       return Type.ERROR;
     }
@@ -1683,7 +1684,10 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     return List.of();
   }
 
-  /** Returns {@code true} if the navigation-chain step immediately before {@code ctx} is a plain property access. */
+  /**
+   * Returns {@code true} if the navigation-chain step immediately before {@code ctx} is a plain
+   * property access.
+   */
   private boolean previousNavWasPropertyAccess(VitruvOCLParser.NavigationChainCSContext ctx) {
     List<VitruvOCLParser.NavigationChainCSContext> chain = enclosingNavigationChain(ctx);
     int idx = chain.indexOf(ctx);
@@ -1799,7 +1803,8 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    * conformance. Deliberately does NOT require every attribute to be listed (no completeness
    * check — partial aggregates are valid per spec).
    *
-   * @param argsCtx the aggregate argument list, or {@code null} if the bare (no-parens) form was used
+   * @param argsCtx the aggregate argument list, or {@code null} if the bare (no-parens) form was
+   *     used
    * @param receiverType the (already-validated) object receiver type
    */
   private void checkLifecycleAggregateArgs(
@@ -1835,7 +1840,9 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
               ? featureType.getElementType()
               : featureType;
       Type actualElem =
-          (valueType.isSingleton() || valueType.isOptional()) ? valueType.getElementType() : valueType;
+          (valueType.isSingleton() || valueType.isOptional())
+              ? valueType.getElementType()
+              : valueType;
       if (!actualElem.isConformantTo(expectedElem)) {
         reportError(
             arg.value,

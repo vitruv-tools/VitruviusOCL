@@ -40,12 +40,11 @@ import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * Manual benchmark: an incremental
- * session over the real Vitruvius correspondence model, with and without the shared
- * correspondence lookup. Model: {@code n} {@code SubA} and {@code n} {@code Other}, the first half
- * of each corresponding 1:1. Measured: {@code initialize()}, a transaction changing one {@code
- * Other.amount} (read by the {@code ~} constraints), and a transaction that only adds a
- * correspondence silently. Disabled by default; run with {@code
+ * Manual benchmark: an incremental session over the real Vitruvius correspondence model, with and
+ * without the shared correspondence lookup. Model: {@code n} {@code SubA} and {@code n} {@code
+ * Other}, the first half of each corresponding 1:1. Measured: {@code initialize()}, a transaction
+ * changing one {@code Other.amount} (read by the {@code ~} constraints), and a transaction that
+ * only adds a correspondence silently. Disabled by default; run with {@code
  * -Dvitruvocl.bench.corrSession=true} (optionally {@code -Dvitruvocl.bench.corrSizes=500,1000}).
  */
 class CorrespondenceSessionBenchmark {
@@ -55,9 +54,11 @@ class CorrespondenceSessionBenchmark {
   private static final List<String> CONSTRAINTS =
       List.of(
           "context edge::SubA inv: edge::Other.allInstances().select(~).size() <= 1",
-          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount > 0)",
+          "context edge::SubA inv: edge::Other.allInstances().forAll(o | self ~ o implies o.amount"
+              + " > 0)",
           "context edge::SubA inv: edge::Other.allInstances().reject(~).size() >= 0",
-          "context edge::Other inv: edge::SubA.allInstances().exists(a | a ~ self) or self.amount > 0",
+          "context edge::Other inv: edge::SubA.allInstances().exists(a | a ~ self) or self.amount >"
+              + " 0",
           "context edge::Item inv: self.value >= 0");
 
   @AfterEach
@@ -70,11 +71,13 @@ class CorrespondenceSessionBenchmark {
     assumeTrue(Boolean.getBoolean("vitruvocl.bench.corrSession"), "benchmark disabled");
     String sizes = System.getProperty("vitruvocl.bench.corrSizes", "500,1000");
     System.out.println(
-        "| Level | n | Korrespondenzen | gemeinsamer Lookup | initialize [ms] | Modell-Tx [ms] | Korrespondenz-Tx [ms] |");
+        "| Level | n | Korrespondenzen | gemeinsamer Lookup | initialize [ms] | Modell-Tx [ms] |"
+            + " Korrespondenz-Tx [ms] |");
     System.out.println("|---|---:|---:|---|---:|---:|---:|");
     for (String size : sizes.split(",")) {
       int n = Integer.parseInt(size.trim());
-      for (IncrementalLevel level : List.of(IncrementalLevel.READ_SET, IncrementalLevel.RELEVANT_INSTANCES)) {
+      for (IncrementalLevel level :
+          List.of(IncrementalLevel.READ_SET, IncrementalLevel.RELEVANT_INSTANCES)) {
         for (boolean shared : List.of(false, true)) {
           measure(n, level, shared);
         }
@@ -113,7 +116,13 @@ class CorrespondenceSessionBenchmark {
       }
       System.out.printf(
           "| %d | %d | %d | %s | %.0f | %.0f | %.0f |%n",
-          level.number(), n, n / 2, shared ? "ja" : "nein", init, modelTx / TRANSACTIONS, corrTx / TRANSACTIONS);
+          level.number(),
+          n,
+          n / 2,
+          shared ? "ja" : "nein",
+          init,
+          modelTx / TRANSACTIONS,
+          corrTx / TRANSACTIONS);
     }
   }
 
@@ -127,7 +136,10 @@ class CorrespondenceSessionBenchmark {
     final List<EObject> others = new ArrayList<>();
 
     Model(int n) {
-      resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("*", new XMIResourceFactoryImpl());
+      resourceSet
+          .getResourceFactoryRegistry()
+          .getExtensionToFactoryMap()
+          .put("*", new XMIResourceFactoryImpl());
       resource = resourceSet.createResource(URI.createURI("memory:/session.edge"));
       EObject root = EdgeFixture.create("Root");
       resource.getContents().add(root);

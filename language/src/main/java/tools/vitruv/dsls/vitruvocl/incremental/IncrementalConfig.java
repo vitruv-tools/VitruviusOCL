@@ -43,6 +43,7 @@ public record IncrementalConfig(
   /** System property for the number of worker threads; default {@code 1}. */
   public static final String PROP_THREADS = "vitruvocl.incremental.threads";
 
+  /** Validates the configuration. */
   public IncrementalConfig {
     if (level == null) {
       throw new IllegalArgumentException("level must not be null");

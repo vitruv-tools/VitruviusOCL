@@ -5,16 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+import java.util.Set;
+import org.eclipse.emf.ecore.EReference;
+import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallCollector;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
 import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.CyclicMetamodelFixture;
 import tools.vitruv.dsls.vitruvocl.allinstances.fixtures.UniversityMetamodelFixture;
-import java.util.List;
-import java.util.Set;
-import org.eclipse.emf.ecore.EReference;
-import org.junit.jupiter.api.Test;
 
 /**
  * Verifies Algorithm 1 (Wei &amp; Kolovos, BigMDE 2015, Section 3.2) against the paper's own
@@ -52,8 +52,8 @@ class ContainmentReachabilityAnalyzerTest {
   /**
    * Regression test for a bug where the recursive branch of {@code shouldBeTraversed} only
    * inspected {@code r.getEReferenceType().getEAllContainments()} instead of the containments of
-   * every type in {@code reachableTypes} (declared type <em>and</em> all its subtypes), as Algorithm
-   * 1 requires ("foreach containment EReference tr of each of the types").
+   * every type in {@code reachableTypes} (declared type <em>and</em> all its subtypes), as
+   * Algorithm 1 requires ("foreach containment EReference tr of each of the types").
    *
    * <p>Fixture: {@code Department.members} is declared with the abstract type {@code Member},
    * which has no containments of its own. Only its subtype {@code Staff} declares an additional

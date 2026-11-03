@@ -31,7 +31,7 @@ import tools.vitruv.change.utils.ResourceAccess;
 
 /**
  * Hand-written stand-in for generated Reactions code, mirroring what typical Reactions do with the
- * correspondence model:
+ * correspondence model.
  *
  * <ul>
  *   <li>new {@code ARoot} → create {@code BRoot} (plus one pre-existing "spare" {@code BElem}) and
@@ -48,10 +48,12 @@ import tools.vitruv.change.utils.ResourceAccess;
  *       [spare]} (tag {@code multi}).
  * </ul>
  */
-public final class CorrespondingElementsSpecification extends AbstractChangePropagationSpecification {
+public final class CorrespondingElementsSpecification
+    extends AbstractChangePropagationSpecification {
 
   public static final String SPARE_NAME = "spare";
 
+  /** Creates the specification, which propagates changes from {@code incra} to {@code incrb}. */
   public CorrespondingElementsSpecification() {
     super(
         MetamodelDescriptor.of(RealVsumFixture.PACKAGE_A),
@@ -60,7 +62,8 @@ public final class CorrespondingElementsSpecification extends AbstractChangeProp
 
   @Override
   public boolean doesHandleChange(
-      EChange<EObject> change, EditableCorrespondenceModelView<Correspondence> correspondenceModel) {
+      EChange<EObject> change,
+      EditableCorrespondenceModelView<Correspondence> correspondenceModel) {
     return change instanceof InsertRootEObject<EObject> insert
             && insert.getNewValue().eClass() == RealVsumFixture.rootA()
         || change instanceof FeatureEChange<?, ?> featureChange
@@ -89,12 +92,15 @@ public final class CorrespondingElementsSpecification extends AbstractChangeProp
       InsertRootEObject<EObject> insert,
       EditableCorrespondenceModelView<Correspondence> correspondenceModel,
       ResourceAccess resourceAccess) {
-    EObject rootA = insert.getNewValue();
+    final EObject rootA = insert.getNewValue();
     EObject rootB = EcoreUtil.create(RealVsumFixture.rootB());
     EObject spare = EcoreUtil.create(RealVsumFixture.elemB());
     spare.eSet(RealVsumFixture.elemB().getEStructuralFeature("name"), SPARE_NAME);
     elements(rootB).add(spare);
-    URI uriB = URI.createURI(insert.getUri()).trimFileExtension().appendFileExtension(RealVsumFixture.EXT_B);
+    URI uriB =
+        URI.createURI(insert.getUri())
+            .trimFileExtension()
+            .appendFileExtension(RealVsumFixture.EXT_B);
     resourceAccess.persistAsRoot(rootB, uriB);
     correspondenceModel.addCorrespondenceBetween(rootA, rootB, "root");
   }
@@ -103,7 +109,8 @@ public final class CorrespondingElementsSpecification extends AbstractChangeProp
       InsertEReference<EObject> insert,
       EditableCorrespondenceModelView<Correspondence> correspondenceModel) {
     EObject elemA = insert.getNewValue();
-    EObject rootB = single(correspondenceModel.getCorrespondingEObjects(insert.getAffectedElement(), "root"));
+    EObject rootB =
+        single(correspondenceModel.getCorrespondingEObjects(insert.getAffectedElement(), "root"));
     if (rootB == null) {
       return;
     }
@@ -136,7 +143,10 @@ public final class CorrespondingElementsSpecification extends AbstractChangeProp
     }
     EObject spare =
         elements(rootB).stream()
-            .filter(e -> SPARE_NAME.equals(e.eGet(RealVsumFixture.elemB().getEStructuralFeature("name"))))
+            .filter(
+                e ->
+                    SPARE_NAME.equals(
+                        e.eGet(RealVsumFixture.elemB().getEStructuralFeature("name"))))
             .findFirst()
             .orElse(null);
     if (spare == null) {

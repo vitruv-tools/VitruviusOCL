@@ -34,7 +34,8 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 
 /**
  * Unit tests for {@link CorrespondenceSnapshot} and {@link CorrespondenceDelta}: the diff of two
- * snapshots reports exactly the (unordered, tagged) pairs whose two-way relation {@code b ∈ corr(a, t) ∨ a ∈ corr(b, t)} changed.
+ * snapshots reports exactly the (unordered, tagged) pairs whose two-way relation {@code b ∈ corr(a,
+ * t) ∨ a ∈ corr(b, t)} changed.
  */
 class CorrespondenceSnapshotTest {
 

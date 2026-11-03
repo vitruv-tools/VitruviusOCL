@@ -45,21 +45,27 @@ class PolarityAnalyzerTest {
   @Test
   void sizeBoundedFromAbove() {
     // ≤: left +  →  size +  →  navigation +
-    assertEquals(Polarity.PLUS, read(pse("context edge::Root inv: self.items.size() <= 3"), "items", "Root"));
+    assertEquals(
+        Polarity.PLUS,
+        read(pse("context edge::Root inv: self.items.size() <= 3"), "items", "Root"));
   }
 
   @Test
   void sizeBoundedFromBelow() {
-    assertEquals(Polarity.MINUS, read(pse("context edge::Root inv: self.items.size() >= 1"), "items", "Root"));
+    assertEquals(
+        Polarity.MINUS,
+        read(pse("context edge::Root inv: self.items.size() >= 1"), "items", "Root"));
   }
 
   @Test
   void notFlips() {
     // not (size > 3) ≡ size <= 3: '>' under 'not' must stay false, so its left operand gets +
     assertEquals(
-        Polarity.PLUS, read(pse("context edge::Root inv: not (self.items.size() > 3)"), "items", "Root"));
+        Polarity.PLUS,
+        read(pse("context edge::Root inv: not (self.items.size() > 3)"), "items", "Root"));
     assertEquals(
-        Polarity.MINUS, read(pse("context edge::Root inv: not (self.items.size() < 1)"), "items", "Root"));
+        Polarity.MINUS,
+        read(pse("context edge::Root inv: not (self.items.size() < 1)"), "items", "Root"));
   }
 
   @Test

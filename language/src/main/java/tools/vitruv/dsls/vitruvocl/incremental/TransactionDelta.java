@@ -72,12 +72,15 @@ public final class TransactionDelta {
     this.changes = List.copyOf(changes);
     this.events = List.copyOf(events);
     Map<String, Set<EClass>> copy = new HashMap<>();
-    touchedFeatures.forEach((k, v) -> copy.put(k, Collections.unmodifiableSet(new LinkedHashSet<>(v))));
+    touchedFeatures.forEach(
+        (k, v) -> copy.put(k, Collections.unmodifiableSet(new LinkedHashSet<>(v))));
     this.touchedFeatures = Collections.unmodifiableMap(copy);
     this.structurallyInsertedObjects = List.copyOf(structurallyInsertedObjects);
     this.structurallyRemovedObjects = List.copyOf(structurallyRemovedObjects);
-    this.structurallyInsertedClasses = Collections.unmodifiableSet(classesOf(structurallyInsertedObjects));
-    this.structurallyRemovedClasses = Collections.unmodifiableSet(classesOf(structurallyRemovedObjects));
+    this.structurallyInsertedClasses =
+        Collections.unmodifiableSet(classesOf(structurallyInsertedObjects));
+    this.structurallyRemovedClasses =
+        Collections.unmodifiableSet(classesOf(structurallyRemovedObjects));
     Set<EClass> all = new LinkedHashSet<>(structurallyInsertedClasses);
     all.addAll(structurallyRemovedClasses);
     this.structurallyAffectedClasses = Collections.unmodifiableSet(all);
@@ -193,7 +196,10 @@ public final class TransactionDelta {
     return hasUnknownChanges;
   }
 
-  /** Whether some object of a class conforming to one of {@code staticTypes} touched {@code feature}. */
+  /**
+   * Whether some object of a class conforming to one of {@code staticTypes} touched {@code
+   * feature}.
+   */
   public boolean touchesFeature(String featureName, Set<EClass> staticTypes) {
     Set<EClass> runtimeClasses = touchedFeatures.get(featureName);
     if (runtimeClasses == null) {

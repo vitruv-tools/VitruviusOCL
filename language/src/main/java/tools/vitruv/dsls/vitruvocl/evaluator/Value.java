@@ -329,8 +329,10 @@ public class Value implements Comparable<Value> {
 
   /** Symmetric difference (elements in either but not both). */
   public Value symmetricDifference(Value other) {
-    OCLElementSource onlyInThis = LazyOperations.filter(this.asSource(), elem -> !other.includes(elem));
-    OCLElementSource onlyInOther = LazyOperations.filter(other.asSource(), elem -> !this.includes(elem));
+    OCLElementSource onlyInThis =
+        LazyOperations.filter(this.asSource(), elem -> !other.includes(elem));
+    OCLElementSource onlyInOther =
+        LazyOperations.filter(other.asSource(), elem -> !this.includes(elem));
     return Value.lazy(LazyOperations.concat(onlyInThis, onlyInOther), this.runtimeType);
   }
 

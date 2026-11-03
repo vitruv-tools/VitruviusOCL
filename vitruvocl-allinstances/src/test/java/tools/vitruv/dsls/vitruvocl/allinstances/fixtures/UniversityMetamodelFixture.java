@@ -10,8 +10,8 @@ import org.eclipse.emf.ecore.EcoreFactory;
 
 /**
  * Builds, programmatically via {@link EcoreFactory}, the "University" example metamodel used
- * throughout Wei &amp; Kolovos (BigMDE 2015) to illustrate the allInstances() pruning strategy
- * (see Fig. 5/6 in the paper):
+ * throughout Wei &amp; Kolovos (BigMDE 2015) to illustrate the allInstances() pruning strategy (see
+ * Fig. 5/6 in the paper):
  *
  * <pre>
  * University --*departments--&gt; Department
@@ -46,6 +46,7 @@ public final class UniversityMetamodelFixture {
 
   private final EFactory factory;
 
+  /** Builds the metamodel. */
   public UniversityMetamodelFixture() {
     EcoreFactory ecoreFactory = EcoreFactory.eINSTANCE;
 
@@ -81,10 +82,8 @@ public final class UniversityMetamodelFixture {
 
     universityDepartments =
         addContainment(ecoreFactory, universityClass, "departments", departmentClass, true);
-    departmentMembers =
-        addContainment(ecoreFactory, departmentClass, "members", memberClass, true);
-    departmentModules =
-        addContainment(ecoreFactory, departmentClass, "modules", moduleClass, true);
+    departmentMembers = addContainment(ecoreFactory, departmentClass, "members", memberClass, true);
+    departmentModules = addContainment(ecoreFactory, departmentClass, "modules", moduleClass, true);
     staffWebpage = addContainment(ecoreFactory, staffClass, "webpage", webPageClass, false);
     moduleLectures = addContainment(ecoreFactory, moduleClass, "lectures", lectureClass, true);
 

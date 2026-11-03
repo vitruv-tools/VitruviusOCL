@@ -68,7 +68,8 @@ public enum IncrementalLevel {
     }
     String trimmed = value.trim();
     for (IncrementalLevel level : values()) {
-      if (trimmed.equals(Integer.toString(level.number)) || trimmed.equalsIgnoreCase(level.name())) {
+      if (trimmed.equals(Integer.toString(level.number))
+          || trimmed.equalsIgnoreCase(level.name())) {
         return level;
       }
     }

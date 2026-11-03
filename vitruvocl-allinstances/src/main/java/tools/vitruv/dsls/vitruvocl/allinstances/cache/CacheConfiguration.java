@@ -13,7 +13,8 @@ import org.eclipse.emf.ecore.EReference;
  * <p>A {@code CacheConfiguration} is derived purely from a set of {@code allInstances()}-style
  * call sites and the metamodel — it does not depend on any concrete instance model. This is what
  * allows it to be computed once and reused across many {@code compute()} invocations, even as the
- * underlying instance model changes between calls (see {@link tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine}).
+ * underlying instance model changes between calls (see {@link
+ * tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine}).
  */
 public final class CacheConfiguration {
 
@@ -28,8 +29,8 @@ public final class CacheConfiguration {
 
   /**
    * The containment references that a model traversal must descend into, as computed by {@link
-   * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer}. Empty until that analysis
-   * has run.
+   * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer}. Empty until
+   * that analysis has run.
    */
   private final Set<EReference> traverse = new LinkedHashSet<>();
 
@@ -57,7 +58,8 @@ public final class CacheConfiguration {
 
   /**
    * Replaces the traversable-reference set. Called by {@link
-   * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} after running Algorithm 1.
+   * tools.vitruv.dsls.vitruvocl.allinstances.analysis.ContainmentReachabilityAnalyzer} after
+   * running Algorithm 1.
    */
   public void setTraverse(Set<EReference> traversableRefs) {
     traverse.clear();

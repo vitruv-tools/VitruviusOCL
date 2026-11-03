@@ -77,7 +77,8 @@ class IncrementalEdgeCaseTest {
   void edgeCorpusCompiles() {
     EdgeFixture fx = EdgeFixture.create();
     try (IncrementalSession session =
-        new IncrementalSession(CONSTRAINTS, fx.model().wrapper(), IncrementalConfig.of(IncrementalLevel.READ_SET))) {
+        new IncrementalSession(
+            CONSTRAINTS, fx.model().wrapper(), IncrementalConfig.of(IncrementalLevel.READ_SET))) {
       IncrementalResult result = session.initialize();
       List<String> failed =
           result.result().getResults().stream()
@@ -155,7 +156,9 @@ class IncrementalEdgeCaseTest {
         run(
             fx,
             level,
-            () -> ((org.eclipse.emf.common.util.EList<Object>) EdgeFixture.list(fx.root(1), "items")).move(0, 1));
+            () ->
+                ((org.eclipse.emf.common.util.EList<Object>) EdgeFixture.list(fx.root(1), "items"))
+                    .move(0, 1));
     assertTrue(violated(r, "firstPositive"), "b1 (value 3) is now first");
   }
 
@@ -220,8 +223,12 @@ class IncrementalEdgeCaseTest {
             fx,
             level,
             () -> {
-              fx.model().correspondences().addCorrespondenceBetween(List.of(fx.find("a1")), List.of(fx.find("x")), "t");
-              fx.model().correspondences().addCorrespondenceBetween(List.of(fx.find("a1")), List.of(fx.find("y")), "t");
+              fx.model()
+                  .correspondences()
+                  .addCorrespondenceBetween(List.of(fx.find("a1")), List.of(fx.find("x")), "t");
+              fx.model()
+                  .correspondences()
+                  .addCorrespondenceBetween(List.of(fx.find("a1")), List.of(fx.find("y")), "t");
               // the only recorded change touches nothing the correspondence constraints read
               EdgeFixture.list(fx.root(2), "tags").add("unrelated");
             });
@@ -267,7 +274,8 @@ class IncrementalEdgeCaseTest {
   void messageTemplateIsRefreshedWhenOnlyTheTemplateAttributeChanges(IncrementalLevel level) {
     EdgeFixture fx = EdgeFixture.create();
     EObject a1 = fx.find("a1");
-    IncrementalResult r = run(fx, level, () -> set(a1, "value", -5), () -> set(a1, "name", "renamed"));
+    IncrementalResult r =
+        run(fx, level, () -> set(a1, "value", -5), () -> set(a1, "name", "renamed"));
     String warnings =
         r.result().getResults().stream()
             .filter(c -> c.getConstraint().contains("messageTemplate"))
@@ -343,19 +351,21 @@ class IncrementalEdgeCaseTest {
         for (int step = 0; step < 40; step++) {
           int perTransaction = 1 + step % 3;
           List<EChange<EObject>> tx =
-              fx.model().record(
-                  () -> {
-                    for (int i = 0; i < perTransaction; i++) {
-                      mutator.mutate();
-                    }
-                  });
+              fx.model()
+                  .record(
+                      () -> {
+                        for (int i = 0; i < perTransaction; i++) {
+                          mutator.mutate();
+                        }
+                      });
           if (tx.isEmpty()) {
             continue;
           }
           try {
             session.onTransaction(tx);
           } catch (IncrementalMismatchException e) {
-            throw new AssertionError("seed " + seed + " after " + mutator.log() + "\n" + e.getMessage(), e);
+            throw new AssertionError(
+                "seed " + seed + " after " + mutator.log() + "\n" + e.getMessage(), e);
           }
         }
       }

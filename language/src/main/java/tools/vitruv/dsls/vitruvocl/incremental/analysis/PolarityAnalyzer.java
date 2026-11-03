@@ -52,9 +52,9 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  *   <li><b>Attribute access on a collection</b> (implicit collect) propagates its own annotation
  *       joined with {@code +} to the receiver instead of only {@code +} (Tab. 3.1 assumes a single
  *       receiver object).
- *   <li><b>{@code not} and {@code select}</b> (paper: opposite events of the subtree) are handled by
- *       flipping the annotation for {@code not} and by annotating the {@code select}/{@code reject}
- *       body {@link Polarity#BOTH}.
+ *   <li><b>{@code not} and {@code select}</b> (paper: opposite events of the subtree) are handled
+ *       by flipping the annotation for {@code not} and by annotating the {@code select}/{@code
+ *       reject} body {@link Polarity#BOTH}.
  * </ul>
  */
 public final class PolarityAnalyzer {
@@ -79,7 +79,9 @@ public final class PolarityAnalyzer {
    * allInstances} fallback type): they are made sensitive to insertion and deletion.
    */
   public static PseSet analyze(
-      VitruvOCLParser.ContextDeclCSContext tree, ParseTreeProperty<Type> nodeTypes, ReadSet readSet) {
+      VitruvOCLParser.ContextDeclCSContext tree,
+      ParseTreeProperty<Type> nodeTypes,
+      ReadSet readSet) {
     PolarityAnalyzer analyzer =
         new PolarityAnalyzer(nodeTypes, ReadSetAnalyzer.containsUntrustedTypeProducer(tree));
     for (VitruvOCLParser.ClassifierContextCSContext ctx : tree.classifierContextCS()) {
@@ -92,7 +94,10 @@ public final class PolarityAnalyzer {
         .forEach(
             (name, classes) -> {
               for (EClass c : classes) {
-                analyzer.typed.computeIfAbsent(name, k -> new LinkedHashMap<>()).putIfAbsent(c, Polarity.BOTH);
+                analyzer
+                    .typed
+                    .computeIfAbsent(name, k -> new LinkedHashMap<>())
+                    .putIfAbsent(c, Polarity.BOTH);
               }
             });
     for (String name : readSet.untypedFeatureReads()) {
@@ -314,7 +319,8 @@ public final class PolarityAnalyzer {
       Polarity p,
       Type chainType) {
     List<Type> receiverTypes = new ArrayList<>(steps.size());
-    Type current = base instanceof ParserRuleContext b ? ReadSetAnalyzer.spineType(nodeTypes, b, 3) : null;
+    Type current =
+        base instanceof ParserRuleContext b ? ReadSetAnalyzer.spineType(nodeTypes, b, 3) : null;
     if (current == null && base instanceof VitruvOCLParser.SelfContext && currentContext != null) {
       current = Type.metaclassType(currentContext);
     }
@@ -349,7 +355,8 @@ public final class PolarityAnalyzer {
     if (target instanceof VitruvOCLParser.PropertyNavContext prop) {
       String name = prop.propertyAccess().propertyName.getText();
       recordRead(name, receiverClass, p);
-      EStructuralFeature feature = receiverClass == null ? null : receiverClass.getEStructuralFeature(name);
+      EStructuralFeature feature =
+          receiverClass == null ? null : receiverClass.getEStructuralFeature(name);
       if (feature instanceof EAttribute) {
         return p.join(Polarity.PLUS); // Tab. 3.1: attribute access propagates + (adapted)
       }
@@ -386,7 +393,9 @@ public final class PolarityAnalyzer {
     if (receiverClass == null || untrustedTypes) {
       untyped.merge(name, p, Polarity::join);
     } else {
-      typed.computeIfAbsent(name, k -> new LinkedHashMap<>()).merge(receiverClass, p, Polarity::join);
+      typed
+          .computeIfAbsent(name, k -> new LinkedHashMap<>())
+          .merge(receiverClass, p, Polarity::join);
     }
   }
 

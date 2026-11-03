@@ -140,6 +140,7 @@ public class DependencyAnalyzer {
     }
     Token prevColon = tokenList.get(index - 1);
     Token prevId = tokenList.get(index - 2);
-    return prevColon.getType() == VitruvOCLLexer.COLONCOLON && prevId.getType() == VitruvOCLLexer.ID;
+    return prevColon.getType() == VitruvOCLLexer.COLONCOLON
+        && prevId.getType() == VitruvOCLLexer.ID;
   }
 }

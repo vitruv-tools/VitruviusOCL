@@ -55,23 +55,30 @@ class TransactionModelTest {
   @BeforeAll
   static void loadMetamodel() {
     ResourceSet rs = new ResourceSetImpl();
-    rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("ecore", new EcoreResourceFactoryImpl());
+    rs.getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("ecore", new EcoreResourceFactoryImpl());
     File ecoreFile = new File("src/test/resources/test-metamodels/brakesystem.ecore");
     Resource ecoreResource = rs.getResource(URI.createFileURI(ecoreFile.getAbsolutePath()), true);
     EPackage brakesystemPkg = (EPackage) ecoreResource.getContents().get(0);
 
     brakeDiskClass = (EClass) brakesystemPkg.getEClassifier("BrakeDisk");
     diameterAttr = (EAttribute) brakeDiskClass.getEStructuralFeature("diameterInMM");
-    minimumThicknessAttr = (EAttribute) brakeDiskClass.getEStructuralFeature("minimumThicknessInMM");
+    minimumThicknessAttr =
+        (EAttribute) brakeDiskClass.getEStructuralFeature("minimumThicknessInMM");
     brakeCaliperClass = (EClass) brakesystemPkg.getEClassifier("BrakeCaliper");
     brakePadClass = (EClass) brakesystemPkg.getEClassifier("BrakePad");
     brakePadsRef = (EReference) brakeCaliperClass.getEStructuralFeature("brakePads");
   }
 
-  /** Fresh, empty resource set with an XMI resource ready to hold instances, plus a live recorder. */
+  /**
+   * Fresh, empty resource set with an XMI resource ready to hold instances, plus a live recorder.
+   */
   private static ResourceSet newResourceSet() {
     ResourceSet rs = new ResourceSetImpl();
-    rs.getResourceFactoryRegistry().getExtensionToFactoryMap().put("xmi", new XMIResourceFactoryImpl());
+    rs.getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("xmi", new XMIResourceFactoryImpl());
     return rs;
   }
 
@@ -116,7 +123,9 @@ class TransactionModelTest {
 
     TransactionModel tx = record(rs, () -> brakeDisk.eSet(diameterAttr, 42));
 
-    assertThat(tx.getPreStateSingleValue(brakeDisk, minimumThicknessAttr, brakeDisk.eGet(minimumThicknessAttr)))
+    assertThat(
+            tx.getPreStateSingleValue(
+                brakeDisk, minimumThicknessAttr, brakeDisk.eGet(minimumThicknessAttr)))
         .isEqualTo(5);
   }
 

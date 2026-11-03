@@ -26,8 +26,8 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 
 /**
- * M2 (type-checking) tests for {@code pre}/{@code post} blocks, {@code @pre}, and the
- * {@code OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted} lifecycle predicates.
+ * M2 (type-checking) tests for {@code pre}/{@code post} blocks, {@code @pre}, and the {@code
+ * OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted} lifecycle predicates.
  *
  * <p>Uses the brakesystem metamodel (same fixture as {@link AnnotationTypeCheckTest}) so context
  * types resolve and property/attribute type-checking is actually exercised. {@code BrakeDisk} has
@@ -65,8 +65,9 @@ class PrePostTypeCheckTest {
     ConstraintResult result =
         eval(
             """
-        context brakesystem::BrakeDisk pre: self.diameterInMM > 0
-        post: self.diameterInMM > 0""");
+            context brakesystem::BrakeDisk pre: self.diameterInMM > 0
+            post: self.diameterInMM > 0\
+            """);
     assertTrue(result.isSuccess(), "Expected success: " + result.toDetailedErrorString());
   }
 
@@ -75,10 +76,11 @@ class PrePostTypeCheckTest {
     ConstraintResult result =
         eval(
             """
-        context brakesystem::BrakeDisk
-        pre: self.diameterInMM > 0
-        pre: self.diameterInMM > 1
-        post: true""");
+            context brakesystem::BrakeDisk
+            pre: self.diameterInMM > 0
+            pre: self.diameterInMM > 1
+            post: true\
+            """);
     assertFalse(result.isSuccess(), "Expected failure for duplicate pre");
     assertTrue(
         result.getCompilerErrors().stream().anyMatch(e -> e.getMessage().contains("pre")),
@@ -90,10 +92,11 @@ class PrePostTypeCheckTest {
     ConstraintResult result =
         eval(
             """
-        context brakesystem::BrakeDisk
-        pre: true
-        post: self.diameterInMM > 0
-        post: self.diameterInMM > 1""");
+            context brakesystem::BrakeDisk
+            pre: true
+            post: self.diameterInMM > 0
+            post: self.diameterInMM > 1\
+            """);
     assertFalse(result.isSuccess(), "Expected failure for duplicate post");
     assertTrue(
         result.getCompilerErrors().stream().anyMatch(e -> e.getMessage().contains("post")),
@@ -203,7 +206,8 @@ class PrePostTypeCheckTest {
   @Test
   void testOclIsNewAggregateValueTypeMismatchReportsError() {
     ConstraintResult result =
-        eval("context brakesystem::BrakeDisk post: self.OCLisNew(diameterInMM => \"not a number\")");
+        eval(
+            "context brakesystem::BrakeDisk post: self.OCLisNew(diameterInMM => \"not a number\")");
     assertFalse(result.isSuccess(), "Expected failure: String value assigned to Integer attribute");
   }
 
@@ -244,9 +248,10 @@ class PrePostTypeCheckTest {
     ConstraintResult result =
         eval(
             """
-        context brakesystem::BrakeDisk::inspect(threshold: Integer)
-        pre: threshold > 0
-        post: self.diameterInMM > threshold""");
+            context brakesystem::BrakeDisk::inspect(threshold: Integer)
+            pre: threshold > 0
+            post: self.diameterInMM > threshold\
+            """);
     assertTrue(result.isSuccess(), "Expected success: " + result.toDetailedErrorString());
   }
 
@@ -255,9 +260,10 @@ class PrePostTypeCheckTest {
     ConstraintResult result =
         eval(
             """
-        context brakesystem::BrakeDisk::inspect(threshold: Integer)
-        pre: undefinedParam > 0
-        post: true""");
+            context brakesystem::BrakeDisk::inspect(threshold: Integer)
+            pre: undefinedParam > 0
+            post: true\
+            """);
     assertFalse(result.isSuccess(), "Expected failure: 'undefinedParam' was never declared");
   }
 }

@@ -17,11 +17,11 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 
 /**
- * End-to-end regression tests through the full parse/type-check/evaluate pipeline, confirming
- * that chained expressions built from the newly-lazy operations ({@code select}, {@code collect},
- * {@code reject}, {@code union}, {@code intersection}, {@code flatten}) still produce exactly the
- * same results as before the lazy evaluation rewrite (Kernanforderung 1 requirement: laziness is
- * purely an evaluation strategy, never a semantic change).
+ * End-to-end regression tests through the full parse/type-check/evaluate pipeline, confirming that
+ * chained expressions built from the newly-lazy operations ({@code select}, {@code collect}, {@code
+ * reject}, {@code union}, {@code intersection}, {@code flatten}) still produce exactly the same
+ * results as before the lazy evaluation rewrite (Kernanforderung 1 requirement: laziness is purely
+ * an evaluation strategy, never a semantic change).
  *
  * <p>Consumption-count proofs for the four laziness categories live in {@link
  * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperationsTest} and {@link ValueLazyTest}, which
@@ -33,13 +33,15 @@ class LazyChainRegressionTest extends DummyTestSpecification {
 
   @Test
   void selectThenCollectThenExistsChainsThroughMultipleLazyStages() {
-    Value result = compile("Set{1,2,3,4,5,6}.select(x | x > 2).collect(x | x * 10).exists(y | y > 50)");
+    Value result =
+        compile("Set{1,2,3,4,5,6}.select(x | x > 2).collect(x | x * 10).exists(y | y > 50)");
     assertSingleBool(result, true);
   }
 
   @Test
   void selectThenCollectThenExistsIsFalseWhenNoMatch() {
-    Value result = compile("Set{1,2,3,4,5,6}.select(x | x > 2).collect(x | x * 10).exists(y | y > 1000)");
+    Value result =
+        compile("Set{1,2,3,4,5,6}.select(x | x > 2).collect(x | x * 10).exists(y | y > 1000)");
     assertSingleBool(result, false);
   }
 
@@ -99,7 +101,8 @@ class LazyChainRegressionTest extends DummyTestSpecification {
     // collect() already flattens one level, so the total is 2 + 2 + 2 = 6.
     Value result =
         compile(
-            "Set{1,2,3}.collect(x | Set{x*100+1, x*100+2, x*100+3}.select(y | y > x*100+1)).size()");
+            "Set{1,2,3}.collect(x | Set{x*100+1, x*100+2, x*100+3}.select(y | y >"
+                + " x*100+1)).size()");
     assertSingleInt(result, 6);
   }
 
@@ -148,7 +151,8 @@ class LazyChainRegressionTest extends DummyTestSpecification {
 
   @Test
   void iterateOverALazySelectReceiverAccumulatesCorrectly() {
-    Value result = compile("Set{1,2,3,4}.select(x | x > 1).iterate(x; acc : Integer = 0 | acc + x)");
+    Value result =
+        compile("Set{1,2,3,4}.select(x | x > 1).iterate(x; acc : Integer = 0 | acc + x)");
     assertSingleInt(result, 9); // select() leaves {2,3,4}
   }
 
@@ -168,7 +172,7 @@ class LazyChainRegressionTest extends DummyTestSpecification {
   // the returned value comes out numerically correct anyway despite the internal scope-tree state
   // being wrong. They are kept as a regression net for the fixed code's intended behavior, not as
   // proof of the bug. The fourth test
-  // (letBodyResolvesAShadowedVariableFromTheCorrectEnclosingScopeAfterAnEarlierDeclarationDrainsAnOuterLazyVariable)
+  // (letBodyResolvesShadowedVariableAfterAnEarlierDeclarationDrainsAnOuterLazyVariable)
   // breaks that self-healing with real shadowing and *does* reproduce the bug: reverting the fix
   // makes it return 111 instead of 222 (confirmed by actually reverting and re-running, not by
   // code-reading alone). That is the test that verifies this fix was necessary. ─────────────────
@@ -180,7 +184,8 @@ class LazyChainRegressionTest extends DummyTestSpecification {
     // not the inner one. `b` must still resolve `a`, bound in the inner let's own scope,
     // afterwards.
     Value result =
-        compile("let outer = Set{1,2,3,4,5}.select(x | x > 2) in let a = outer.size(), b = a + 1 in b");
+        compile(
+            "let outer = Set{1,2,3,4,5}.select(x | x > 2) in let a = outer.size(), b = a + 1 in b");
     assertSingleInt(result, 4); // outer -> {3,4,5}, a = 3, b = 4
   }
 
@@ -197,12 +202,13 @@ class LazyChainRegressionTest extends DummyTestSpecification {
   void letBodyResolvesLetBoundVariableAfterDrainingAnOuterLazySelectDuringTheSameDeclaration() {
     // The single declaration's own initializer drains an outer lazy variable; the body must still
     // resolve `a`, defined in the scope captured before that initializer ran.
-    Value result = compile("let outer = Set{1,2,3}.select(x | x > 1) in let a = outer.size() in a + 100");
+    Value result =
+        compile("let outer = Set{1,2,3}.select(x | x > 1) in let a = outer.size() in a + 100");
     assertSingleInt(result, 102); // outer -> {2,3}, a = 2
   }
 
   @Test
-  void letBodyResolvesAShadowedVariableFromTheCorrectEnclosingScopeAfterAnEarlierDeclarationDrainsAnOuterLazyVariable() {
+  void letBodyResolvesShadowedVariableAfterAnEarlierDeclarationDrainsAnOuterLazyVariable() {
     // Breaks the self-healing that made the three tests above pass even against the pre-fix code:
     // `shadow` is a *different* name from `a`, already correctly bound in the scope two levels
     // out (L2) *before* any corruption happens - it is not created by the corrupted registration
@@ -229,13 +235,15 @@ class LazyChainRegressionTest extends DummyTestSpecification {
 
   @Test
   void iterateStreamsALazySelectReceiverInsteadOfPreMaterializingIt() {
-    Value result = compile("Set{1,2,3,4,5}.select(x | x > 1).iterate(n; acc : Integer = 0 | acc + n)");
+    Value result =
+        compile("Set{1,2,3,4,5}.select(x | x > 1).iterate(n; acc : Integer = 0 | acc + n)");
     assertSingleInt(result, 14); // select() -> {2,3,4,5}, sum = 14
   }
 
   @Test
   void iterateOverAnEmptyLazySelectReceiverReturnsTheSeed() {
-    Value result = compile("Set{1,2,3}.select(x | x > 100).iterate(n; acc : Integer = 0 | acc + n)");
+    Value result =
+        compile("Set{1,2,3}.select(x | x > 100).iterate(n; acc : Integer = 0 | acc + n)");
     assertSingleInt(result, 0);
   }
 
@@ -246,8 +254,8 @@ class LazyChainRegressionTest extends DummyTestSpecification {
    * {@code select()} - which does its own, independent enter/exit of a scope parented off wherever
    * {@code select()} was originally evaluated ({@code L1} below), not off {@code iterate()}'s own
    * scope ({@code L3}, parented off {@code L2}). If anything in that gap left {@code currentScope}
-   * in a state some later step's body evaluation could observe, resolving {@code shadow} - bound
-   * to a *different* value in {@code L2}, the scope directly enclosing the iterate() call, than in
+   * in a state some later step's body evaluation could observe, resolving {@code shadow} - bound to
+   * a *different* value in {@code L2}, the scope directly enclosing the iterate() call, than in
    * {@code L0} - would occasionally resolve to the wrong (L0) value instead of always L2's.
    *
    * <p>Unlike the let-bug shadowing test, this one doesn't fold to a single scalar (which could
@@ -258,14 +266,14 @@ class LazyChainRegressionTest extends DummyTestSpecification {
    * among the expected 222xxx ones.
    */
   @Test
-  void iterateBodyResolvesAShadowedOuterVariableCorrectlyOnEveryStepWhilePullingFromALazySelectReceiver() {
+  void iterateBodyResolvesShadowedOuterVariableOnEveryStepOfALazySelectReceiver() {
     Value result =
         compile(
-            "let shadow = 111 in"
-                + " let source = Set{1,2,3,4,5}.select(x | x > 1) in"
-                + " let shadow = 222 in"
-                + " source.iterate(n; acc : Sequence(Integer) = Sequence{0} | acc.including(shadow * 1000 + n))");
-    assertCollection(result, 0, 222002, 222003, 222004, 222005); // never 111xxx - shadow always L2's 222
+            "let shadow = 111 in let source = Set{1,2,3,4,5}.select(x | x > 1) in let shadow = 222"
+                + " in source.iterate(n; acc : Sequence(Integer) = Sequence{0} |"
+                + " acc.including(shadow * 1000 + n))");
+    assertCollection(
+        result, 0, 222002, 222003, 222004, 222005); // never 111xxx - shadow always L2's 222
   }
 
   // ── isUnique() streaming (receiver.getElements() -> receiver.elementIterator()). ────────────
@@ -284,16 +292,16 @@ class LazyChainRegressionTest extends DummyTestSpecification {
 
   /**
    * Targets the same gap as {@code
-   * iterateBodyResolvesAShadowedOuterVariableCorrectlyOnEveryStepWhilePullingFromALazySelectReceiver},
-   * adapted so that a wrong binding flips the final boolean outright rather than merely appearing
-   * as a stray value in a list: with exactly two receiver elements and a body that projects to the
-   * shadowed variable alone (ignoring the iterator variable), <em>correct</em> resolution
-   * (always {@code shadow == 222}) makes both projections collide -&gt; not unique -&gt; {@code
-   * false}. If even one of the two elements resolved {@code shadow} against the wrong (skipped)
-   * enclosing scope, that element's projection would be {@code 111} instead of {@code 222} -&gt;
-   * no collision -&gt; {@code true}. Two elements is the minimum needed to make any single wrong
-   * resolution decisive - with three or more, one bad element could still collide with the other,
-   * correct ones and self-heal, the same trap the first, non-shadowing tests above don't avoid.
+   * iterateBodyResolvesShadowedOuterVariableOnEveryStepOfALazySelectReceiver}, adapted so that a
+   * wrong binding flips the final boolean outright rather than merely appearing as a stray value in
+   * a list: with exactly two receiver elements and a body that projects to the shadowed variable
+   * alone (ignoring the iterator variable), <em>correct</em> resolution (always {@code shadow ==
+   * 222}) makes both projections collide -&gt; not unique -&gt; {@code false}. If even one of the
+   * two elements resolved {@code shadow} against the wrong (skipped) enclosing scope, that
+   * element's projection would be {@code 111} instead of {@code 222} -&gt; no collision -&gt;
+   * {@code true}. Two elements is the minimum needed to make any single wrong resolution decisive -
+   * with three or more, one bad element could still collide with the other, correct ones and
+   * self-heal, the same trap the first, non-shadowing tests above don't avoid.
    */
   @Test
   void isUniqueBodyResolvesAShadowedOuterVariableCorrectlyForBothElementsOfALazySelectReceiver() {
@@ -330,12 +338,12 @@ class LazyChainRegressionTest extends DummyTestSpecification {
   /**
    * Same construction and reasoning as {@code
    * isUniqueBodyResolvesAShadowedOuterVariableCorrectlyForBothElementsOfALazySelectReceiver},
-   * adapted to {@code one()}: with exactly two receiver elements and a body that tests the
-   * shadowed variable alone, <em>correct</em> resolution (always {@code shadow == 222}) makes the
-   * condition true for both elements -&gt; two matches -&gt; not exactly one -&gt; {@code false}.
-   * If even one of the two elements resolved {@code shadow} against the wrong (skipped) enclosing
-   * scope, that element's condition would be {@code false} (since {@code 111 != 222}) -&gt; only
-   * one match remains -&gt; {@code true}. Any single wrong resolution flips the final boolean.
+   * adapted to {@code one()}: with exactly two receiver elements and a body that tests the shadowed
+   * variable alone, <em>correct</em> resolution (always {@code shadow == 222}) makes the condition
+   * true for both elements -&gt; two matches -&gt; not exactly one -&gt; {@code false}. If even one
+   * of the two elements resolved {@code shadow} against the wrong (skipped) enclosing scope, that
+   * element's condition would be {@code false} (since {@code 111 != 222}) -&gt; only one match
+   * remains -&gt; {@code true}. Any single wrong resolution flips the final boolean.
    */
   @Test
   void oneBodyResolvesAShadowedOuterVariableCorrectlyForBothElementsOfALazySelectReceiver() {
@@ -364,11 +372,11 @@ class LazyChainRegressionTest extends DummyTestSpecification {
   /**
    * Uses a discontinuous key ({@code if shadow = 222 then n else 0 - n endif}) rather than a
    * constant offset: adding/subtracting a fixed shadow value would preserve elements' relative
-   * order regardless of which shadow value was used, hiding a wrong resolution. Flipping the
-   * key's *sign* based on an exact-match test against the correct value (222) means a wrong
-   * resolution for even a single element reverses that element's position - detectable whether
-   * the (hypothetical) corruption affects all elements uniformly or just one, unlike a simple
-   * shared additive shift.
+   * order regardless of which shadow value was used, hiding a wrong resolution. Flipping the key's
+   * *sign* based on an exact-match test against the correct value (222) means a wrong resolution
+   * for even a single element reverses that element's position - detectable whether the
+   * (hypothetical) corruption affects all elements uniformly or just one, unlike a simple shared
+   * additive shift.
    */
   @Test
   void sortedByBodyResolvesAShadowedOuterVariableCorrectlyForEveryElementOfALazySelectReceiver() {
@@ -397,19 +405,18 @@ class LazyChainRegressionTest extends DummyTestSpecification {
 
   /**
    * Same construction and reasoning as {@code
-   * sortedByBodyResolvesAShadowedOuterVariableCorrectlyForEveryElementOfALazySelectReceiver}:
-   * a discontinuous body ({@code if shadow == 222 then n else 0 - n endif}) means a wrong
-   * resolution for any element flips that element's sign, detectable via {@code flatten()} after
-   * unwrapping the per-element {@code NestedCollection}s.
+   * sortedByBodyResolvesAShadowedOuterVariableCorrectlyForEveryElementOfALazySelectReceiver}: a
+   * discontinuous body ({@code if shadow == 222 then n else 0 - n endif}) means a wrong resolution
+   * for any element flips that element's sign, detectable via {@code flatten()} after unwrapping
+   * the per-element {@code NestedCollection}s.
    */
   @Test
-  void collectNestedBodyResolvesAShadowedOuterVariableCorrectlyForEveryElementOfALazySelectReceiver() {
+  void collectNestedBodyResolvesShadowedOuterVariableForEveryElementOfALazySelect() {
     Value result =
         compile(
-            "let shadow = 111 in"
-                + " let source = Set{1,2,3}.select(x | x > 0) in"
-                + " let shadow = 222 in"
-                + " source.collectNested(n | if shadow == 222 then Set{n} else Set{0 - n} endif).flatten()");
+            "let shadow = 111 in let source = Set{1,2,3}.select(x | x > 0) in let shadow = 222 in"
+                + " source.collectNested(n | if shadow == 222 then Set{n} else Set{0 - n}"
+                + " endif).flatten()");
     assertCollection(result, 1, 2, 3); // never negative - shadow always resolves to L2's 222
   }
 
@@ -451,7 +458,9 @@ class LazyChainRegressionTest extends DummyTestSpecification {
                 + " let source = Set{1,2}.select(x | x > 0) in"
                 + " let shadow = 222 in"
                 + " source.select(a, b | shadow == 222)");
-    assertSize(result, 8); // all 4 pairs match (2 elements each) - never 0 (which a wrong shadow would give)
+    assertSize(
+        result,
+        8); // all 4 pairs match (2 elements each) - never 0 (which a wrong shadow would give)
   }
 
   @Test
@@ -462,7 +471,9 @@ class LazyChainRegressionTest extends DummyTestSpecification {
                 + " let source = Set{1,2}.select(x | x > 0) in"
                 + " let shadow = 222 in"
                 + " source.reject(a, b | shadow == 222)");
-    assertSize(result, 0); // all 4 pairs match and are rejected - never 8 (which a wrong shadow would give)
+    assertSize(
+        result,
+        0); // all 4 pairs match and are rejected - never 8 (which a wrong shadow would give)
   }
 
   @Test
@@ -476,7 +487,8 @@ class LazyChainRegressionTest extends DummyTestSpecification {
     assertSize(result, 4); // one value per pair (4 pairs)
     // Every one of the 4 collected values must be 1 (never -1, which a wrong shadow would give) -
     // a sum of anything less than 4 means at least one pair resolved shadow incorrectly.
-    long sum = result.getElements().stream().mapToLong(e -> ((OCLElement.IntValue) e).value()).sum();
+    long sum =
+        result.getElements().stream().mapToLong(e -> ((OCLElement.IntValue) e).value()).sum();
     org.junit.jupiter.api.Assertions.assertEquals(4, sum);
   }
 }

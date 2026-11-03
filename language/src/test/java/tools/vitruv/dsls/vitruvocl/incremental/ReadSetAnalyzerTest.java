@@ -50,7 +50,8 @@ class ReadSetAnalyzerTest {
 
   @Test
   void navigationChainUsesStaticReceiverTypes() {
-    ReadSet rs = readSet("context edge::Root inv: self.items.select(i | i.next.value > 0).size() >= 0");
+    ReadSet rs =
+        readSet("context edge::Root inv: self.items.select(i | i.next.value > 0).size() >= 0");
     assertEquals(Set.of(cls("Root")), rs.typedFeatureReads().get("items"));
     assertEquals(Set.of(cls("Item")), rs.typedFeatureReads().get("next"));
     assertEquals(Set.of(cls("Item")), rs.typedFeatureReads().get("value"));
@@ -102,15 +103,20 @@ class ReadSetAnalyzerTest {
   void appendMakesAllReadsUntyped() {
     ReadSet rs =
         readSet(
-            "context edge::Root inv: self.items.append(self.items.first()).forAll(x | x.value >= 0)");
+            "context edge::Root inv: self.items.append(self.items.first()).forAll(x | x.value >="
+                + " 0)");
     assertTrue(rs.typedFeatureReads().isEmpty(), rs.typedFeatureReads().toString());
     assertTrue(rs.untypedFeatureReads().contains("value"));
   }
 
   @Test
   void referenceInMessageTemplateForcesFullEvaluation() {
-    assertTrue(readSet("context edge::Item inv: @message \"{self.next}\" self.value >= 0").requiresFullEvaluation());
-    assertFalse(readSet("context edge::Item inv: @message \"{self.name}\" self.value >= 0").requiresFullEvaluation());
+    assertTrue(
+        readSet("context edge::Item inv: @message \"{self.next}\" self.value >= 0")
+            .requiresFullEvaluation());
+    assertFalse(
+        readSet("context edge::Item inv: @message \"{self.name}\" self.value >= 0")
+            .requiresFullEvaluation());
   }
 
   @Test

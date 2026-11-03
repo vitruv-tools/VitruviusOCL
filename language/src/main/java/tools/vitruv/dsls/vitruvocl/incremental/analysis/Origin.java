@@ -49,6 +49,7 @@ public record Origin(Kind kind, List<EReference> steps, EClass correspondentType
   public static final Origin CLASS = new Origin(Kind.CLASS, List.of(), null);
   public static final Origin VALUE = new Origin(Kind.VALUE, List.of(), null);
 
+  /** Copies the steps, so the origin is immutable. */
   public Origin {
     steps = List.copyOf(steps);
   }
@@ -58,7 +59,9 @@ public record Origin(Kind kind, List<EReference> steps, EClass correspondentType
     return kind == Kind.SELF || kind == Kind.CORRESPONDENTS;
   }
 
-  /** This origin extended by navigating {@code reference}; untraceable origins stay {@link #CLASS}. */
+  /**
+   * This origin extended by navigating {@code reference}; untraceable origins stay {@link #CLASS}.
+   */
   public Origin navigate(EReference reference) {
     if (!traceable()) {
       return CLASS;
