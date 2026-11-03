@@ -23,6 +23,9 @@
              that code. Consumers must run on JDK 21+. -->
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <!-- Tests tagged "slow" (the incremental oracle and other long-running sweeps) are skipped
+             by default; the profile all-tests runs them too. -->
+        <excludedTestGroups>slow</excludedTestGroups>
     </properties>
 
     <repositories>
@@ -219,6 +222,7 @@
                         <include>**/*Tests.java</include>
                     </includes>
                     <printSummary>true</printSummary>
+                    <excludedGroups>${excludedTestGroups}</excludedGroups>
                 </configuration>
             </plugin>
 
@@ -278,4 +282,13 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>all-tests</id>
+            <properties>
+                <excludedTestGroups>none</excludedTestGroups>
+            </properties>
+        </profile>
+    </profiles>
 </project>
