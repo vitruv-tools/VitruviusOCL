@@ -30,8 +30,9 @@ jobs:
         cache: 'maven'
 
     - name: Verify build
+      # a release also runs the slow tests that the regular CI build skips
       run: >
-        ./mvnw clean verify
+        ./mvnw clean verify -P all-tests
         --batch-mode
         --update-snapshots
         --no-transfer-progress

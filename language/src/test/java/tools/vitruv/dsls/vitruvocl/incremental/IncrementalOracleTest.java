@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -51,6 +52,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
  * transaction) dominates the run time, so the defaults are small; larger sweeps use {@code
  * -Dvitruvocl.incremental.mutations=N} and {@code -Dvitruvocl.incremental.manySeeds=true}.
  */
+@Tag("slow")
 class IncrementalOracleTest {
 
   private static final int MUTATIONS = Integer.getInteger("vitruvocl.incremental.mutations", 6);
