@@ -39,7 +39,9 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- required at runtime by a real virtual model (VitruvOclVsumIntegrationTest) -->
+        <!-- required at runtime by a real (non-mocked) virtual model in VitruvOclVsumIntegrationTest
+             and the incremental-evaluation tests (VsumFileSystemLayout uses
+             org.eclipse.core.runtime.IPath). Version managed by the tools.vitruv.dsls parent. -->
         <dependency>
             <groupId>org.eclipse.platform</groupId>
             <artifactId>org.eclipse.equinox.common</artifactId>
@@ -94,15 +96,6 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Needed at runtime by a real (non-mocked) VSUM built in incremental-evaluation tests
-             (VsumFileSystemLayout uses org.eclipse.core.runtime.IPath). Version managed by the
-             tools.vitruv.dsls parent. -->
-        <dependency>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.equinox.common</artifactId>
             <scope>test</scope>
         </dependency>
 
