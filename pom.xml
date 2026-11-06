@@ -62,7 +62,7 @@
         <emf.ecore.version>2.43.0</emf.ecore.version>
         <emf.ecore.xmi.version>2.41.0</emf.ecore.xmi.version>
         <equinox.common.version>3.21.0</equinox.common.version>
-        <guava.version>33.7.2-jre</guava.version>
+        <guava.version>33.8.0-jre</guava.version>
         <!-- Must match the junit-platform-launcher/engine versions the parent pins for maven-surefire-plugin -->
         <junit.jupiter.version>6.1.3</junit.jupiter.version>
         <junit.platform.version>6.1.3</junit.platform.version>
