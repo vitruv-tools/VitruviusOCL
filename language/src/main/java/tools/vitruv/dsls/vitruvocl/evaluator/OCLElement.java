@@ -394,6 +394,34 @@ public sealed interface OCLElement
   }
 
   /**
+   * Hash code consistent with {@link #semanticEquals}: semantically equal elements have equal
+   * hashes. Lets buffers of already-seen elements be looked up by hash bucket instead of by a
+   * linear scan.
+   *
+   * <p>Numbers hash by their {@code double} value (cross-type numeric equality), strings and enum
+   * literals by their (literal) name (enum/string equality by name), metaclass values by their
+   * instance. Nested collections share one bucket, since their equality is structural.
+   *
+   * @param element the element, may be {@code null}
+   * @return the semantic hash
+   */
+  static int semanticHash(OCLElement element) {
+    return switch (element) {
+      case null -> 0;
+      case IntValue(int v) -> Double.hashCode(v);
+      case FloatValue(float v) -> Double.hashCode(v);
+      case DoubleValue(double v) -> Double.hashCode(v);
+      case BoolValue(boolean v) -> Boolean.hashCode(v);
+      case StringValue(String v) -> v.hashCode();
+      case EnumValue(EEnumLiteral literal) -> literal.getName().hashCode();
+      case ObjectRef(String oid) -> oid.hashCode();
+      case MetaclassValue(EObject instance) -> instance.hashCode();
+      case CastedMetaclassValue casted -> casted.instance().hashCode();
+      case NestedCollection ignored -> NestedCollection.class.hashCode();
+    };
+  }
+
+  /**
    * Compares two OCL elements for ordering. Used for normalizing unordered collections (Sets, Bags)
    * and for relational operators ({@code <}, {@code <=}, {@code >}, {@code >=}).
    *

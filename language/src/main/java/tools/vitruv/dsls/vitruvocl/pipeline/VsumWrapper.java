@@ -228,33 +228,51 @@ public class VsumWrapper implements MetamodelWrapperInterface {
    */
   @Override
   public List<EObject> getAllInstances(EClass eClass) {
-    if (instanceCache != null) {
-      synchronized (instanceCache) {
-        return instanceCache.computeIfAbsent(eClass, this::collectAllInstances);
-      }
-    }
-    return collectAllInstances(eClass);
-  }
-
-  private List<EObject> collectAllInstances(EClass eClass) {
-    // See MetamodelWrapper#getAllInstances for why only the cache bookkeeping is synchronized
-    // while the compute() traversal itself runs lock-free.
-    AllInstancesEngine engine = obtainEngine(eClass);
-    Map<EClass, List<EObject>> instancesByType = engine.compute(getAllRootObjects());
-    return instancesByType.getOrDefault(eClass, Collections.emptyList());
+    return getAllInstances(List.of(eClass)).getOrDefault(eClass, Collections.emptyList());
   }
 
   /**
-   * Registers {@code eClass} as a call site (if not already known) and returns an {@link
-   * AllInstancesEngine} whose cache configuration covers it, rebuilding the cached engine first if
-   * necessary.
+   * Returns the instances of all given types, collected in one traversal (Wei &amp; Kolovos, BigMDE
+   * 2015, Section 3.4) together with those of every type requested before.
+   *
+   * <p>A wrapper of a single constraint check caches the result for the rest of the check, since
+   * the models do not change during a check; a traversal happens only when a type not cached yet
+   * is requested. A wrapper reading the live VSUM receives no notification of model changes here,
+   * so it traverses on every call — once for all requested types instead of once per type.
+   *
+   * @param types the metaclasses whose instances should be retrieved
+   * @return an unmodifiable map with an entry for every requested type (and possibly more)
+   */
+  @Override
+  public Map<EClass, List<EObject>> getAllInstances(Collection<EClass> types) {
+    if (instanceCache == null) {
+      return Collections.unmodifiableMap(obtainEngine(types).compute(getAllRootObjects()));
+    }
+    synchronized (instanceCache) {
+      if (!instanceCache.keySet().containsAll(types)) {
+        obtainEngine(types)
+            .compute(getAllRootObjects())
+            .forEach((type, instances) -> instanceCache.putIfAbsent(type, List.copyOf(instances)));
+      }
+      Map<EClass, List<EObject>> result = new HashMap<>();
+      for (EClass type : types) {
+        result.put(type, instanceCache.getOrDefault(type, Collections.emptyList()));
+      }
+      return Collections.unmodifiableMap(result);
+    }
+  }
+
+  /**
+   * Registers {@code types} as call sites (if not already known) and returns an {@link
+   * AllInstancesEngine} whose cache configuration covers them, rebuilding the cached engine first
+   * if necessary.
    *
    * <p>Synchronized because {@link #queriedAllInstancesTypes} and {@link #allInstancesEngine} are
    * shared, mutable state read and written by every {@link #getAllInstances} call — including
    * concurrently from multiple threads when constraints are evaluated in parallel.
    */
-  private synchronized AllInstancesEngine obtainEngine(EClass eClass) {
-    if (queriedAllInstancesTypes.add(eClass)) {
+  private synchronized AllInstancesEngine obtainEngine(Collection<EClass> types) {
+    if (queriedAllInstancesTypes.addAll(types)) {
       allInstancesEngine = null; // newly-seen call site -> cache configuration is stale
     }
     if (allInstancesEngine == null) {

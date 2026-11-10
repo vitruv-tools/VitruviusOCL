@@ -147,6 +147,19 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private final java.util.Map<EClass, Value> allInstancesCache = new java.util.HashMap<>();
 
   /**
+   * Every EClass the current constraint needs the extension of, collected from the type-checked AST
+   * before evaluation (static query analysis, Wei &amp; Kolovos, BigMDE 2015, Section 3.2).
+   */
+  private Set<EClass> prescannedTypes = Set.of();
+
+  /**
+   * The extensions of {@link #prescannedTypes}, fetched with one request on first need; {@code
+   * null} until then, so an evaluation that never asks for an extension (e.g. an incremental one
+   * with a context-instance override) does not trigger a traversal.
+   */
+  private Map<EClass, List<EObject>> prescannedInstances;
+
+  /**
    * Stack of receiver values for navigation chains.
    *
    * <p>When evaluating {@code receiver.operation()}, the receiver value is pushed onto this stack
@@ -319,11 +332,28 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitContextDeclCS(VitruvOCLParser.ContextDeclCSContext ctx) {
+    prescannedTypes = AllInstancesTypeScanner.scan(ctx, nodeTypes);
+    prescannedInstances = null;
     Value lastResult = null;
     for (VitruvOCLParser.ClassifierContextCSContext classifierCtx : ctx.classifierContextCS()) {
       lastResult = visit(classifierCtx);
     }
     return lastResult != null ? lastResult : Value.empty(Type.ERROR);
+  }
+
+  /**
+   * Returns all instances of {@code eClass} (subtypes included). Types found by the static
+   * analysis are fetched together with one request; any other type (e.g. when evaluation does not
+   * start at a {@code contextDeclCS}) falls back to a single-type request.
+   */
+  private List<EObject> instancesOf(EClass eClass) {
+    if (!prescannedTypes.contains(eClass)) {
+      return specification.getAllInstances(eClass);
+    }
+    if (prescannedInstances == null) {
+      prescannedInstances = specification.getAllInstances(prescannedTypes);
+    }
+    return prescannedInstances.getOrDefault(eClass, Collections.emptyList());
   }
 
   // ==================== Classifier Context (Constraint Evaluation)
@@ -365,9 +395,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     // Retrieve all instances of the context type from the metamodel (or the incremental
     // evaluator's relevant subset of them, if an override is installed)
     List<EObject> instances =
-        contextInstanceOverride != null
-            ? contextInstanceOverride.apply(ctx)
-            : specification.getAllInstances(eClass);
+        contextInstanceOverride != null ? contextInstanceOverride.apply(ctx) : instancesOf(eClass);
     List<OCLElement> allResults = new ArrayList<>();
 
     // Evaluate invariants for each instance
@@ -3353,37 +3381,24 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitAllInstancesOp(VitruvOCLParser.AllInstancesOpContext ctx) {
-    // Navigate up parse tree to find receiver type
-    ParseTree nav = ctx.getParent().getParent().getParent();
-    Type receiverType = nodeTypes.get(nav);
-
-    if (receiverType == null) {
-      ParseTree prefixed = nav.getParent();
-      receiverType = nodeTypes.get(prefixed);
-    }
-
-    // Unwrap collection type if present
-    if (receiverType != null && receiverType.isCollection()) {
-      receiverType = receiverType.getElementType();
-    }
-
-    if (receiverType == null || !receiverType.isMetaclassType()) {
+    // Navigate up the parse tree to the receiver's (metaclass) type
+    EClass eClass = AllInstancesTypeScanner.receiverEClass(ctx, nodeTypes);
+    if (eClass == null) {
       return Value.empty(Type.set(Type.ANY));
     }
-
-    EClass eClass = receiverType.getEClass();
 
     // Cache lookup
     if (allInstancesCache.containsKey(eClass)) {
       return allInstancesCache.get(eClass);
     }
 
-    List<EObject> instances = specification.getAllInstances(eClass);
+    List<EObject> instances = instancesOf(eClass);
     List<OCLElement> elements =
         instances.stream().map(obj -> (OCLElement) new OCLElement.MetaclassValue(obj)).toList();
 
     Type resultType = nodeTypes.get(ctx);
-    Value result = Value.of(elements, resultType != null ? resultType : Type.set(receiverType));
+    Value result =
+        Value.of(elements, resultType != null ? resultType : Type.set(Type.metaclassType(eClass)));
 
     // Cache result
     allInstancesCache.put(eClass, result);
@@ -3443,7 +3458,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     // TypeCheckVisitor#typeCheckPropertyAccess) says "unique". Deduplicated incrementally (Kern-
     // anforderung 2) instead of via a post-hoc removeDuplicates() pass over a fully built list.
     OCLElementSource result =
-        finalType.isUnique() ? LazyOperations.dedupe(mapped, OCLElement::semanticEquals) : mapped;
+        finalType.isUnique() ? LazyOperations.dedupeSemantically(mapped) : mapped;
     return Value.lazy(result, finalType);
   }
 

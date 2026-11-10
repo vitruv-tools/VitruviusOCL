@@ -155,4 +155,80 @@ class ContainmentReachabilityAnalyzerTest {
     assertTrue(traversable.contains(fixture.bToA));
     assertTrue(traversable.contains(fixture.aToB));
   }
+
+  /**
+   * Regression test: the cycle guard of the recursive formulation used to store its provisional
+   * {@code false} for {@code B.a} permanently (evaluated while {@code A.b} was still in progress),
+   * so the second lap around the cycle — and every {@code C} behind it — was pruned.
+   */
+  @Test
+  void cyclicContainment_withSideBranchRequested_keepsTheWholeCycle() {
+    CyclicMetamodelFixture fixture = new CyclicMetamodelFixture();
+    CacheConfiguration cacheConfig =
+        new AllInstancesCallCollector()
+            .analyzeQueries(List.of(new AllInstancesCallSite(fixture.classC, Kind.ALL_OF_KIND)));
+
+    Set<EReference> traversable =
+        new ContainmentReachabilityAnalyzer()
+            .computeTraversableReferences(fixture.cyclicPackage, cacheConfig);
+
+    assertEquals(Set.of(fixture.aToB, fixture.bToA, fixture.bToC), traversable);
+  }
+
+  /**
+   * A requested type, or a container on the way to it, may live in a package that is not among the
+   * analyzed ones (e.g. a metamodel that was unloaded or never registered by name). Its containment
+   * references must still be followed.
+   */
+  @Test
+  void requestedTypeOutsideAnalyzedPackages_isStillReached() {
+    org.eclipse.emf.ecore.EcoreFactory factory = org.eclipse.emf.ecore.EcoreFactory.eINSTANCE;
+    org.eclipse.emf.ecore.EPackage analyzed = factory.createEPackage();
+    org.eclipse.emf.ecore.EPackage foreign = factory.createEPackage();
+    org.eclipse.emf.ecore.EClass root = factory.createEClass();
+    root.setName("Root");
+    analyzed.getEClassifiers().add(root);
+    org.eclipse.emf.ecore.EClass holder = factory.createEClass();
+    holder.setName("Holder");
+    org.eclipse.emf.ecore.EClass leaf = factory.createEClass();
+    leaf.setName("Leaf");
+    foreign.getEClassifiers().addAll(List.of(holder, leaf));
+    EReference rootHolders = containment(factory, "holders", holder);
+    root.getEStructuralFeatures().add(rootHolders);
+    EReference holderLeaves = containment(factory, "leaves", leaf);
+    holder.getEStructuralFeatures().add(holderLeaves);
+    CacheConfiguration cacheConfig =
+        new AllInstancesCallCollector()
+            .analyzeQueries(List.of(new AllInstancesCallSite(leaf, Kind.ALL_OF_KIND)));
+
+    Set<EReference> traversable =
+        new ContainmentReachabilityAnalyzer().computeTraversableReferences(analyzed, cacheConfig);
+
+    assertEquals(Set.of(rootHolders, holderLeaves), traversable);
+  }
+
+  private static EReference containment(
+      org.eclipse.emf.ecore.EcoreFactory factory, String name, org.eclipse.emf.ecore.EClass type) {
+    EReference ref = factory.createEReference();
+    ref.setName(name);
+    ref.setContainment(true);
+    ref.setUpperBound(-1);
+    ref.setEType(type);
+    return ref;
+  }
+
+  @Test
+  void cyclicContainment_withSideBranchRequested_isIndependentOfClassifierOrder() {
+    CyclicMetamodelFixture fixture = new CyclicMetamodelFixture();
+    fixture.cyclicPackage.getEClassifiers().move(0, fixture.classB);
+    CacheConfiguration cacheConfig =
+        new AllInstancesCallCollector()
+            .analyzeQueries(List.of(new AllInstancesCallSite(fixture.classC, Kind.ALL_OF_KIND)));
+
+    Set<EReference> traversable =
+        new ContainmentReachabilityAnalyzer()
+            .computeTraversableReferences(fixture.cyclicPackage, cacheConfig);
+
+    assertEquals(Set.of(fixture.aToB, fixture.bToA, fixture.bToC), traversable);
+  }
 }

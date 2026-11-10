@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -30,6 +31,7 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import org.eclipse.emf.common.notify.Notification;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
@@ -43,7 +45,9 @@ import org.eclipse.emf.ecore.EcorePackage;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
+import org.eclipse.emf.ecore.util.EContentAdapter;
 import org.eclipse.emf.ecore.util.EcoreUtil;
+import org.eclipse.emf.ecore.util.FeatureMapUtil;
 import org.eclipse.emf.ecore.xmi.impl.EcoreResourceFactoryImpl;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 import org.w3c.dom.Document;
@@ -94,16 +98,14 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
   private final Map<String, EPackage> metamodelRegistry = new HashMap<>();
 
   /**
-   * Every {@link EClass} ever passed to {@link #getAllInstances}, in first-seen order.
+   * Every {@link EClass} ever passed to {@link #getAllInstances}, in first-seen order: the call
+   * sites of the allInstances() computation strategy of Wei &amp; Kolovos (BigMDE 2015).
    *
-   * <p>This is the runtime-discovered "call site" registration mentioned in the allInstances()
-   * computation strategy of Wei &amp; Kolovos (BigMDE 2015): rather than statically pre-scanning
-   * every constraint's AST for {@code allInstances()} calls, each type is registered the moment a
-   * constraint actually asks for it (from {@link
-   * tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor}, the sole caller of {@link
-   * #getAllInstances}). This is exact, not an approximation: the set of types ever queried against
-   * this wrapper equals the set of types constraints actually need, since there is no other way to
-   * ask for instances than through this method.
+   * <p>The static query analysis of the paper (Section 3.2) happens in {@link
+   * tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor}: before a constraint is evaluated, it
+   * collects every type the constraint needs from the type-checked AST and requests all of them at
+   * once via {@link #getAllInstances(Collection)}. Types of all constraints evaluated so far
+   * accumulate here, so one traversal serves all of them.
    *
    * <p><b>Semantics note:</b> every prior call site is treated as {@code ALL_OF_KIND}
    * (subtype-inclusive), matching the old greedy implementation's behavior exactly — see {@link
@@ -116,12 +118,57 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    *
    * <p>Invalidated whenever {@link #queriedAllInstancesTypes} gains a new entry or a new metamodel
    * package is (un)registered — both change the metamodel-level pruning decision the engine's
-   * cache configuration is based on. Per {@link AllInstancesEngine}'s own contract, this cached
-   * engine may be reused across many {@link #getAllInstances} calls even as the instance model
-   * changes, since {@code compute()} always performs a fresh traversal; only the pruning analysis
-   * itself (query analysis + containment reachability) is cached here.
+   * cache configuration is based on.
    */
   private AllInstancesEngine allInstancesEngine;
+
+  /**
+   * Result of the last single-pass traversal: the instances of every type in {@link
+   * #queriedAllInstancesTypes}; {@code null} means stale/not-yet-computed.
+   *
+   * <p>This is the cache of Wei &amp; Kolovos (BigMDE 2015, Section 3.4): one traversal collects
+   * all needed extensions, every later request is a lookup. It is discarded whenever an extension
+   * may have changed: a new type is requested, a metamodel package is (un)registered, a model is
+   * loaded, or a containment feature of a loaded model changes (see {@link #extensionTracker}).
+   */
+  private Map<EClass, List<EObject>> cachedInstancesByType;
+
+  /**
+   * Discards {@link #cachedInstancesByType} as soon as a containment feature anywhere below a
+   * loaded model root changes — the only kind of change that can add an object to or remove one
+   * from an extension (attribute and cross-reference changes cannot). As an {@link
+   * EContentAdapter} it follows newly contained objects automatically. It does not resolve
+   * containment proxies, so attaching it never loads further resources.
+   *
+   * <p>Not observed: changes made with notification delivery switched off ({@code
+   * eSetDeliver(false)}); callers doing that must not rely on cached extensions.
+   */
+  private final EContentAdapter extensionTracker =
+      new EContentAdapter() {
+        @Override
+        public void notifyChanged(Notification notification) {
+          super.notifyChanged(notification);
+          if (!notification.isTouch() && affectsContainment(notification.getFeature())) {
+            invalidateAllInstancesCache(false);
+          }
+        }
+
+        @Override
+        protected boolean resolve() {
+          return false;
+        }
+      };
+
+  /**
+   * Whether a change of {@code feature} can change which objects are contained: a containment
+   * reference, or a feature map (whose entries may be containment references).
+   */
+  private static boolean affectsContainment(Object feature) {
+    if (feature instanceof EReference reference) {
+      return reference.isContainment();
+    }
+    return feature instanceof EAttribute attribute && FeatureMapUtil.isFeatureMap(attribute);
+  }
 
   /**
    * Maps each registered EObject to its source filename. Uses identity (not equals) so different.
@@ -411,7 +458,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     // A genuinely new package changes what computeTraversableReferences() can see, so it
     // invalidates the cached engine (putIfAbsent returns null exactly when newly inserted).
     if (pkg.getName() != null && metamodelRegistry.putIfAbsent(pkg.getName(), pkg) == null) {
-      allInstancesEngine = null;
+      invalidateAllInstancesCache(true);
     }
     for (EPackage subPkg : pkg.getESubpackages()) {
       registerPackageRecursively(subPkg);
@@ -465,7 +512,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
         EPackage.Registry.INSTANCE.remove(pkg.getNsURI());
       }
       // The known metamodel package set shrank, invalidating any cached engine built from it.
-      allInstancesEngine = null;
+      invalidateAllInstancesCache(true);
     }
 
     toRemove.unload();
@@ -510,6 +557,8 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
       contextObjects.add(root);
       instanceFilenames.add(filename);
     }
+    // New roots extend the traversal root set, so every cached extension may have grown.
+    invalidateAllInstancesCache(false);
   }
 
   /**
@@ -585,47 +634,74 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * populated from (via {@link #loadModelInstance}) — not {@link #getAllRootObjects()}, which would
    * also include metamodel (.ecore) and correspondence resources the old index never touched.
    *
-   * <p><b>Engine lifecycle:</b> the engine's cache configuration and pruned containment-reference
-   * set depend only on the metamodel and the accumulated query call sites, so they are cached and
-   * reused across calls; only a newly-seen type or a newly-(un)registered metamodel package
-   * invalidates and rebuilds them (see {@link #queriedAllInstancesTypes} and {@link
-   * #allInstancesEngine}). The instance collection itself ({@code engine.compute(...)}) is always
-   * performed fresh on every call, so changes to the loaded instance model between calls are always
-   * reflected.
+   * <p><b>Caching:</b> one traversal collects the instances of every type requested so far; its
+   * result is cached and every further request is a lookup (Section 3.4 of the paper). The cache is
+   * discarded when a new type is requested, a metamodel package is (un)registered, a model is
+   * loaded, or a containment feature of a loaded model changes, so changes to the instance model
+   * between calls are always reflected (see {@link #cachedInstancesByType}).
    *
    * @param eClass EClass to query
-   * @return List of all direct and indirect instances
+   * @return List of all direct and indirect instances (unmodifiable)
    */
   @Override
   public List<EObject> getAllInstances(EClass eClass) {
-    // Only the cheap call-site bookkeeping + lazy engine (re)build is synchronized; the
-    // potentially expensive compute() traversal below runs lock-free so parallel constraint
-    // evaluation (see ConstraintListEvaluator) isn't serialized on this call. This is safe because
-    // AllInstancesEngine is immutable after construction (see its class doc) and obtainEngine()
-    // guarantees the returned engine's call-site set already includes eClass — even if another
-    // thread concurrently swaps in a newer engine for a different, newly-seen type.
-    AllInstancesEngine engine = obtainEngine(eClass);
-    Map<EClass, List<EObject>> instancesByType = engine.compute(contextObjects);
-    return instancesByType.getOrDefault(eClass, Collections.emptyList());
+    return getAllInstances(List.of(eClass)).getOrDefault(eClass, Collections.emptyList());
   }
 
   /**
-   * Registers {@code eClass} as a call site (if not already known) and returns an {@link
-   * AllInstancesEngine} whose cache configuration covers it, rebuilding the cached engine first if
-   * necessary.
+   * Returns the instances of all given types, collected together with those of every type
+   * requested before in a single traversal (see {@link #getAllInstances(EClass)}).
    *
-   * <p>Synchronized because {@link #queriedAllInstancesTypes} and {@link #allInstancesEngine} are
-   * shared, mutable state read and written by every {@link #getAllInstances} call — including
-   * concurrently from multiple threads when constraints are evaluated in parallel.
+   * <p>Synchronized because the call-site set, engine, and cache are shared, mutable state —
+   * including across threads when constraints are evaluated in parallel. Computing the cache under
+   * the lock is intended: concurrent first requests wait for the one traversal instead of each
+   * performing their own.
+   *
+   * @param types the EClasses whose instances are needed
+   * @return an unmodifiable map with an entry for every requested type (and possibly more)
    */
-  private synchronized AllInstancesEngine obtainEngine(EClass eClass) {
-    if (queriedAllInstancesTypes.add(eClass)) {
-      allInstancesEngine = null; // newly-seen call site -> cache configuration is stale
+  @Override
+  public synchronized Map<EClass, List<EObject>> getAllInstances(Collection<EClass> types) {
+    if (queriedAllInstancesTypes.addAll(types)) {
+      invalidateAllInstancesCache(true); // newly-seen call site -> cache configuration is stale
     }
-    if (allInstancesEngine == null) {
-      allInstancesEngine = buildAllInstancesEngine();
+    if (cachedInstancesByType == null) {
+      if (allInstancesEngine == null) {
+        allInstancesEngine = buildAllInstancesEngine();
+      }
+      trackExtensionChanges();
+      cachedInstancesByType = freeze(allInstancesEngine.compute(contextObjects));
     }
-    return allInstancesEngine;
+    return cachedInstancesByType;
+  }
+
+  /**
+   * Discards the cached instances, and with {@code engineToo} also the engine (whose pruning
+   * depends on the call sites and the metamodel, not on the instance model).
+   */
+  private synchronized void invalidateAllInstancesCache(boolean engineToo) {
+    cachedInstancesByType = null;
+    if (engineToo) {
+      allInstancesEngine = null;
+    }
+  }
+
+  /**
+   * Attaches {@link #extensionTracker} to every model root it is not attached to (any more) — also
+   * re-attaching it if something removed the root's adapters in the meantime.
+   */
+  private void trackExtensionChanges() {
+    for (EObject root : contextObjects) {
+      if (!root.eAdapters().contains(extensionTracker)) {
+        root.eAdapters().add(extensionTracker);
+      }
+    }
+  }
+
+  private static Map<EClass, List<EObject>> freeze(Map<EClass, List<EObject>> instancesByType) {
+    Map<EClass, List<EObject>> frozen = new HashMap<>();
+    instancesByType.forEach((type, instances) -> frozen.put(type, List.copyOf(instances)));
+    return Collections.unmodifiableMap(frozen);
   }
 
   /**

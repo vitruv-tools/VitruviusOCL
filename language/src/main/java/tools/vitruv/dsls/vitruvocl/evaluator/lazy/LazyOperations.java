@@ -14,12 +14,15 @@
 package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 
 /**
@@ -113,6 +116,24 @@ public final class LazyOperations {
    */
   public static OCLElementSource dedupe(
       OCLElementSource source, BiPredicate<OCLElement, OCLElement> semanticEquals) {
+    return dedupe(source, semanticEquals, elem -> 0);
+  }
+
+  /**
+   * Like {@link #dedupe(OCLElementSource, BiPredicate)}, with the buffer of already-accepted
+   * elements hashed by {@code semanticHash}: a candidate is compared only with the accepted
+   * elements in its hash bucket, so deduplicating {@code n} elements takes linear instead of
+   * quadratic time.
+   *
+   * @param source the upstream source
+   * @param semanticEquals equality test used to compare a candidate against the buffer
+   * @param semanticHash hash consistent with {@code semanticEquals} (equal elements, equal hashes)
+   * @return a source yielding each semantically-distinct element exactly once, in first-seen order
+   */
+  public static OCLElementSource dedupe(
+      OCLElementSource source,
+      BiPredicate<OCLElement, OCLElement> semanticEquals,
+      ToIntFunction<OCLElement> semanticHash) {
     // The "seen" buffer is per-traversal state (built fresh in the predicateFactory below), not
     // shared across independent newIterator() calls - otherwise a partially-consumed-then-
     // abandoned traversal (e.g. from an early-terminating exists()) would corrupt a later, fresh
@@ -120,12 +141,10 @@ public final class LazyOperations {
     return filterStateful(
         source,
         () -> {
-          List<OCLElement> seen = new ArrayList<>();
+          HashedBuffer seen = new HashedBuffer(semanticEquals, semanticHash);
           return elem -> {
-            for (OCLElement s : seen) {
-              if (semanticEquals.test(s, elem)) {
-                return false;
-              }
+            if (seen.contains(elem)) {
+              return false;
             }
             seen.add(elem);
             return true;
@@ -161,10 +180,88 @@ public final class LazyOperations {
       OCLElementSource left,
       OCLElementSource right,
       BiPredicate<OCLElement, OCLElement> semanticEquals) {
-    return () -> new IntersectIterator(left.newIterator(), right.newIterator(), semanticEquals);
+    return intersect(left, right, semanticEquals, elem -> 0);
+  }
+
+  /**
+   * Like {@link #intersect(OCLElementSource, OCLElementSource, BiPredicate)}, with both side
+   * buffers hashed by {@code semanticHash} (see {@link #dedupe(OCLElementSource, BiPredicate,
+   * ToIntFunction)}); the result is identical.
+   *
+   * @param left the receiver-side source
+   * @param right the argument-side source
+   * @param semanticEquals equality test used to compare elements across sides
+   * @param semanticHash hash consistent with {@code semanticEquals} (equal elements, equal hashes)
+   * @return a source yielding one element per pairwise match between the two sides
+   */
+  public static OCLElementSource intersect(
+      OCLElementSource left,
+      OCLElementSource right,
+      BiPredicate<OCLElement, OCLElement> semanticEquals,
+      ToIntFunction<OCLElement> semanticHash) {
+    return () ->
+        new IntersectIterator(
+            left.newIterator(), right.newIterator(), semanticEquals, semanticHash);
+  }
+
+  /**
+   * {@link #dedupe(OCLElementSource, BiPredicate, ToIntFunction)} with OCL semantic equality
+   * ({@link OCLElement#semanticEquals}) and its consistent hash ({@link OCLElement#semanticHash}).
+   *
+   * @param source the upstream source
+   * @return a source yielding each semantically-distinct element exactly once, in first-seen order
+   */
+  public static OCLElementSource dedupeSemantically(OCLElementSource source) {
+    return dedupe(source, OCLElement::semanticEquals, OCLElement::semanticHash);
+  }
+
+  /**
+   * {@link #intersect(OCLElementSource, OCLElementSource, BiPredicate, ToIntFunction)} with OCL
+   * semantic equality and its consistent hash.
+   *
+   * @param left the receiver-side source
+   * @param right the argument-side source
+   * @return a source yielding one element per pairwise match between the two sides
+   */
+  public static OCLElementSource intersectSemantically(
+      OCLElementSource left, OCLElementSource right) {
+    return intersect(left, right, OCLElement::semanticEquals, OCLElement::semanticHash);
   }
 
   // ==================== Iterator implementations ====================
+
+  /**
+   * Buffer of already-seen elements, bucketed by a hash consistent with the equality test, so a
+   * membership test compares a candidate only with the elements of its own bucket.
+   */
+  private static final class HashedBuffer {
+    private final Map<Integer, List<OCLElement>> buckets = new HashMap<>();
+    private final BiPredicate<OCLElement, OCLElement> semanticEquals;
+    private final ToIntFunction<OCLElement> semanticHash;
+
+    HashedBuffer(
+        BiPredicate<OCLElement, OCLElement> semanticEquals,
+        ToIntFunction<OCLElement> semanticHash) {
+      this.semanticEquals = semanticEquals;
+      this.semanticHash = semanticHash;
+    }
+
+    boolean contains(OCLElement elem) {
+      List<OCLElement> bucket = buckets.get(semanticHash.applyAsInt(elem));
+      if (bucket != null) {
+        for (OCLElement buffered : bucket) {
+          if (semanticEquals.test(buffered, elem)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    void add(OCLElement elem) {
+      buckets.computeIfAbsent(semanticHash.applyAsInt(elem), hash -> new ArrayList<>()).add(elem);
+    }
+  }
 
   /** Lookahead filter: computes the next matching element eagerly so {@code hasNext()} is cheap. */
   private static final class FilterIterator implements Iterator<OCLElement> {
@@ -270,9 +367,8 @@ public final class LazyOperations {
   private static final class IntersectIterator implements Iterator<OCLElement> {
     private final Iterator<OCLElement> left;
     private final Iterator<OCLElement> right;
-    private final BiPredicate<OCLElement, OCLElement> semanticEquals;
-    private final List<OCLElement> leftSeen = new ArrayList<>();
-    private final List<OCLElement> rightSeen = new ArrayList<>();
+    private final HashedBuffer leftSeen;
+    private final HashedBuffer rightSeen;
     private boolean onLeft = true;
     private boolean leftExhausted;
     private boolean rightExhausted;
@@ -282,20 +378,13 @@ public final class LazyOperations {
     IntersectIterator(
         Iterator<OCLElement> left,
         Iterator<OCLElement> right,
-        BiPredicate<OCLElement, OCLElement> semanticEquals) {
+        BiPredicate<OCLElement, OCLElement> semanticEquals,
+        ToIntFunction<OCLElement> semanticHash) {
       this.left = left;
       this.right = right;
-      this.semanticEquals = semanticEquals;
+      this.leftSeen = new HashedBuffer(semanticEquals, semanticHash);
+      this.rightSeen = new HashedBuffer(semanticEquals, semanticHash);
       advance();
-    }
-
-    private boolean containsSemantically(List<OCLElement> buffer, OCLElement elem) {
-      for (OCLElement b : buffer) {
-        if (semanticEquals.test(b, elem)) {
-          return true;
-        }
-      }
-      return false;
     }
 
     @SuppressWarnings("java:S3776")
@@ -318,7 +407,7 @@ public final class LazyOperations {
           }
           OCLElement candidate = left.next();
           onLeft = rightExhausted; // switch sides, unless the other side is already drained
-          if (containsSemantically(rightSeen, candidate)) {
+          if (rightSeen.contains(candidate)) {
             pending = candidate;
             hasPending = true;
             return;
@@ -331,7 +420,7 @@ public final class LazyOperations {
           }
           OCLElement candidate = right.next();
           onLeft = !leftExhausted; // switch sides, unless the other side is already drained
-          if (containsSemantically(leftSeen, candidate)) {
+          if (leftSeen.contains(candidate)) {
             pending = candidate;
             hasPending = true;
             return;

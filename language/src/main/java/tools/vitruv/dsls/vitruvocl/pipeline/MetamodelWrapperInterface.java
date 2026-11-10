@@ -13,6 +13,8 @@
 
 package tools.vitruv.dsls.vitruvocl.pipeline;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +48,27 @@ public interface MetamodelWrapperInterface {
    * @return List of all instances
    */
   List<EObject> getAllInstances(EClass eClass);
+
+  /**
+   * Returns all instances of each of the given EClasses (subtype instances included), as needed by
+   * one constraint evaluation.
+   *
+   * <p>This is the entry point of the allInstances() computation strategy of Wei &amp; Kolovos
+   * (BigMDE 2015): the caller states up front every type it will need, so that an implementation
+   * can collect all of them in a single model traversal instead of one traversal per type. The
+   * default implementation simply asks for each type separately.
+   *
+   * @param types the EClasses whose instances are needed
+   * @return a map containing an entry for every requested type (possibly an empty list); it may
+   *     contain further types and must not be modified by the caller
+   */
+  default Map<EClass, List<EObject>> getAllInstances(Collection<EClass> types) {
+    Map<EClass, List<EObject>> result = new LinkedHashMap<>();
+    for (EClass type : types) {
+      result.put(type, getAllInstances(type));
+    }
+    return result;
+  }
 
   /**
    * * Resolves an EEnum by qualified name.

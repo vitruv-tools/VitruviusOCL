@@ -13,6 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.incremental;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -95,6 +96,11 @@ final class SnapshotCorrespondenceWrapper implements MetamodelWrapperInterface {
   @Override
   public List<EObject> getAllInstances(EClass eClass) {
     return delegate.getAllInstances(eClass);
+  }
+
+  @Override
+  public Map<EClass, List<EObject>> getAllInstances(Collection<EClass> types) {
+    return delegate.getAllInstances(types);
   }
 
   @Override

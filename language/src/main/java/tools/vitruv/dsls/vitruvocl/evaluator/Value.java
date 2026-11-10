@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
@@ -50,8 +51,39 @@ public class Value implements Comparable<Value> {
    * The lazy pull-based source backing this Value, or {@code null} if {@link #elements} was
    * supplied eagerly. See the {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy package
    * documentation} for the classification of which operations produce a lazy Value.
+   *
+   * <p>Released ({@code null}) once the source is exhausted and {@link #elements} is set, so that
+   * the upstream steps of a lazy chain — and the elements they buffered — become garbage as soon as
+   * this Value no longer needs them.
    */
-  private final OCLElementSource lazySource;
+  private OCLElementSource lazySource;
+
+  /**
+   * Elements pulled from {@link #lazySource} so far, shared by every traversal of this Value
+   * (call-by-need, Tisi et al., "Lazy Evaluation for OCL", 2015: an element is computed at most
+   * once, however many consumers traverse the Value). {@code null} until the first pull; becomes
+   * {@link #elements} once the source is exhausted.
+   *
+   * <p>Trade-off: every lazy step that is traversed buffers the elements it produced, i.e. a chain
+   * of {@code k} steps over {@code n} elements holds up to {@code k * n} references while it is
+   * being evaluated (instead of streaming with constant extra memory). In exchange no element is
+   * ever recomputed when a Value is traversed more than once, which call-by-name evaluation did
+   * (quadratically, e.g. for {@code includes} on a {@code let}-bound collection inside an
+   * iterator).
+   */
+  private List<OCLElement> pulled;
+
+  /** The single traversal of {@link #lazySource} that fills {@link #pulled}; started on demand. */
+  private Iterator<OCLElement> pullSource;
+
+  /**
+   * The exception the shared traversal failed with, if any. Rethrown by every later access, so a
+   * failed traversal can never be mistaken for a complete (but truncated) collection.
+   */
+  private RuntimeException pullFailure;
+
+  /** Whether a pull from {@link #pullSource} is in progress (guards against reentrant pulls). */
+  private boolean pulling;
 
   /** The runtime type - includes Ctype information (unique, ordered). */
   private final Type runtimeType;
@@ -164,12 +196,16 @@ public class Value implements Comparable<Value> {
     return elements;
   }
 
-  /** Materializes {@link #elements} from {@link #lazySource} on first access; idempotent. */
+  /**
+   * Materializes {@link #elements} on first access by pulling the rest of the shared traversal
+   * (see {@link #pulled}); elements already pulled by earlier consumers are not recomputed.
+   */
   private void materialize() {
     if (elements == null) {
-      List<OCLElement> materialized = new ArrayList<>();
-      lazySource.newIterator().forEachRemaining(materialized::add);
-      elements = Collections.unmodifiableList(materialized);
+      Iterator<OCLElement> it = elementIterator();
+      while (it.hasNext()) {
+        it.next();
+      }
     }
   }
 
@@ -178,25 +214,115 @@ public class Value implements Comparable<Value> {
    * materialization.
    *
    * <p>For an already-eager or already-materialized Value this simply wraps {@link #elements}. For
-   * an unmaterialized lazily-backed Value, this starts a new traversal of {@link #lazySource};
-   * stopping early (e.g. from {@code exists}/{@code any}/{@code notEmpty()}) never triggers
-   * evaluation of the remaining elements, and never affects any other, independent traversal of
-   * the same Value (each call starts fresh).
+   * an unmaterialized lazily-backed Value, the iterator reads the elements already computed by
+   * earlier traversals and pulls further ones from the one shared traversal of {@link #lazySource}
+   * only when it gets past them (call-by-need). Stopping early (e.g. from {@code exists}/{@code
+   * any}/{@code notEmpty()}) never triggers evaluation of the remaining elements; a later traversal
+   * continues where the furthest one stopped instead of starting over.
    *
    * @return a fresh iterator over this collection's elements
    */
   public Iterator<OCLElement> elementIterator() {
-    return elements != null ? elements.iterator() : lazySource.newIterator();
+    return elements != null ? elements.iterator() : new SharedTraversalIterator();
   }
 
   /**
    * Returns this Value's elements as a replayable {@link OCLElementSource}, for composing further
-   * lazy chains (e.g. {@code union}/{@code intersection}) without forcing materialization.
+   * lazy chains (e.g. {@code union}/{@code intersection}) without forcing materialization. Chains
+   * built on it share this Value's computed elements (see {@link #elementIterator()}).
    *
    * @return a source that replays this Value's elements on every traversal
    */
   public OCLElementSource asSource() {
-    return elements != null ? OCLElementSource.of(elements) : lazySource;
+    return elements != null ? OCLElementSource.of(elements) : this::elementIterator;
+  }
+
+  /**
+   * Whether the shared traversal has an element beyond those in {@link #pulled}. Only asks {@code
+   * hasNext()} of the source — taking the element is left to {@link
+   * SharedTraversalIterator#next()}, since a source's {@code next()} may already look ahead (e.g.
+   * a filter searching for its following match), which a mere {@code hasNext()} must not cause.
+   *
+   * @return {@code false} if the source is exhausted, in which case {@link #elements} is set
+   */
+  private boolean canPull() {
+    boolean hasMore = pull(this::sourceHasNext);
+    if (!hasMore) {
+      elements = Collections.unmodifiableList(pulled);
+      pullSource = null;
+      lazySource = null;
+    }
+    return hasMore;
+  }
+
+  /**
+   * Starts the shared traversal on first use (the iterator is created before {@link #pulled}, so
+   * a failing start leaves no half-initialized state) and asks it for a further element.
+   */
+  private boolean sourceHasNext() {
+    if (pullSource == null) {
+      pullSource = lazySource.newIterator();
+      pulled = new ArrayList<>();
+    }
+    return pullSource.hasNext();
+  }
+
+  /** Takes the next element of the shared traversal into {@link #pulled}. */
+  private OCLElement pullNext() {
+    OCLElement element = pull(pullSource::next);
+    pulled.add(element);
+    return element;
+  }
+
+  /**
+   * Runs one step of the shared traversal: rethrows an earlier failure, refuses reentrant pulls,
+   * and records a failure so that every later access rethrows it.
+   */
+  private <T> T pull(Supplier<T> step) {
+    if (pullFailure != null) {
+      throw pullFailure;
+    }
+    if (pulling) {
+      throw new IllegalStateException(
+          "Reentrant traversal of a lazy collection while one of its elements is being computed");
+    }
+    pulling = true;
+    try {
+      return step.get();
+    } catch (RuntimeException e) {
+      pullFailure = e;
+      throw e;
+    } finally {
+      pulling = false;
+    }
+  }
+
+  /** Iterates the elements of a lazily-backed Value, computing each one at most once. */
+  private final class SharedTraversalIterator implements Iterator<OCLElement> {
+    private int index;
+
+    @Override
+    public boolean hasNext() {
+      if (elements != null) {
+        return index < elements.size();
+      }
+      return (pulled != null && index < pulled.size()) || canPull();
+    }
+
+    @Override
+    public OCLElement next() {
+      if (!hasNext()) {
+        throw new java.util.NoSuchElementException();
+      }
+      if (elements != null) {
+        return elements.get(index++);
+      }
+      if (index < pulled.size()) {
+        return pulled.get(index++);
+      }
+      index++;
+      return pullNext();
+    }
   }
 
   /** Returns the runtime type. */
@@ -214,7 +340,7 @@ public class Value implements Comparable<Value> {
    * unmaterialized source.
    */
   public boolean isEmpty() {
-    return elements != null ? elements.isEmpty() : !lazySource.newIterator().hasNext();
+    return elements != null ? elements.isEmpty() : !elementIterator().hasNext();
   }
 
   /** Checks if this collection is not empty. Lazy; see {@link #isEmpty()}. */
@@ -244,7 +370,7 @@ public class Value implements Comparable<Value> {
     OCLElementSource concatenated = LazyOperations.concat(this.asSource(), other.asSource());
     OCLElementSource result =
         isUnique
-            ? LazyOperations.dedupe(concatenated, OCLElement::semanticEquals)
+            ? LazyOperations.dedupeSemantically(concatenated)
             : concatenated;
     return Value.lazy(result, this.runtimeType);
   }
@@ -317,7 +443,7 @@ public class Value implements Comparable<Value> {
    */
   public Value intersection(Value other) {
     OCLElementSource result =
-        LazyOperations.intersect(this.asSource(), other.asSource(), OCLElement::semanticEquals);
+        LazyOperations.intersectSemantically(this.asSource(), other.asSource());
     return Value.lazy(result, this.runtimeType);
   }
 
@@ -492,7 +618,7 @@ public class Value implements Comparable<Value> {
    * still avoid full materialization.
    */
   public Value removeDuplicates() {
-    return Value.lazy(LazyOperations.dedupe(asSource(), OCLElement::semanticEquals), runtimeType);
+    return Value.lazy(LazyOperations.dedupeSemantically(asSource()), runtimeType);
   }
 
   // ==================== Helper Methods ====================
@@ -595,7 +721,7 @@ public class Value implements Comparable<Value> {
     OCLElementSource expanded = LazyOperations.flatMap(asSource(), expand);
     OCLElementSource result =
         runtimeType.isUnique()
-            ? LazyOperations.dedupe(expanded, OCLElement::semanticEquals)
+            ? LazyOperations.dedupeSemantically(expanded)
             : expanded;
     return Value.lazy(result, runtimeType);
   }
