@@ -24,6 +24,7 @@ import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.common.OclLexers;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
@@ -161,7 +162,7 @@ public class VitruvOCLCompiler {
    * @return the evaluation {@link Value}, or {@code null} if a pass before evaluation failed
    */
   private Value runPipeline(CharStream input) {
-    VitruvOCLLexer lexer = new VitruvOCLLexer(input);
+    VitruvOCLLexer lexer = OclLexers.create(input);
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     VitruvOCLParser parser = new VitruvOCLParser(tokens);
     VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();

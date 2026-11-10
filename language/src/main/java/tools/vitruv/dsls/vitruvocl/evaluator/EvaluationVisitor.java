@@ -398,55 +398,29 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         contextInstanceOverride != null ? contextInstanceOverride.apply(ctx) : instancesOf(eClass);
     List<OCLElement> allResults = new ArrayList<>();
 
+    // Everything that does not depend on the instance is set up once, not per instance: the
+    // scope, the 'self' symbol (rebound per instance, like the iterator variables - see
+    // defineIterVar/rebindIterVar), the operation parameters, the 'self' type, and the lists of
+    // invariant/pre/post nodes (ANTLR collects these anew on every accessor call).
+    Scope instanceScope = new LocalScope(symbolTable.getCurrentScope());
+    symbolTable.enterScope(instanceScope);
+    VariableSymbol selfSymbol = bindContextVariables(ctx, contextType);
+    exitScope(instanceScope);
+    Type selfType = Type.singleton(contextType);
+    List<VitruvOCLParser.InvCSContext> invariants = ctx.invCS();
+    List<VitruvOCLParser.PreCSContext> preconditions =
+        transactionSupported ? ctx.preCS() : List.of();
+    List<VitruvOCLParser.PostCSContext> postconditions =
+        transactionSupported ? ctx.postCS() : List.of();
+
     // Evaluate invariants for each instance
     for (EObject instance : instances) {
       evaluatedInstanceCount++;
-      // Create instance-specific scope
-      Scope instanceScope = new LocalScope(symbolTable.getCurrentScope());
       symbolTable.enterScope(instanceScope);
-
-      // Bind 'self' to current instance
-      Value selfValue =
-          Value.of(List.of(new OCLElement.MetaclassValue(instance)), Type.singleton(contextType));
-
-      VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-      if (selfSymbol != null) {
-        // Update existing 'self' binding
-        selfSymbol.setValue(selfValue);
-      } else {
-        // Create new 'self' binding
-        VariableSymbol newSelf =
-            new VariableSymbol("self", contextType, symbolTable.getCurrentScope(), false);
-        newSelf.setValue(selfValue);
-        symbolTable.defineVariable(newSelf);
-      }
-
-      // Operation-context params (context Type::operation(name: Type, ...)): there is no
-      // method-invocation mechanism in this evaluator, so — unlike 'self' — these are always
-      // bound to an empty value rather than a real argument (see class-level docs on
-      // pre/post support). Binding them at all (instead of leaving them unresolved) matters:
-      // an unresolved variable is a hard evaluation error via handleUndefinedSymbol, whereas an
-      // empty-valued binding lets the constraint evaluate (typically to a vacuous/empty result)
-      // until a future Reactions/YAML layer supplies real argument values.
-      if (ctx.operationParamListCS() != null) {
-        for (VitruvOCLParser.OperationParamCSContext param :
-            ctx.operationParamListCS().operationParamCS()) {
-          String paramName = param.paramName.getText();
-          Value emptyValue = Value.empty(Type.ANY);
-          VariableSymbol paramSymbol = symbolTable.resolveVariable(paramName);
-          if (paramSymbol != null) {
-            paramSymbol.setValue(emptyValue);
-          } else {
-            VariableSymbol newParam =
-                new VariableSymbol(paramName, Type.ANY, symbolTable.getCurrentScope(), false);
-            newParam.setValue(emptyValue);
-            symbolTable.defineVariable(newParam);
-          }
-        }
-      }
+      selfSymbol.setValue(Value.of(List.of(new OCLElement.MetaclassValue(instance)), selfType));
 
       // Evaluate all invariants/preconditions/postconditions for this instance
-      for (VitruvOCLParser.InvCSContext inv : ctx.invCS()) {
+      for (VitruvOCLParser.InvCSContext inv : invariants) {
         // Re-enter defensively before each invariant - see EvaluationVisitor#exitScope(Scope):
         // 'self' is never lazy so nothing here currently drains an outer sibling value mid-loop,
         // but this keeps the loop correct regardless of what a future invariant body might touch.
@@ -454,17 +428,15 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         Value invResult = visit(inv);
         recordConstraintResult(invResult, allResults, instance, inv.annotationCS());
       }
-      if (transactionSupported) {
-        for (VitruvOCLParser.PreCSContext pre : ctx.preCS()) {
-          symbolTable.enterScope(instanceScope);
-          Value preResult = visit(pre);
-          recordConstraintResult(preResult, allResults, instance, pre.annotationCS());
-        }
-        for (VitruvOCLParser.PostCSContext post : ctx.postCS()) {
-          symbolTable.enterScope(instanceScope);
-          Value postResult = visit(post);
-          recordConstraintResult(postResult, allResults, instance, post.annotationCS());
-        }
+      for (VitruvOCLParser.PreCSContext pre : preconditions) {
+        symbolTable.enterScope(instanceScope);
+        Value preResult = visit(pre);
+        recordConstraintResult(preResult, allResults, instance, pre.annotationCS());
+      }
+      for (VitruvOCLParser.PostCSContext post : postconditions) {
+        symbolTable.enterScope(instanceScope);
+        Value postResult = visit(post);
+        recordConstraintResult(postResult, allResults, instance, post.annotationCS());
       }
 
       exitScope(instanceScope);
@@ -483,6 +455,47 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     }
 
     return Value.of(allResults, Type.bag(Type.BOOLEAN));
+  }
+
+  /**
+   * Binds {@code self} and the operation parameters of a classifier context in the current scope,
+   * once per context; the caller rebinds {@code self} for each instance.
+   *
+   * <p>Operation-context params (context Type::operation(name: Type, ...)): there is no
+   * method-invocation mechanism in this evaluator, so — unlike 'self' — these are always bound to
+   * an empty value rather than a real argument (see class-level docs on pre/post support). Binding
+   * them at all (instead of leaving them unresolved) matters: an unresolved variable is a hard
+   * evaluation error via handleUndefinedSymbol, whereas an empty-valued binding lets the
+   * constraint evaluate (typically to a vacuous/empty result) until a future Reactions/YAML layer
+   * supplies real argument values. Since that value never depends on the instance, binding once
+   * per context is equivalent to binding per instance.
+   *
+   * @return the symbol {@code self} resolves to (an existing outer binding, or a new one)
+   */
+  private VariableSymbol bindContextVariables(
+      VitruvOCLParser.ClassifierContextCSContext ctx, Type contextType) {
+    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
+    if (selfSymbol == null) {
+      selfSymbol = new VariableSymbol("self", contextType, symbolTable.getCurrentScope(), false);
+      symbolTable.defineVariable(selfSymbol);
+    }
+    if (ctx.operationParamListCS() != null) {
+      for (VitruvOCLParser.OperationParamCSContext param :
+          ctx.operationParamListCS().operationParamCS()) {
+        String paramName = param.paramName.getText();
+        Value emptyValue = Value.empty(Type.ANY);
+        VariableSymbol paramSymbol = symbolTable.resolveVariable(paramName);
+        if (paramSymbol != null) {
+          paramSymbol.setValue(emptyValue);
+        } else {
+          VariableSymbol newParam =
+              new VariableSymbol(paramName, Type.ANY, symbolTable.getCurrentScope(), false);
+          newParam.setValue(emptyValue);
+          symbolTable.defineVariable(newParam);
+        }
+      }
+    }
+    return selfSymbol;
   }
 
   private static String nameOf(org.antlr.v4.runtime.tree.TerminalNode idToken) {
@@ -3444,8 +3457,23 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     if (!probe.hasNext()) {
       return Value.empty(emptyType);
     }
-    if (probe.next().tryGetInstance() == null) {
+    OCLElement first = probe.next();
+    EObject firstInstance = first.tryGetInstance();
+    if (firstInstance == null) {
       return Value.empty(emptyType);
+    }
+
+    // A single object navigated along a single-valued feature (self.name, i.flag) yields at most
+    // one value - there is no collection to evaluate lazily (Tisi et al. restrict laziness to
+    // collections), so the value is read directly instead of building a lazy chain for it.
+    // Many-valued features stay lazy below, so early termination on them is preserved.
+    if (receiver.isMaterialized() && receiver.size() == 1) {
+      EStructuralFeature feature = firstInstance.eClass().getEStructuralFeature(propertyName);
+      if (feature != null && !feature.isMany()) {
+        List<OCLElement> values = new ArrayList<>(1);
+        navigateOne(first, propertyName).forEachRemaining(values::add);
+        return Value.of(values, finalType);
+      }
     }
 
     // Category 1 (fully lazy): each receiver element expands to zero or more navigated values;

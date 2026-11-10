@@ -18,7 +18,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
@@ -201,12 +200,26 @@ public class Value implements Comparable<Value> {
    * (see {@link #pulled}); elements already pulled by earlier consumers are not recomputed.
    */
   private void materialize() {
-    if (elements == null) {
-      Iterator<OCLElement> it = elementIterator();
-      while (it.hasNext()) {
-        it.next();
-      }
+    if (elements != null) {
+      return;
     }
+    beginPull();
+    try {
+      if (pullSource == null) {
+        // Nobody has started the shared traversal: drain the source in one go (the common case,
+        // e.g. a navigation result consumed whole), without per-element bookkeeping.
+        Iterator<OCLElement> source = lazySource.newIterator();
+        pulled = new ArrayList<>();
+        pullSource = source;
+      }
+      pullSource.forEachRemaining(pulled::add);
+    } catch (RuntimeException e) {
+      pullFailure = e;
+      throw e;
+    } finally {
+      pulling = false;
+    }
+    finishTraversal();
   }
 
   /**
@@ -246,39 +259,50 @@ public class Value implements Comparable<Value> {
    * @return {@code false} if the source is exhausted, in which case {@link #elements} is set
    */
   private boolean canPull() {
-    boolean hasMore = pull(this::sourceHasNext);
+    beginPull();
+    boolean hasMore;
+    try {
+      if (pullSource == null) {
+        // The iterator is created before pulled, so a failing start leaves no half-built state.
+        Iterator<OCLElement> source = lazySource.newIterator();
+        pulled = new ArrayList<>();
+        pullSource = source;
+      }
+      hasMore = pullSource.hasNext();
+    } catch (RuntimeException e) {
+      pullFailure = e;
+      throw e;
+    } finally {
+      pulling = false;
+    }
     if (!hasMore) {
-      elements = Collections.unmodifiableList(pulled);
-      pullSource = null;
-      lazySource = null;
+      finishTraversal();
     }
     return hasMore;
   }
 
-  /**
-   * Starts the shared traversal on first use (the iterator is created before {@link #pulled}, so
-   * a failing start leaves no half-initialized state) and asks it for a further element.
-   */
-  private boolean sourceHasNext() {
-    if (pullSource == null) {
-      pullSource = lazySource.newIterator();
-      pulled = new ArrayList<>();
-    }
-    return pullSource.hasNext();
-  }
-
   /** Takes the next element of the shared traversal into {@link #pulled}. */
   private OCLElement pullNext() {
-    OCLElement element = pull(pullSource::next);
+    beginPull();
+    OCLElement element;
+    try {
+      element = pullSource.next();
+    } catch (RuntimeException e) {
+      pullFailure = e;
+      throw e;
+    } finally {
+      pulling = false;
+    }
     pulled.add(element);
     return element;
   }
 
   /**
-   * Runs one step of the shared traversal: rethrows an earlier failure, refuses reentrant pulls,
-   * and records a failure so that every later access rethrows it.
+   * Starts one step of the shared traversal: rethrows an earlier failure (so a failed traversal is
+   * never mistaken for a complete one) and refuses reentrant pulls. Every caller records its own
+   * failure in {@link #pullFailure} and resets {@link #pulling}.
    */
-  private <T> T pull(Supplier<T> step) {
+  private void beginPull() {
     if (pullFailure != null) {
       throw pullFailure;
     }
@@ -287,14 +311,13 @@ public class Value implements Comparable<Value> {
           "Reentrant traversal of a lazy collection while one of its elements is being computed");
     }
     pulling = true;
-    try {
-      return step.get();
-    } catch (RuntimeException e) {
-      pullFailure = e;
-      throw e;
-    } finally {
-      pulling = false;
-    }
+  }
+
+  /** Freezes the pulled elements as {@link #elements} and releases the upstream chain. */
+  private void finishTraversal() {
+    elements = Collections.unmodifiableList(pulled);
+    pullSource = null;
+    lazySource = null;
   }
 
   /** Iterates the elements of a lazily-backed Value, computing each one at most once. */
@@ -323,6 +346,14 @@ public class Value implements Comparable<Value> {
       index++;
       return pullNext();
     }
+  }
+
+  /**
+   * Whether all elements are already known (an eager Value, or a lazy one that has been fully
+   * traversed), so that {@link #size()} and {@link #getElements()} cost nothing.
+   */
+  boolean isMaterialized() {
+    return elements != null;
   }
 
   /** Returns the runtime type. */

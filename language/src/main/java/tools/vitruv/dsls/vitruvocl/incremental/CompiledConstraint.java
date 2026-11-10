@@ -20,9 +20,9 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.common.OclLexers;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
@@ -83,7 +83,7 @@ final class CompiledConstraint {
   static CompiledConstraint compile(
       String text, MetamodelWrapperInterface wrapper, FeatureIndex features) {
     CommonTokenStream tokens =
-        new CommonTokenStream(new VitruvOCLLexer(CharStreams.fromString(text)));
+        new CommonTokenStream(OclLexers.create(CharStreams.fromString(text)));
     VitruvOCLParser parser = new VitruvOCLParser(tokens);
     parser.removeErrorListeners();
     VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
