@@ -1705,18 +1705,21 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     for (int i = 0; i < elements.size(); i++) {
       indices.add(i);
     }
+    // An empty key (e.g. from 6.div(0)) is null here and sorts before every other key
     indices.sort(
-        (a, b) -> {
-          OCLElement ka = keys.get(a).getElements().get(0);
-          OCLElement kb = keys.get(b).getElements().get(0);
-          return OCLElement.compare(ka, kb);
-        });
+        (a, b) ->
+            OCLElement.compareRelational(firstOrNull(keys.get(a)), firstOrNull(keys.get(b))));
 
     List<OCLElement> sorted = new ArrayList<>();
     for (int i : indices) {
       sorted.add(elements.get(i));
     }
     return Value.of(sorted, Type.orderedSet(elemType));
+  }
+
+  private static OCLElement firstOrNull(Value value) {
+    List<OCLElement> elements = value.getElements();
+    return elements.isEmpty() ? null : elements.get(0);
   }
 
   /**
@@ -2958,7 +2961,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitLessThanComparison(VitruvOCLParser.LessThanComparisonContext ctx) {
     return evaluateBinaryComparison(
-        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compare(left, right) < 0);
+        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compareRelational(left, right) < 0);
   }
 
   /**
@@ -2971,7 +2974,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitLessThanOrEqualComparison(
       VitruvOCLParser.LessThanOrEqualComparisonContext ctx) {
     return evaluateBinaryComparison(
-        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compare(left, right) <= 0);
+        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compareRelational(left, right) <= 0);
   }
 
   /**
@@ -2983,7 +2986,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitGreaterThanComparison(VitruvOCLParser.GreaterThanComparisonContext ctx) {
     return evaluateBinaryComparison(
-        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compare(left, right) > 0);
+        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compareRelational(left, right) > 0);
   }
 
   /**
@@ -2997,7 +3000,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitGreaterThanOrEqualComparison(
       VitruvOCLParser.GreaterThanOrEqualComparisonContext ctx) {
     return evaluateBinaryComparison(
-        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compare(left, right) >= 0);
+        ctx.left, ctx.right, ctx, (left, right) -> OCLElement.compareRelational(left, right) >= 0);
   }
 
   /**
@@ -5068,24 +5071,24 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * <p>Example: {@code ' 42 '->toInteger()} yields {@code 42}
    *
    * @param ctx the parse tree node for the {@code toInteger()} operation
-   * @return a singleton {@code INTEGER} value parsed from the receiver string; or an error value if
-   *     the receiver is not a singleton {@code String} or the string cannot be parsed as a decimal
-   *     integer
+   * @return a singleton {@code INTEGER} value parsed from the receiver string; or an empty {@code
+   *     INTEGER} value ("no object") if the receiver is not a singleton {@code String} or the
+   *     string cannot be parsed as a decimal integer
    */
   @Override
   public Value visitToIntegerOp(VitruvOCLParser.ToIntegerOpContext ctx) {
     Value receiver = receiverStack.peek();
     if (receiver.isEmpty()) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     String str = receiver.getElements().get(0).tryGetString();
     if (str == null) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER);
     }
     try {
       return Value.intValue(Integer.parseInt(str.trim()));
     } catch (NumberFormatException e) {
-      return Value.intValue(0);
+      return Value.empty(Type.INTEGER); // unparsable: "no object", like div by zero
     }
   }
 
@@ -5099,24 +5102,24 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * <p>Example: {@code ' 3.14 '->toReal()} yields {@code 3.14}
    *
    * @param ctx the parse tree node for the {@code toReal()} operation
-   * @return a singleton {@code DOUBLE} value parsed from the receiver string; or an error value if
-   *     the receiver is not a singleton {@code String} or the string cannot be parsed as a
-   *     floating-point number
+   * @return a singleton {@code DOUBLE} value parsed from the receiver string; or an empty {@code
+   *     DOUBLE} value ("no object") if the receiver is not a singleton {@code String} or the
+   *     string cannot be parsed as a floating-point number
    */
   @Override
   public Value visitToRealOp(VitruvOCLParser.ToRealOpContext ctx) {
     Value receiver = receiverStack.peek();
     if (receiver.isEmpty()) {
-      return Value.doubleValue(0.0);
+      return Value.empty(Type.DOUBLE);
     }
     String str = receiver.getElements().get(0).tryGetString();
     if (str == null) {
-      return Value.doubleValue(0.0);
+      return Value.empty(Type.DOUBLE);
     }
     try {
       return Value.doubleValue(Double.parseDouble(str.trim()));
     } catch (NumberFormatException e) {
-      return Value.doubleValue(0.0);
+      return Value.empty(Type.DOUBLE); // unparsable: "no object", like div by zero
     }
   }
 

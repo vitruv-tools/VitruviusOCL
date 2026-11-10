@@ -319,6 +319,22 @@ public sealed interface OCLElement
   }
 
   /**
+   * Returns the model instance denoted by a {@link MetaclassValue} or {@link
+   * CastedMetaclassValue}, or {@code null} for any other element. A cast does not change identity,
+   * so both kinds are compared, ordered and hashed by this instance.
+   *
+   * @param elem the element
+   * @return the denoted instance, or {@code null}
+   */
+  private static EObject instanceOf(OCLElement elem) {
+    return switch (elem) {
+      case MetaclassValue(EObject instance) -> instance;
+      case CastedMetaclassValue casted -> casted.instance();
+      default -> null;
+    };
+  }
+
+  /**
    * Compares two OCL elements for semantic equality.
    *
    * <p>Numeric cross-type rules:
@@ -334,7 +350,7 @@ public sealed interface OCLElement
    * <p>Enum rules:
    *
    * <ul>
-   *   <li>{@code EnumValue == EnumValue} → literal identity
+   *   <li>{@code EnumValue == EnumValue} → literal name (also across metamodels)
    *   <li>{@code EnumValue == StringValue} → literal name equals string
    * </ul>
    *
@@ -369,8 +385,10 @@ public sealed interface OCLElement
     if (a instanceof NestedCollection(Value na) && b instanceof NestedCollection(Value nb)) {
       return Value.semanticEquals(na, nb);
     }
-    if (a instanceof MetaclassValue(EObject ma) && b instanceof MetaclassValue(EObject mb)) {
-      return ma.equals(mb);
+    EObject instanceA = instanceOf(a);
+    EObject instanceB = instanceOf(b);
+    if (instanceA != null && instanceB != null) {
+      return instanceA.equals(instanceB);
     }
 
     // ── Enum equality ────────────────────────────────────────────────────────
@@ -465,7 +483,9 @@ public sealed interface OCLElement
       return sa.compareTo(sb);
     }
     if (a instanceof EnumValue(EEnumLiteral ea) && b instanceof EnumValue(EEnumLiteral eb)) {
-      return Integer.compare(ea.getValue(), eb.getValue());
+      // By name, consistent with semanticEquals (same-named literals of different metamodels are
+      // equal). Declaration order for relational operators: see compareRelational.
+      return ea.getName().compareTo(eb.getName());
     }
     if (a instanceof ObjectRef(String oa) && b instanceof ObjectRef(String ob)) {
       return oa.compareTo(ob);
@@ -473,11 +493,31 @@ public sealed interface OCLElement
     if (a instanceof NestedCollection(Value na) && b instanceof NestedCollection(Value nb)) {
       return Value.compare(na, nb);
     }
-    if (a instanceof MetaclassValue(EObject ma) && b instanceof MetaclassValue(EObject mb)) {
-      return Integer.compare(System.identityHashCode(ma), System.identityHashCode(mb));
+    EObject instanceA = instanceOf(a);
+    EObject instanceB = instanceOf(b);
+    if (instanceA != null && instanceB != null) {
+      return InstanceOrder.compare(instanceA, instanceB);
     }
 
     return 0;
+  }
+
+  /**
+   * Ordering for the relational operators ({@code <}, {@code <=}, {@code >}, {@code >=}) and
+   * {@code sortedBy}: like {@link #compare}, except that enum literals are ordered by their
+   * declared value (tie-broken by name). {@link #compare} itself orders enums by name so that it
+   * stays consistent with {@link #semanticEquals} when normalizing unordered collections.
+   *
+   * @param a first element
+   * @param b second element
+   * @return negative if {@code a < b}, zero if equal, positive if {@code a > b}
+   */
+  static int compareRelational(OCLElement a, OCLElement b) {
+    if (a instanceof EnumValue(EEnumLiteral ea) && b instanceof EnumValue(EEnumLiteral eb)) {
+      int byValue = Integer.compare(ea.getValue(), eb.getValue());
+      return byValue != 0 ? byValue : ea.getName().compareTo(eb.getName());
+    }
+    return compare(a, b);
   }
 
   /**
@@ -510,7 +550,7 @@ public sealed interface OCLElement
     if (elem instanceof ObjectRef) {
       return 4;
     }
-    if (elem instanceof MetaclassValue) {
+    if (elem instanceof MetaclassValue || elem instanceof CastedMetaclassValue) {
       return 5;
     }
     if (elem instanceof NestedCollection) {

@@ -818,8 +818,9 @@ public class Value implements Comparable<Value> {
   }
 
   /**
-   * Returns a hash code consistent with {@link #equals(Object)}. Numeric elements are hashed by
-   * their {@code double} value so that cross-numeric-type equal values hash identically.
+   * Returns a hash code consistent with {@link #equals(Object)}: elements are hashed via {@link
+   * OCLElement#semanticHash}, so values that compare equal element-wise (e.g. {@code 1} and {@code
+   * 1.0}, or a cast and an uncast reference to the same instance) hash identically.
    *
    * @return the hash code
    */
@@ -828,9 +829,7 @@ public class Value implements Comparable<Value> {
     List<OCLElement> all = getElements();
     int result = all.size();
     for (OCLElement elem : all) {
-      int elemHash =
-          OCLElement.isNumeric(elem) ? Double.hashCode(elem.toDoubleValue()) : elem.hashCode();
-      result = 31 * result + elemHash;
+      result = 31 * result + OCLElement.semanticHash(elem);
     }
     return result;
   }

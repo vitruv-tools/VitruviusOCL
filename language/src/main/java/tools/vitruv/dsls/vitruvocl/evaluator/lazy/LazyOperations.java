@@ -261,6 +261,25 @@ public final class LazyOperations {
     void add(OCLElement elem) {
       buckets.computeIfAbsent(semanticHash.applyAsInt(elem), hash -> new ArrayList<>()).add(elem);
     }
+
+    /** Removes one buffered element equal to {@code elem}; returns whether one was removed. */
+    boolean removeOne(OCLElement elem) {
+      int hash = semanticHash.applyAsInt(elem);
+      List<OCLElement> bucket = buckets.get(hash);
+      if (bucket == null) {
+        return false;
+      }
+      for (int i = 0; i < bucket.size(); i++) {
+        if (semanticEquals.test(bucket.get(i), elem)) {
+          bucket.remove(i);
+          if (bucket.isEmpty()) {
+            buckets.remove(hash);
+          }
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   /** Lookahead filter: computes the next matching element eagerly so {@code hasNext()} is cheap. */
@@ -407,7 +426,8 @@ public final class LazyOperations {
           }
           OCLElement candidate = left.next();
           onLeft = rightExhausted; // switch sides, unless the other side is already drained
-          if (rightSeen.contains(candidate)) {
+          // Consume the match so each occurrence pairs once: Bag result = min multiplicity
+          if (rightSeen.removeOne(candidate)) {
             pending = candidate;
             hasPending = true;
             return;
@@ -420,7 +440,7 @@ public final class LazyOperations {
           }
           OCLElement candidate = right.next();
           onLeft = !leftExhausted; // switch sides, unless the other side is already drained
-          if (leftSeen.contains(candidate)) {
+          if (leftSeen.removeOne(candidate)) {
             pending = candidate;
             hasPending = true;
             return;
