@@ -18,8 +18,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
+import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations.HashedBuffer;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
 import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 
@@ -478,29 +480,43 @@ public class Value implements Comparable<Value> {
     return Value.lazy(result, this.runtimeType);
   }
 
-  /** Set difference (this - other). */
+  /**
+   * Set difference (this - other). Lazy in {@code this}; {@code other} is indexed by semantic hash
+   * on first use, so the whole operation is O(n + m) instead of O(n * m).
+   */
   public Value minus(Value other) {
-    OCLElementSource result = LazyOperations.filter(this.asSource(), elem -> !other.includes(elem));
+    Supplier<HashedBuffer> otherIndex = memoizedIndex(other);
+    OCLElementSource result =
+        LazyOperations.filter(this.asSource(), elem -> !otherIndex.get().contains(elem));
     return Value.lazy(result, this.runtimeType);
   }
 
-  /** Symmetric difference (elements in either but not both). */
+  /**
+   * Symmetric difference (elements in either but not both). Each side is indexed by semantic hash
+   * on first use: O(n + m).
+   */
   public Value symmetricDifference(Value other) {
+    Supplier<HashedBuffer> thisIndex = memoizedIndex(this);
+    Supplier<HashedBuffer> otherIndex = memoizedIndex(other);
     OCLElementSource onlyInThis =
-        LazyOperations.filter(this.asSource(), elem -> !other.includes(elem));
+        LazyOperations.filter(this.asSource(), elem -> !otherIndex.get().contains(elem));
     OCLElementSource onlyInOther =
-        LazyOperations.filter(other.asSource(), elem -> !this.includes(elem));
+        LazyOperations.filter(other.asSource(), elem -> !thisIndex.get().contains(elem));
     return Value.lazy(LazyOperations.concat(onlyInThis, onlyInOther), this.runtimeType);
   }
 
   /**
-   * Checks if this collection includes all elements of another. Lazy: stops as soon as one element
-   * of {@code other} is missing.
+   * Checks if this collection includes all elements of another. Indexes {@code this} once (O(n +
+   * m) instead of O(n * m)); still stops pulling {@code other} as soon as one element is missing.
    */
   public boolean includesAll(Value other) {
     Iterator<OCLElement> it = other.elementIterator();
+    if (!it.hasNext()) {
+      return true;
+    }
+    HashedBuffer index = LazyOperations.semanticIndex(elementIterator());
     while (it.hasNext()) {
-      if (!this.includes(it.next())) {
+      if (!index.contains(it.next())) {
         return false;
       }
     }
@@ -508,17 +524,39 @@ public class Value implements Comparable<Value> {
   }
 
   /**
-   * Checks if this collection excludes all elements of another. Lazy: stops as soon as one element
-   * of {@code other} is found in this collection.
+   * Checks if this collection excludes all elements of another. Indexes {@code this} once (O(n +
+   * m) instead of O(n * m)); still stops pulling {@code other} as soon as one element is found.
    */
   public boolean excludesAll(Value other) {
     Iterator<OCLElement> it = other.elementIterator();
+    if (!it.hasNext()) {
+      return true;
+    }
+    HashedBuffer index = LazyOperations.semanticIndex(elementIterator());
     while (it.hasNext()) {
-      if (this.includes(it.next())) {
+      if (index.contains(it.next())) {
         return false;
       }
     }
     return true;
+  }
+
+  /**
+   * Returns a supplier that builds a semantic index of {@code value} on first call and reuses it
+   * afterwards (also across replays of a lazy result). The index is read-only once published.
+   */
+  static Supplier<HashedBuffer> memoizedIndex(Value value) {
+    return new Supplier<>() {
+      private HashedBuffer index;
+
+      @Override
+      public synchronized HashedBuffer get() {
+        if (index == null) {
+          index = LazyOperations.semanticIndex(value.elementIterator());
+        }
+        return index;
+      }
+    };
   }
 
   // ==================== Ordered Collection Operations ====================

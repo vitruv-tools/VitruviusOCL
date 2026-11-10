@@ -76,6 +76,20 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   private static final String PHASE_TAG = "evaluator";
 
+  /** Matches {@code {self.attr}} placeholders in {@code @message} templates. */
+  private static final java.util.regex.Pattern SELF_ATTRIBUTE_PLACEHOLDER =
+      java.util.regex.Pattern.compile("\\{self\\.([a-zA-Z_]\\w*)\\}");
+
+  /** Upper bound for {@link #REGEX_CACHE}; cleared wholesale when exceeded. */
+  private static final int REGEX_CACHE_LIMIT = 256;
+
+  /**
+   * Compiled {@code matches()} patterns by source string. A pattern usually repeats for every
+   * element of an iterator body, so compiling it once avoids per-element recompilation.
+   */
+  private static final Map<String, java.util.Optional<java.util.regex.Pattern>> REGEX_CACHE =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
   private static OCLElement unwrapNestedCollection(OCLElement e) {
     if (e instanceof OCLElement.NestedCollection(Value value) && !value.getElements().isEmpty()) {
       return value.getElements().get(0);
@@ -615,8 +629,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @SuppressWarnings("java:S125")
   private String interpolateTemplate(String template, EObject instance) {
     // Replace {self.attr}
-    java.util.regex.Matcher m =
-        java.util.regex.Pattern.compile("\\{self\\.([a-zA-Z_]\\w*)\\}").matcher(template);
+    java.util.regex.Matcher m = SELF_ATTRIBUTE_PLACEHOLDER.matcher(template);
     StringBuffer sb = new StringBuffer();
     while (m.find()) {
       String attr = m.group(1);
@@ -1614,12 +1627,30 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     Type iterVarType = Type.singleton(elemType);
     LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
     VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
+    // Singleton body results (the common case, e.g. isUnique(p | p.name)) are tracked in a hash
+    // index: O(n) instead of O(n^2). Empty and multi-element results keep the pairwise scan.
+    LazyOperations.HashedBuffer seenSingletons = LazyOperations.newSemanticBuffer();
+    boolean seenEmpty = false;
     List<Value> seen = new ArrayList<>();
     Iterator<OCLElement> it = receiver.elementIterator();
     while (it.hasNext()) {
       OCLElement elem = it.next();
       Value bodyResult =
           evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
+      List<OCLElement> resultElements = bodyResult.getElements();
+      if (resultElements.size() <= 1) {
+        boolean duplicate =
+            resultElements.isEmpty() ? seenEmpty : seenSingletons.contains(resultElements.get(0));
+        if (duplicate) {
+          return Value.boolValue(false);
+        }
+        if (resultElements.isEmpty()) {
+          seenEmpty = true;
+        } else {
+          seenSingletons.add(resultElements.get(0));
+        }
+        continue;
+      }
       for (Value s : seen) {
         if (s.getElements().size() == bodyResult.getElements().size()) {
           boolean allEqual = true;
@@ -1715,6 +1746,28 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       sorted.add(elements.get(i));
     }
     return Value.of(sorted, Type.orderedSet(elemType));
+  }
+
+  /**
+   * Returns the compiled pattern for {@code regex}, cached across calls, or {@code null} if the
+   * pattern is syntactically invalid (then {@code matches()} reports an evaluation error instead
+   * of aborting with an uncaught {@link java.util.regex.PatternSyntaxException}).
+   */
+  private static java.util.regex.Pattern compileCached(String regex) {
+    if (REGEX_CACHE.size() > REGEX_CACHE_LIMIT) {
+      REGEX_CACHE.clear();
+    }
+    return REGEX_CACHE
+        .computeIfAbsent(
+            regex,
+            key -> {
+              try {
+                return java.util.Optional.of(java.util.regex.Pattern.compile(key));
+              } catch (java.util.regex.PatternSyntaxException e) {
+                return java.util.Optional.empty();
+              }
+            })
+        .orElse(null);
   }
 
   private static OCLElement firstOrNull(Value value) {
@@ -2707,14 +2760,18 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitSymmetricDifferenceOp(VitruvOCLParser.SymmetricDifferenceOpContext ctx) {
     Value receiver = receiverStack.peek();
     Value arg = visit(ctx.arg);
+    // Index each side once: O(n + m) instead of O(n * m) membership scans
+    LazyOperations.HashedBuffer receiverIndex =
+        LazyOperations.semanticIndex(receiver.elementIterator());
+    LazyOperations.HashedBuffer argIndex = LazyOperations.semanticIndex(arg.elementIterator());
     List<OCLElement> results = new ArrayList<>();
     for (OCLElement elem : receiver.getElements()) {
-      if (!arg.includes(elem)) {
+      if (!argIndex.contains(elem)) {
         results.add(elem);
       }
     }
     for (OCLElement elem : arg.getElements()) {
-      if (!receiver.includes(elem)) {
+      if (!receiverIndex.contains(elem)) {
         results.add(elem);
       }
     }
@@ -5239,7 +5296,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     if (pattern == null) {
       return Value.boolValue(false);
     }
-    return Value.boolValue(str.matches(pattern));
+    java.util.regex.Pattern compiled = compileCached(pattern);
+    if (compiled == null) {
+      reportError(ctx, "Invalid regular expression in matches(): " + pattern);
+      return Value.empty(Type.ERROR);
+    }
+    return Value.boolValue(compiled.matcher(str).matches());
   }
 
   @Override

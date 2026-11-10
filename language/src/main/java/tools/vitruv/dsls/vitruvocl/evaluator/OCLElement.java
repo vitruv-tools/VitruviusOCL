@@ -13,6 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.evaluator;
 
+import java.util.List;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnumLiteral;
 import org.eclipse.emf.ecore.EObject;
@@ -418,7 +419,9 @@ public sealed interface OCLElement
    *
    * <p>Numbers hash by their {@code double} value (cross-type numeric equality), strings and enum
    * literals by their (literal) name (enum/string equality by name), metaclass values by their
-   * instance. Nested collections share one bucket, since their equality is structural.
+   * instance. Nested collections hash by size plus the order-independent sum of their element
+   * hashes: semantically equal collections hold pairwise equal elements (after normalization), so
+   * they hash alike regardless of order.
    *
    * @param element the element, may be {@code null}
    * @return the semantic hash
@@ -435,8 +438,17 @@ public sealed interface OCLElement
       case ObjectRef(String oid) -> oid.hashCode();
       case MetaclassValue(EObject instance) -> instance.hashCode();
       case CastedMetaclassValue casted -> casted.instance().hashCode();
-      case NestedCollection ignored -> NestedCollection.class.hashCode();
+      case NestedCollection(Value nested) -> nestedHash(nested);
     };
+  }
+
+  private static int nestedHash(Value nested) {
+    List<OCLElement> elements = nested.getElements();
+    int sum = 0;
+    for (OCLElement element : elements) {
+      sum += semanticHash(element);
+    }
+    return 31 * elements.size() + sum;
   }
 
   /**

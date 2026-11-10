@@ -231,10 +231,34 @@ public final class LazyOperations {
   // ==================== Iterator implementations ====================
 
   /**
-   * Buffer of already-seen elements, bucketed by a hash consistent with the equality test, so a
-   * membership test compares a candidate only with the elements of its own bucket.
+   * Creates an empty {@link HashedBuffer} using OCL semantic equality ({@link
+   * OCLElement#semanticEquals}) and its consistent hash ({@link OCLElement#semanticHash}).
+   *
+   * @return a new, empty buffer
    */
-  private static final class HashedBuffer {
+  public static HashedBuffer newSemanticBuffer() {
+    return new HashedBuffer(OCLElement::semanticEquals, OCLElement::semanticHash);
+  }
+
+  /**
+   * Builds a {@link #newSemanticBuffer() semantic buffer} holding every element of {@code
+   * elements}. Membership tests against it cost O(1) on average instead of a linear scan.
+   *
+   * @param elements the elements to index (fully consumed)
+   * @return the populated buffer
+   */
+  public static HashedBuffer semanticIndex(Iterator<OCLElement> elements) {
+    HashedBuffer index = newSemanticBuffer();
+    elements.forEachRemaining(index::add);
+    return index;
+  }
+
+  /**
+   * Buffer of already-seen elements, bucketed by a hash consistent with the equality test, so a
+   * membership test compares a candidate only with the elements of its own bucket. Not
+   * thread-safe.
+   */
+  public static final class HashedBuffer {
     private final Map<Integer, List<OCLElement>> buckets = new HashMap<>();
     private final BiPredicate<OCLElement, OCLElement> semanticEquals;
     private final ToIntFunction<OCLElement> semanticHash;
@@ -246,7 +270,8 @@ public final class LazyOperations {
       this.semanticHash = semanticHash;
     }
 
-    boolean contains(OCLElement elem) {
+    /** Returns whether a buffered element equals {@code elem}. */
+    public boolean contains(OCLElement elem) {
       List<OCLElement> bucket = buckets.get(semanticHash.applyAsInt(elem));
       if (bucket != null) {
         for (OCLElement buffered : bucket) {
@@ -258,12 +283,13 @@ public final class LazyOperations {
       return false;
     }
 
-    void add(OCLElement elem) {
+    /** Adds {@code elem} (duplicates are kept). */
+    public void add(OCLElement elem) {
       buckets.computeIfAbsent(semanticHash.applyAsInt(elem), hash -> new ArrayList<>()).add(elem);
     }
 
     /** Removes one buffered element equal to {@code elem}; returns whether one was removed. */
-    boolean removeOne(OCLElement elem) {
+    public boolean removeOne(OCLElement elem) {
       int hash = semanticHash.applyAsInt(elem);
       List<OCLElement> bucket = buckets.get(hash);
       if (bucket == null) {
