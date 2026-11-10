@@ -12,6 +12,7 @@ package tools.vitruv.dsls.vitruvocl.lsp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -139,7 +140,7 @@ public class DocumentAnalyzer {
             new SymbolTableBuilder(symbolTable, wrapper, errors, scopeAnnotator);
         builder.visit(tree);
       } catch (Exception e) {
-        LOG.fine(() -> "[OCL-LS] SymbolTableBuilder error: " + e.getMessage());
+        LOG.log(Level.WARNING, "[OCL-LS] SymbolTableBuilder crashed", e);
       }
 
       // -----------------------------------------------------------------------
@@ -152,7 +153,7 @@ public class DocumentAnalyzer {
         typeChecker.visit(tree);
         nodeTypes = typeChecker.getNodeTypes();
       } catch (Exception e) {
-        LOG.fine(() -> "[OCL-LS] TypeCheckVisitor error: " + e.getMessage());
+        LOG.log(Level.WARNING, "[OCL-LS] TypeCheckVisitor crashed", e);
       }
 
       // -----------------------------------------------------------------------
@@ -189,7 +190,7 @@ public class DocumentAnalyzer {
 
     } catch (Exception e) {
       // Catch-all — return empty analysis with a single internal-error diagnostic.
-      LOG.fine(() -> "[OCL-LS] Unexpected analysis error: " + e.getMessage());
+      LOG.log(Level.WARNING, "[OCL-LS] Unexpected analysis error", e);
       diagnostics.add(
           new Diagnostic(
               new Range(new Position(0, 0), new Position(0, 1)),

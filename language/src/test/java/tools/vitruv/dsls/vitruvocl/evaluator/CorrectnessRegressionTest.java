@@ -220,6 +220,40 @@ class CorrectnessRegressionTest extends DummyTestSpecification {
   }
 
   @Nested
+  class SortedByResultKind {
+
+    @Test
+    void sortedByOnSequenceKeepsDuplicatesAsSequence() {
+      Value result = compile("Sequence{3, 1, 3}.sortedBy(x | x)");
+      assertSize(result, 3);
+      assertTrue(result.getRuntimeType().isOrdered());
+      assertFalse(result.getRuntimeType().isUnique(), "Sequence.sortedBy yields a Sequence");
+    }
+
+    @Test
+    void sortedByOnBagYieldsSequence() {
+      Value result = compile("Bag{2, 1, 2}.sortedBy(x | x)");
+      assertSize(result, 3);
+      assertTrue(result.getRuntimeType().isOrdered());
+      assertFalse(result.getRuntimeType().isUnique(), "Bag.sortedBy yields a Sequence");
+    }
+
+    @Test
+    void sortedByOnSetYieldsOrderedSet() {
+      Value result = compile("Set{3, 1, 2}.sortedBy(x | x)");
+      assertSize(result, 3);
+      assertTrue(result.getRuntimeType().isOrdered());
+      assertTrue(result.getRuntimeType().isUnique(), "Set.sortedBy yields an OrderedSet");
+    }
+
+    @Test
+    void sequenceResultKeepsSequenceSemanticsDownstream() {
+      // including() on a Sequence appends; on an OrderedSet it would drop the duplicate
+      assertSize(compile("Sequence{2, 1, 2}.sortedBy(x | x).including(1)"), 4);
+    }
+  }
+
+  @Nested
   class Intersection {
 
     @Test

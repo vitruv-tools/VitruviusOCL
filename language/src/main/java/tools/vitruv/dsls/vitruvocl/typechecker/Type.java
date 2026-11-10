@@ -138,6 +138,21 @@ public abstract class Type {
   }
 
   /**
+   * Result type of {@code sortedBy} on a receiver of type {@code receiverType}, as in the OCL
+   * standard: a non-unique collection (Bag, Sequence) keeps its duplicates and yields a {@code
+   * Sequence}; every other receiver (Set, OrderedSet, singleton, optional) yields an {@code
+   * OrderedSet}.
+   *
+   * @param receiverType the receiver type
+   * @return {@code Sequence<T>} or {@code OrderedSet<T>} of the receiver's element type
+   */
+  public static Type sortedByResult(Type receiverType) {
+    Type elementType = receiverType.getElementType();
+    boolean keepsDuplicates = receiverType.isCollection() && !receiverType.isUnique();
+    return keepsDuplicates ? sequence(elementType) : orderedSet(elementType);
+  }
+
+  /**
    * Creates an OrderedSet type &lt;T&gt; with explicit cardinality bounds.
    *
    * @param elementType The type of elements in the ordered set

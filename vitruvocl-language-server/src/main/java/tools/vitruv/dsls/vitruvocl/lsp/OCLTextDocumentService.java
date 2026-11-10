@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionKind;
@@ -80,7 +81,13 @@ public class OCLTextDocumentService implements TextDocumentService {
   /** Latest analysis result per URI — updated after each debounce cycle. */
   private final Map<String, DocumentAnalysis> analyses = new ConcurrentHashMap<>();
 
-  /** Pending debounce futures per URI — cancelled when a new edit arrives. */
+  /**
+   * Guards publishing against {@link #didClose}: a finished analysis is only stored and published
+   * if its document is still open with the analyzed text.
+   */
+  private final Object lifecycleLock = new Object();
+
+  /** Pending debounce futures per URI — cancelled when a new edit arrives or the file closes. */
   private final Map<String, ScheduledFuture<?>> pending = new ConcurrentHashMap<>();
 
   private final ScheduledExecutorService debouncer =
@@ -137,11 +144,17 @@ public class OCLTextDocumentService implements TextDocumentService {
   @Override
   public void didClose(DidCloseTextDocumentParams params) {
     String uri = params.getTextDocument().getUri();
-    documents.remove(uri);
-    analyses.remove(uri);
-    // Clear diagnostics for the closed file.
-    if (client != null) {
-      client.publishDiagnostics(new PublishDiagnosticsParams(uri, List.of()));
+    synchronized (lifecycleLock) {
+      documents.remove(uri);
+      ScheduledFuture<?> scheduled = pending.remove(uri);
+      if (scheduled != null) {
+        scheduled.cancel(false);
+      }
+      analyses.remove(uri);
+      // Clear diagnostics for the closed file.
+      if (client != null) {
+        client.publishDiagnostics(new PublishDiagnosticsParams(uri, List.of()));
+      }
     }
   }
 
@@ -252,13 +265,19 @@ public class OCLTextDocumentService implements TextDocumentService {
   private void runAnalysis(String uri, String text) {
     try {
       DocumentAnalysis analysis = analyzer.analyze(text);
-      analyses.put(uri, analysis);
-
-      if (client != null) {
-        client.publishDiagnostics(new PublishDiagnosticsParams(uri, analysis.getDiagnostics()));
+      synchronized (lifecycleLock) {
+        // Identity check on purpose: `text` is the exact instance stored by didOpen/didChange.
+        // A closed document or a newer edit makes this result stale, so it is dropped.
+        if (documents.get(uri) != text) {
+          return;
+        }
+        analyses.put(uri, analysis);
+        if (client != null) {
+          client.publishDiagnostics(new PublishDiagnosticsParams(uri, analysis.getDiagnostics()));
+        }
       }
     } catch (Exception e) {
-      LOG.fine("[OCL-LS] Analysis failed for " + uri + ": " + e.getMessage());
+      LOG.log(Level.WARNING, "[OCL-LS] Analysis failed for " + uri, e);
     }
   }
 

@@ -821,7 +821,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * stored bidirectionally in {@link #correspondenceUriMap}.
    */
   @SuppressWarnings("java:S3776")
-  private void loadCorrespondenceViaDOM(Path corrPath) {
+  private void loadCorrespondenceViaDOM(Path corrPath) throws IOException {
     URI baseUri = URI.createFileURI(corrPath.toAbsolutePath().toString());
     try {
       DocumentBuilder builder = newSecureDocumentBuilder();
@@ -859,7 +859,14 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
         }
       }
     } catch (Exception e) {
-      // malformed or unreadable correspondence file — skip silently
+      // Reported to the caller (SmartLoader turns it into a FileError): ignoring it would evaluate
+      // correspondence constraints against an empty correspondence model without any hint.
+      throw new IOException(
+          "Malformed or unreadable correspondence file "
+              + corrPath.getFileName()
+              + ": "
+              + e.getMessage(),
+          e);
     }
   }
 

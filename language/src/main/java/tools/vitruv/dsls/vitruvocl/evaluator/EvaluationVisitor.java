@@ -1676,15 +1676,16 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    *
    * <p>Projects each element of the receiver collection through the body expression to obtain a
    * sort key, then returns the elements in ascending key order. Key comparison uses {@link
-   * OCLElement#compare}. The result is always an {@code OrderedSet} regardless of the receiver's
-   * collection kind.
+   * OCLElement#compareRelational}. The result is a {@code Sequence} for Bag/Sequence receivers
+   * (duplicates are kept) and an {@code OrderedSet} otherwise, see {@link Type#sortedByResult}.
    *
    * <p>Example: {@code employees->sortedBy(e | e.lastName)}
    *
    * @param ctx the parse tree node for the {@code sortedBy()} operation, including the iterator
    *     variable list and body expression
-   * @return an {@code OrderedSet} containing all receiver elements sorted in ascending order of
-   *     their projected key values; or an error value if no iterator variable is declared
+   * @return a {@code Sequence} or {@code OrderedSet} containing all receiver elements sorted in
+   *     ascending order of their projected key values; or an empty value if no iterator variable
+   *     is declared
    */
   @Override
   public Value visitSortedByOp(VitruvOCLParser.SortedByOpContext ctx) {
@@ -1694,7 +1695,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       iterVars.add(id.getText());
     }
     if (iterVars.isEmpty()) {
-      return Value.of(List.of(), Type.orderedSet(receiver.getRuntimeType().getElementType()));
+      return Value.of(List.of(), Type.sortedByResult(receiver.getRuntimeType()));
     }
 
     Type elemType = receiver.getRuntimeType().getElementType();
@@ -1745,7 +1746,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     for (int i : indices) {
       sorted.add(elements.get(i));
     }
-    return Value.of(sorted, Type.orderedSet(elemType));
+    return Value.of(sorted, Type.sortedByResult(receiver.getRuntimeType()));
   }
 
   /**

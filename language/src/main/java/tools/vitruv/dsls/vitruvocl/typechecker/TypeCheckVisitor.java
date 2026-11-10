@@ -4997,10 +4997,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   /**
    * Type checks the {@code sortedBy()} iterator.
    *
-   * <p>Body must return a comparable type. Result is an OrderedSet of the element type.
+   * <p>Body must return a comparable type. Result is a Sequence for Bag/Sequence receivers and an
+   * OrderedSet otherwise (see {@link Type#sortedByResult}).
    *
    * @param ctx The sortedBy operation node
-   * @return OrderedSet of element type
+   * @return Sequence or OrderedSet of element type
    */
   @Override
   public Type visitSortedByOp(VitruvOCLParser.SortedByOpContext ctx) {
@@ -5051,8 +5052,8 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
             ctx,
             "sortedBy() body must return a comparable type (numeric or String), got: " + checkType);
       }
-      // result is always OrderedSet of the original element type
-      Type resultType = Type.orderedSet(receiverType.getElementType());
+      // Bag/Sequence keep duplicates -> Sequence; Set/OrderedSet -> OrderedSet (OCL standard)
+      Type resultType = Type.sortedByResult(receiverType);
       nodeTypes.put(ctx, resultType);
       return resultType;
     } finally {

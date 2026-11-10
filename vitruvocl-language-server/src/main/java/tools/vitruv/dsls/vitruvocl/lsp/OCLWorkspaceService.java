@@ -108,7 +108,8 @@ public class OCLWorkspaceService implements WorkspaceService {
         LOG.fine(() -> "[OCL-LS] Metamodel reloaded: " + ecorePath);
         return true;
       } catch (IOException e) {
-        LOG.fine(() -> "[OCL-LS] Failed to reload metamodel " + ecorePath + ": " + e.getMessage());
+        LOG.warning(
+            () -> "[OCL-LS] Failed to reload metamodel " + ecorePath + ": " + e.getMessage());
       }
     }
 
