@@ -23,6 +23,8 @@ import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
+import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
+import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
@@ -3731,24 +3733,12 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     return Type.ERROR;
   }
 
-  private static final java.util.Set<String> NO_ARG_OPS =
-      java.util.Set.of(
-          "size",
-          "isEmpty",
-          "notEmpty",
-          "first",
-          "last",
-          "reverse",
-          OP_AS_SET,
-          OP_AS_BAG,
-          OP_AS_SEQUENCE,
-          OP_AS_ORDERED_SET,
-          "lift",
-          "abs",
-          OP_FLOOR,
-          OP_CEILING,
-          OP_ROUND,
-          "allInstances");
+  /** Whether {@code name} is a catalog operation called with empty parens, e.g. {@code sum()}. */
+  private static boolean takesNoArguments(String name) {
+    return OclOperations.lookup(name)
+        .map(op -> op.params().isEmpty() && op.family() != OclOperation.Family.ITERATOR)
+        .orElse(false);
+  }
 
   @Override
   public Type visitOpMissingParens(VitruvOCLParser.OpMissingParensContext ctx) {
@@ -3756,7 +3746,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     String name = op.getText();
     String suggestion;
     String message;
-    if (NO_ARG_OPS.contains(name)) {
+    if (takesNoArguments(name)) {
       suggestion = name + "()";
       message = "'" + name + "' is an operation — add parentheses: '" + suggestion + "'";
     } else {
@@ -6215,86 +6205,12 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   // ==================== Operation Name Suggestion ====================
 
   /**
-   * All operation names known to VitruvOCL.
+   * All operation names known to VitruvOCL, from the shared {@link OclOperations} catalog.
    *
    * <p>Used by {@link #suggestOperation} to propose the closest match when an unknown operation
    * name is encountered.
    */
-  private static final java.util.List<String> KNOWN_OPERATIONS =
-      java.util.List.of(
-          // Collection query
-          "isEmpty",
-          "notEmpty",
-          "size",
-          "count",
-          "includes",
-          "excludes",
-          "includesAll",
-          "excludesAll",
-          "first",
-          "last",
-          "at",
-          "reverse",
-          // Collection modification
-          "including",
-          "excluding",
-          "union",
-          "intersection",
-          "symmetricDifference",
-          "flatten",
-          "append",
-          "prepend",
-          "insertAt",
-          "subSequence",
-          // Collection conversion
-          OP_AS_SET,
-          OP_AS_BAG,
-          OP_AS_SEQUENCE,
-          OP_AS_ORDERED_SET,
-          "lift",
-          // Aggregation
-          "sum",
-          "max",
-          "min",
-          "avg",
-          // Numeric
-          "abs",
-          OP_FLOOR,
-          "ceil",
-          OP_CEILING,
-          OP_ROUND,
-          // Iterator
-          OP_SELECT,
-          OP_REJECT,
-          "collect",
-          "collectNested",
-          "forAll",
-          OP_EXISTS,
-          "one",
-          "any",
-          "isUnique",
-          "sortedBy",
-          "iterate",
-          // String
-          "concat",
-          "substring",
-          "length",
-          "toUpper",
-          "toLower",
-          "indexOf",
-          "equalsIgnoreCase",
-          "characters",
-          "tokenize",
-          "substituteAll",
-          "substituteFirst",
-          "matches",
-          "toInteger",
-          "toReal",
-          // Type / meta
-          "oclIsKindOf",
-          "oclIsTypeOf",
-          "oclAsType",
-          "allInstances");
+  private static final java.util.List<String> KNOWN_OPERATIONS = OclOperations.names();
 
   /**
    * Returns the single closest known operation name to {@code typed}, regardless of distance.
