@@ -12,6 +12,8 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EReference;
 import org.eclipse.emf.ecore.EcoreFactory;
+import org.eclipse.emf.ecore.EcorePackage;
+import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite.Kind;
@@ -144,5 +146,107 @@ class AllInstancesEngineTest {
 
     assertTrue(engine.getTraversableRefs().contains(males));
     assertEquals(List.of(homer), engine.compute(List.of(root)).get(person));
+  }
+
+  private static EPackage pkg(String name) {
+    EPackage p = EcoreFactory.eINSTANCE.createEPackage();
+    p.setName(name);
+    p.setNsURI("http://test/b8/" + name);
+    return p;
+  }
+
+  private static EClass eClass(EPackage p, String name) {
+    EClass c = EcoreFactory.eINSTANCE.createEClass();
+    c.setName(name);
+    p.getEClassifiers().add(c);
+    return c;
+  }
+
+  private static EReference containment(EClass owner, String name, EClass type) {
+    EReference r = EcoreFactory.eINSTANCE.createEReference();
+    r.setName(name);
+    r.setEType(type);
+    r.setContainment(true);
+    r.setUpperBound(-1);
+    owner.getEStructuralFeatures().add(r);
+    return r;
+  }
+
+  @Test
+  void instancesBelowAContainerFromAnUnanalyzedPackageAreFound() {
+    // e.g. the wrapper's name-keyed registry dropped the package of the root's class
+    EPackage target = pkg("target");
+    EClass x = eClass(target, "X");
+    EPackage hidden = pkg("hidden");
+    EClass holder = eClass(hidden, "Holder");
+    EReference items = containment(holder, "items", x);
+
+    EObject root = EcoreUtil.create(holder);
+    EObject instance = EcoreUtil.create(x);
+    addMany(root, items, instance);
+
+    AllInstancesEngine engine =
+        new AllInstancesEngine(
+            List.of(target), List.of(new AllInstancesCallSite(x, Kind.ALL_OF_KIND)));
+
+    assertEquals(List.of(instance), engine.compute(List.of(root)).get(x));
+  }
+
+  @Test
+  void eObjectTypedContainmentIsTraversed() {
+    EPackage p = pkg("generic");
+    EClass box = eClass(p, "Box");
+    EClass x = eClass(p, "X");
+    EReference content = containment(box, "content", EcorePackage.Literals.EOBJECT);
+
+    EObject root = EcoreUtil.create(box);
+    EObject instance = EcoreUtil.create(x);
+    addMany(root, content, instance);
+
+    AllInstancesEngine engine =
+        new AllInstancesEngine(p, List.of(new AllInstancesCallSite(x, Kind.ALL_OF_KIND)));
+
+    assertTrue(engine.getTraversableRefs().contains(content));
+    assertEquals(List.of(instance), engine.compute(List.of(root)).get(x));
+  }
+
+  @Test
+  void eObjectTypedContainmentIsReachedThroughAnalysedContainers() {
+    EPackage p = pkg("chained");
+    EClass root = eClass(p, "Root");
+    EClass box = eClass(p, "Box");
+    EClass x = eClass(p, "X");
+    EReference boxes = containment(root, "boxes", box);
+    EReference content = containment(box, "content", EcorePackage.Literals.EOBJECT);
+
+    EObject r = EcoreUtil.create(root);
+    EObject b = EcoreUtil.create(box);
+    EObject instance = EcoreUtil.create(x);
+    addMany(r, boxes, b);
+    addMany(b, content, instance);
+
+    AllInstancesEngine engine =
+        new AllInstancesEngine(p, List.of(new AllInstancesCallSite(x, Kind.ALL_OF_KIND)));
+
+    assertEquals(List.of(instance), engine.compute(List.of(r)).get(x));
+  }
+
+  @Test
+  void eObjectAllInstancesReturnsEveryObject() {
+    EPackage p = pkg("any");
+    EClass root = eClass(p, "Root");
+    EClass x = eClass(p, "X");
+    EReference items = containment(root, "items", x);
+
+    EObject r = EcoreUtil.create(root);
+    EObject instance = EcoreUtil.create(x);
+    addMany(r, items, instance);
+
+    AllInstancesEngine engine =
+        new AllInstancesEngine(
+            p,
+            List.of(new AllInstancesCallSite(EcorePackage.Literals.EOBJECT, Kind.ALL_OF_KIND)));
+
+    assertEquals(List.of(r, instance), engine.compute(List.of(r)).get(EcorePackage.Literals.EOBJECT));
   }
 }

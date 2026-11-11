@@ -1,5 +1,6 @@
 package tools.vitruv.dsls.vitruvocl.allinstances.cache;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
@@ -34,6 +35,18 @@ public final class CacheConfiguration {
    */
   private final Set<EReference> traverse = new LinkedHashSet<>();
 
+  /**
+   * The classes the reachability analysis knew about. A traversal that meets an instance of any
+   * other class cannot rely on {@link #traverse} for it and descends into all of its containments.
+   * Empty until the analysis has run (then every class is treated as analysed).
+   *
+   * <p>Known limit: a subtype from an unanalysed package held by a pruned reference of an analysed
+   * class is still not reached, because the walk never visits it. The analysis therefore needs
+   * every package whose instances can occur in the model (the wrappers pass all loaded packages,
+   * not only one per name).
+   */
+  private final Set<EClass> analyzedClasses = new LinkedHashSet<>();
+
   public Set<EClass> getAllOfKind() {
     return allOfKind;
   }
@@ -44,6 +57,25 @@ public final class CacheConfiguration {
 
   public Set<EReference> getTraverse() {
     return traverse;
+  }
+
+  /** The classes the reachability analysis knew about; see {@link #isAnalyzed}. */
+  public Set<EClass> getAnalyzedClasses() {
+    return Collections.unmodifiableSet(analyzedClasses);
+  }
+
+  /** Replaces the set of analysed classes; called together with {@link #setTraverse}. */
+  public void setAnalyzedClasses(Set<EClass> classes) {
+    analyzedClasses.clear();
+    analyzedClasses.addAll(classes);
+  }
+
+  /**
+   * Whether the pruning decision of {@link #traverse} covers instances of {@code type}; {@code true}
+   * for every type as long as no analysis has recorded its classes.
+   */
+  public boolean isAnalyzed(EClass type) {
+    return analyzedClasses.isEmpty() || analyzedClasses.contains(type);
   }
 
   /** Registers a type for which subtype-inclusive instance collection is required. */

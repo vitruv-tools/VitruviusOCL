@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
+import tools.vitruv.change.atomic.EChange;
 
 /**
  * Inverse of non-containment references without {@code eOpposite} (level 3b): for an indexed
@@ -68,9 +69,18 @@ final class ReverseIndex {
    * Updates the indexed references with the reference events of a transaction that has already
    * been applied to the model. Must be called before the transaction's relevant instances are
    * computed; references indexed for the first time afterwards are built from the post-state.
+   *
+   * <p>Replays the raw changes rather than the deduplicated {@link TransactionDelta#events()}: the
+   * counts are a +1/-1 balance, so an insertion repeated after a removal of the same link (e.g. a
+   * re-insert or a move in a non-unique list) must be counted again.
    */
   void apply(TransactionDelta delta) {
-    for (ModelEvent event : delta.events()) {
+    for (EChange<EObject> change : delta.changes()) {
+      ModelEvent event = EChangeClassifier.toEvent(change);
+      if (event.kind() == ModelEvent.Kind.UNKNOWN) {
+        index.clear(); // it may have changed any indexed reference: rebuild everything lazily
+        return;
+      }
       if (!(event.feature() instanceof EReference ref) || !index.containsKey(ref)) {
         continue;
       }

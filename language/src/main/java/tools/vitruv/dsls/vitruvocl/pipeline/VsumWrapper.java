@@ -16,8 +16,8 @@ package tools.vitruv.dsls.vitruvocl.pipeline;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +76,12 @@ public class VsumWrapper implements MetamodelWrapperInterface {
   private final Map<String, EPackage> metamodelRegistry = new HashMap<>();
 
   /**
+   * Every package registered at construction, by identity: {@link #metamodelRegistry} keeps only
+   * one package per name, but the pruned {@code allInstances()} traversal must know all of them.
+   */
+  private final Set<EPackage> knownPackages = Collections.newSetFromMap(new IdentityHashMap<>());
+
+  /**
    * The wrapped virtual model, used to register transaction listeners; {@code null} for wrappers
    * of a single constraint check.
    */
@@ -86,8 +92,6 @@ public class VsumWrapper implements MetamodelWrapperInterface {
    * wrappers reading the live VSUM.
    */
   private final Map<EClass, List<EObject>> instanceCache;
-
-  private static final int REGISTRY_SNAPSHOT_ATTEMPTS = 3;
 
   /**
    * Every {@link EClass} ever passed to {@link #getAllInstances}, in first-seen order.
@@ -104,15 +108,17 @@ public class VsumWrapper implements MetamodelWrapperInterface {
   /**
    * Lazily (re)built {@link AllInstancesEngine}; {@code null} means stale/not-yet-built.
    *
-   * <p>Invalidated only when {@link #queriedAllInstancesTypes} gains a new entry. Unlike {@link
-   * MetamodelWrapper}, {@link #metamodelRegistry} never grows after construction here — the VSUM
-   * registers all of its metamodels before any {@link VsumWrapper} is created (see {@link
-   * #loadMetamodelsFromRegistry}) — so no metamodel-change invalidation trigger is needed. {@code
+   * <p>Invalidated when {@link #queriedAllInstancesTypes} gains a new entry or a package appears
+   * that the engine was not analysed with (registered globally or used by a model root after
+   * construction). {@code
    * compute()} is always invoked against a freshly-read root list (see {@link #getAllInstances}),
    * so live changes to the VSUM's instance model are always reflected regardless of how long this
    * cached engine has been reused.
    */
   private AllInstancesEngine allInstancesEngine;
+
+  /** The packages {@link #allInstancesEngine} was analysed with. */
+  private Set<EPackage> enginePackages = Set.of();
 
   /**
    * Creates a new VSUM wrapper and initializes the metamodel registry and correspondence model.
@@ -159,6 +165,7 @@ public class VsumWrapper implements MetamodelWrapperInterface {
       for (EObject root : resource.getContents()) {
         EPackage pkg = root.eClass().getEPackage();
         metamodelRegistry.put(pkg.getName(), pkg);
+        knownPackages.add(pkg);
       }
     }
   }
@@ -171,28 +178,14 @@ public class VsumWrapper implements MetamodelWrapperInterface {
    * avoids the need to have instances in the VSUM at construction time.
    */
   private void loadMetamodelsFromRegistry() {
-    for (Object value : snapshotOfGlobalRegistry()) {
+    for (Object value : AnalyzedPackages.snapshot(EPackage.Registry.INSTANCE)) {
       if (value instanceof EPackage pkg) {
         metamodelRegistry.put(pkg.getName(), pkg);
+        knownPackages.add(pkg);
       }
     }
   }
 
-  /**
-   * Copies the values of the global registry, which is not thread-safe and may be modified
-   * concurrently, e.g., when another virtual model is initialized.
-   */
-  private static List<Object> snapshotOfGlobalRegistry() {
-    ConcurrentModificationException lastFailure = null;
-    for (int attempt = 0; attempt < REGISTRY_SNAPSHOT_ATTEMPTS; attempt++) {
-      try {
-        return new ArrayList<>(EPackage.Registry.INSTANCE.values());
-      } catch (ConcurrentModificationException e) {
-        lastFailure = e;
-      }
-    }
-    throw lastFailure;
-  }
 
   /**
    * Resolves a fully qualified metaclass name to its corresponding {@link EClass}.
@@ -275,8 +268,15 @@ public class VsumWrapper implements MetamodelWrapperInterface {
     if (queriedAllInstancesTypes.addAll(types)) {
       allInstancesEngine = null; // newly-seen call site -> cache configuration is stale
     }
-    if (allInstancesEngine == null) {
-      allInstancesEngine = buildAllInstancesEngine();
+    Set<EPackage> packages =
+        AnalyzedPackages.collect(
+            knownPackages,
+            getAllRootObjects(),
+            AnalyzedPackages.snapshot(EPackage.Registry.INSTANCE));
+    if (allInstancesEngine == null || !enginePackages.containsAll(packages)) {
+      // a package the pruning does not know may hold instances below a pruned reference
+      allInstancesEngine = buildAllInstancesEngine(packages);
+      enginePackages = packages;
     }
     return allInstancesEngine;
   }
@@ -284,13 +284,14 @@ public class VsumWrapper implements MetamodelWrapperInterface {
   /**
    * Builds a fresh {@link AllInstancesEngine} from the currently known metamodels and call sites.
    */
-  private AllInstancesEngine buildAllInstancesEngine() {
+  private AllInstancesEngine buildAllInstancesEngine(Set<EPackage> packages) {
     List<AllInstancesCallSite> callSites = new ArrayList<>(queriedAllInstancesTypes.size());
     for (EClass type : queriedAllInstancesTypes) {
       callSites.add(new AllInstancesCallSite(type, AllInstancesCallSite.Kind.ALL_OF_KIND));
     }
-    return new AllInstancesEngine(new LinkedHashSet<>(metamodelRegistry.values()), callSites);
+    return new AllInstancesEngine(packages, callSites);
   }
+
 
   /**
    * Returns the names of all metamodels currently registered in this wrapper.

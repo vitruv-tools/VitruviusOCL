@@ -95,6 +95,7 @@ public class ContainmentReachabilityAnalyzer {
     }
 
     cacheConfig.setTraverse(refs);
+    cacheConfig.setAnalyzedClasses(new LinkedHashSet<>(allClasses));
     return refs;
   }
 
@@ -205,6 +206,10 @@ public class ContainmentReachabilityAnalyzer {
       Set<EClass> targets,
       List<EClass> allClasses,
       Map<EClass, Set<EClass>> subtypeMemo) {
+    if (EcoreConformance.isEObject(ref.getEReferenceType())) {
+      // every class conforms to EObject, but EClass#isSuperTypeOf does not know that
+      return !targets.isEmpty();
+    }
     Set<EClass> holdable =
         transitiveClosureOfSubtypes(ref.getEReferenceType(), allClasses, subtypeMemo);
     for (EClass type : holdable) {
@@ -227,7 +232,7 @@ public class ContainmentReachabilityAnalyzer {
       return true;
     }
     for (EClass kind : cacheConfig.getAllOfKind()) {
-      if (kind.isSuperTypeOf(type)) {
+      if (EcoreConformance.conforms(type, kind)) {
         return true;
       }
     }
