@@ -8,20 +8,20 @@
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.lsp;
+package tools.vitruv.dsls.vitruvocl.common;
 
 /**
- * Damerau-Levenshtein edit-distance utilities shared by the keyword "did you mean?" suggestion
- * logic in {@link LspErrorListener} and {@link DocumentAnalyzer}.
+ * Damerau-Levenshtein (optimal string alignment) edit distance for "did you mean?" suggestions,
+ * shared by the type checker and the language server.
  *
  * <p>Adjacent transpositions count as a single edit.
  */
-final class EditDistance {
+public final class EditDistance {
 
   private EditDistance() {}
 
   /** Maximum edit distance that still counts as a plausible typo for a word of the given length. */
-  static int editThreshold(int len) {
+  public static int editThreshold(int len) {
     if (len <= 3) {
       return 1;
     }
@@ -31,7 +31,8 @@ final class EditDistance {
     return 3;
   }
 
-  static int damerauLevenshtein(String a, String b) {
+  /** Returns the edit distance; an adjacent transposition counts as one edit. */
+  public static int damerauLevenshtein(String a, String b) {
     if (a.equals(b)) {
       return 0;
     }

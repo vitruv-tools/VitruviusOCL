@@ -570,4 +570,18 @@ public sealed interface OCLElement
     }
     return 7;
   }
+
+  /**
+   * Returns the first element of a non-empty {@link NestedCollection}, or {@code element} itself
+   * for any other element (aggregates like {@code max()} treat a nested singleton as its value).
+   *
+   * @param element the element, possibly a nested collection
+   * @return the unwrapped element
+   */
+  static OCLElement unwrapNestedCollection(OCLElement element) {
+    if (element instanceof NestedCollection(Value value) && !value.getElements().isEmpty()) {
+      return value.getElements().get(0);
+    }
+    return element;
+  }
 }

@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.operations;
 
 import static tools.vitruv.dsls.vitruvocl.operations.OclOperation.Family.CLASSIFIER;

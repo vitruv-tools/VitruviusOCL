@@ -22,6 +22,7 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
+import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 
 /**
  * ANTLR error listener that converts parser/lexer errors to LSP {@link Diagnostic} objects.

@@ -24,8 +24,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
@@ -79,23 +77,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /** Matches {@code {self.attr}} placeholders in {@code @message} templates. */
   private static final java.util.regex.Pattern SELF_ATTRIBUTE_PLACEHOLDER =
       java.util.regex.Pattern.compile("\\{self\\.([a-zA-Z_]\\w*)\\}");
-
-  /** Upper bound for {@link #REGEX_CACHE}; cleared wholesale when exceeded. */
-  private static final int REGEX_CACHE_LIMIT = 256;
-
-  /**
-   * Compiled {@code matches()} patterns by source string. A pattern usually repeats for every
-   * element of an iterator body, so compiling it once avoids per-element recompilation.
-   */
-  private static final Map<String, java.util.Optional<java.util.regex.Pattern>> REGEX_CACHE =
-      new java.util.concurrent.ConcurrentHashMap<>();
-
-  private static OCLElement unwrapNestedCollection(OCLElement e) {
-    if (e instanceof OCLElement.NestedCollection(Value value) && !value.getElements().isEmpty()) {
-      return value.getElements().get(0);
-    }
-    return e;
-  }
 
   // ==================== Instance Fields ====================
 
@@ -188,6 +169,22 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * </ol>
    */
   private Deque<Value> receiverStack = new ArrayDeque<>();
+
+  /** Runtime semantics of the String operations, see {@link StringOperationEvaluation}. */
+  private final StringOperationEvaluation strings =
+      new StringOperationEvaluation(new EvaluationContext());
+
+  /** Runtime semantics of the numeric operations, see {@link NumericOperationEvaluation}. */
+  private final NumericOperationEvaluation numerics =
+      new NumericOperationEvaluation(new EvaluationContext());
+
+  /** Runtime semantics of the collection operations, see {@link CollectionOperationEvaluation}. */
+  private final CollectionOperationEvaluation collections =
+      new CollectionOperationEvaluation(new EvaluationContext());
+
+  /** Runtime semantics of the iterator operations, see {@link IteratorOperationEvaluation}. */
+  private final IteratorOperationEvaluation iterators =
+      new IteratorOperationEvaluation(new EvaluationContext());
 
   /**
    * The transaction (ordered list of atomic changes between pre-state and the current post-state)
@@ -745,1280 +742,246 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   // ==================== Collection Query Operations ====================
 
-  /**
-   * Evaluates the {@code isEmpty()} operation.
-   *
-   * <p>Returns true if the receiver collection contains zero elements.
-   *
-   * <p><b>Example:</b> {@code Bag{}.isEmpty()} → {@code true}
-   *
-   * @param ctx The isEmpty operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code isEmpty()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitIsEmptyOp(VitruvOCLParser.IsEmptyOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    return Value.boolValue(receiver.isEmpty());
+    return collections.isEmpty(ctx);
   }
 
-  /**
-   * Evaluates the {@code notEmpty()} operation.
-   *
-   * <p>Returns true if the receiver collection contains at least one element.
-   *
-   * <p><b>Example:</b> {@code Bag{1}.notEmpty()} → {@code true}
-   *
-   * @param ctx The notEmpty operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code notEmpty()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitNotEmptyOp(VitruvOCLParser.NotEmptyOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    return Value.boolValue(!receiver.isEmpty());
+    return collections.notEmpty(ctx);
   }
 
-  /**
-   * Evaluates the {@code first()} operation.
-   *
-   * <p>Returns the first element of an ordered collection, or empty if the collection is empty.
-   *
-   * <p><b>Example:</b> {@code Sequence{1,2,3}.first()} → {@code 1}
-   *
-   * @param ctx The first operation node
-   * @return A singleton containing the first element, or empty
-   */
+  /** Evaluates {@code first()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitFirstOp(VitruvOCLParser.FirstOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.optional(Type.ANY));
-    }
-    return new Value(List.of(receiver.getElements().get(0)), Type.optional(Type.ANY));
+    return collections.first(ctx);
   }
 
-  /**
-   * Evaluates the {@code last()} operation.
-   *
-   * <p>Returns the last element of an ordered collection, or empty if the collection is empty.
-   *
-   * <p><b>Example:</b> {@code Sequence{1,2,3}.last()} → {@code 3}
-   *
-   * @param ctx The last operation node
-   * @return A singleton containing the last element, or empty
-   */
+  /** Evaluates {@code last()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitLastOp(VitruvOCLParser.LastOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.optional(Type.ANY));
-    }
-    int lastIndex = receiver.getElements().size() - 1;
-    return new Value(List.of(receiver.getElements().get(lastIndex)), Type.optional(Type.ANY));
+    return collections.last(ctx);
   }
 
-  /**
-   * Evaluates the {@code reverse()} operation.
-   *
-   * <p>Returns a new collection with elements in reverse order.
-   *
-   * <p><b>Example:</b> {@code Sequence{1,2,3}.reverse()} → {@code Sequence{3,2,1}}
-   *
-   * @param ctx The reverse operation node
-   * @return A new collection with reversed element order
-   */
+  /** Evaluates {@code reverse()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitReverseOp(VitruvOCLParser.ReverseOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> reversed = new ArrayList<>(receiver.getElements());
-    Collections.reverse(reversed);
-    return Value.of(reversed, receiver.getRuntimeType());
+    return collections.reverse(ctx);
   }
 
-  /**
-   * Evaluates the {@code size()} operation.
-   *
-   * <p>Returns the number of elements in the receiver collection.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.size()} → {@code 3}
-   *
-   * @param ctx The size operation node
-   * @return A singleton integer value
-   */
+  /** Evaluates {@code size()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitSizeOp(VitruvOCLParser.SizeOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    return Value.intValue(receiver.size());
+    return collections.size(ctx);
   }
 
   // ==================== Collection Modification Operations ====================
 
-  /**
-   * Evaluates the {@code includes()} operation.
-   *
-   * <p>Returns true if the receiver collection contains an element semantically equal to the
-   * argument.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.includes(2)} → {@code true}
-   *
-   * @param ctx The includes operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code includes()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitIncludesOp(VitruvOCLParser.IncludesOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return Value.boolValue(false);
-    }
-
-    OCLElement searchElem = arg.getElements().get(0);
-    boolean result = receiver.includes(searchElem);
-
-    return Value.boolValue(result);
+    return collections.includes(ctx);
   }
 
-  /**
-   * Evaluates the {@code including()} operation.
-   *
-   * <p>Returns a new collection with the argument element added.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2}.including(3)} → {@code Bag{1,2,3}}
-   *
-   * @param ctx The including operation node
-   * @return A new collection with the element added
-   */
+  /** Evaluates {@code including()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitIncludingOp(VitruvOCLParser.IncludingOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return receiver;
-    }
-    return receiver.including(arg.getElements().get(0));
+    return collections.including(ctx);
   }
 
-  /**
-   * Evaluates the {@code excluding()} operation.
-   *
-   * <p>Returns a new collection with all occurrences of the argument element removed.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,2,3}.excluding(2)} → {@code Bag{1,3}}
-   *
-   * @param ctx The excluding operation node
-   * @return A new collection with the element removed
-   */
+  /** Evaluates {@code excluding()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitExcludingOp(VitruvOCLParser.ExcludingOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return receiver;
-    }
-    return receiver.excluding(arg.getElements().get(0));
+    return collections.excluding(ctx);
   }
 
-  /**
-   * Evaluates the {@code excludes()} operation.
-   *
-   * <p>Returns true if the receiver collection does NOT contain the argument element.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.excludes(4)} → {@code true}
-   *
-   * @param ctx The excludes operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code excludes()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitExcludesOp(VitruvOCLParser.ExcludesOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return Value.boolValue(true);
-    }
-    return Value.boolValue(receiver.excludes(arg.getElements().get(0)));
+    return collections.excludes(ctx);
   }
 
-  /**
-   * Evaluates the {@code union()} operation.
-   *
-   * <p>Returns a new collection containing all elements from both the receiver and argument
-   * collections.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2}.union(Bag{2,3})} → {@code Bag{1,2,2,3}}
-   *
-   * @param ctx The union operation node
-   * @return A new collection with combined elements
-   */
+  /** Evaluates {@code union()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitUnionOp(VitruvOCLParser.UnionOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    return receiver.union(arg);
+    return collections.union(ctx);
   }
 
-  /**
-   * Evaluates the {@code append()} operation.
-   *
-   * <p>Appends an element to the end of an ordered collection. Currently implemented as union.
-   *
-   * <p><b>Example:</b> {@code Sequence{1,2}.append(3)} → {@code Sequence{1,2,3}}
-   *
-   * @param ctx The append operation node
-   * @return A new collection with the element appended
-   */
+  /** Evaluates {@code append()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAppendOp(VitruvOCLParser.AppendOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    return receiver.union(arg);
+    return collections.append(ctx);
   }
 
-  /**
-   * Evaluates the {@code flatten()} operation.
-   *
-   * <p>Flattens nested collections into a single-level collection.
-   *
-   * <p><b>Example:</b> {@code Bag{Bag{1,2}, Bag{3}}.flatten()} → {@code Bag{1,2,3}}
-   *
-   * @param ctx The flatten operation node
-   * @return A flattened collection
-   */
+  /** Evaluates {@code flatten()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitFlattenOp(VitruvOCLParser.FlattenOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    return receiver.flatten();
+    return collections.flatten(ctx);
   }
 
   // ==================== Arithmetic Aggregation Operations ====================
 
-  /**
-   * Evaluates the {@code sum()} operation.
-   *
-   * <p>Returns the sum of all numeric elements. If all elements are integers, returns an Integer;
-   * if any element is Float or Double, returns a Double.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.sum()} → {@code 6}, {@code Set{1.5,2.5}.sum()} → {@code
-   * 4.0}
-   *
-   * @param ctx The sum operation node
-   * @return A singleton integer or double value
-   */
+  /** Evaluates {@code sum()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitSumOp(VitruvOCLParser.SumOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.intValue(0);
-    }
-    boolean hasFloating = false;
-    double sum = 0.0;
-    for (OCLElement elem : receiver.getElements()) {
-      if (!OCLElement.isNumeric(elem)) {
-        continue;
-      }
-      if (elem.tryGetFloat() != null || elem.tryGetDouble() != null) {
-        hasFloating = true;
-      }
-      sum += elem.toDoubleValue();
-    }
-    if (hasFloating) {
-      return Value.doubleValue(sum);
-    }
-    return Value.intValue((int) sum);
+    return collections.sum(ctx);
   }
 
-  /**
-   * Evaluates the {@code max()} operation.
-   *
-   * <p>Returns the maximum integer value in the collection, or empty if the collection is empty.
-   *
-   * <p><b>Example:</b> {@code Bag{1,5,3}.max()} → {@code 5}
-   *
-   * @param ctx The max operation node
-   * @return A singleton integer value, or empty
-   */
+  /** Evaluates {@code max()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitMaxOp(VitruvOCLParser.MaxOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.INTEGER);
-    }
-
-    // Unwrap nested collections/singletons to get primitive values
-    List<OCLElement> elements =
-        receiver.getElements().stream().map(e -> unwrapNestedCollection(e)).toList();
-
-    double max = Double.NEGATIVE_INFINITY;
-    for (OCLElement elem : elements) {
-      if (!OCLElement.isNumeric(elem)) {
-        continue;
-      }
-      double val = elem.toDoubleValue();
-      if (val > max) {
-        max = val;
-      }
-    }
-    boolean allInt = elements.stream().allMatch(e -> e instanceof OCLElement.IntValue);
-    return allInt ? Value.intValue((int) max) : Value.doubleValue(max);
+    return collections.max(ctx);
   }
 
-  /**
-   * Evaluates the {@code min()} operation.
-   *
-   * <p>Returns the minimum integer value in the collection, or empty if the collection is empty.
-   *
-   * <p><b>Example:</b> {@code Bag{1,5,3}.min()} → {@code 1}
-   *
-   * @param ctx The min operation node
-   * @return A singleton integer value, or empty
-   */
+  /** Evaluates {@code min()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitMinOp(VitruvOCLParser.MinOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.INTEGER);
-    }
-
-    // Unwrap nested collections/singletons to get primitive values
-    List<OCLElement> elements =
-        receiver.getElements().stream().map(e -> unwrapNestedCollection(e)).toList();
-
-    double min = Double.POSITIVE_INFINITY;
-    for (OCLElement elem : elements) {
-      if (!OCLElement.isNumeric(elem)) {
-        continue;
-      }
-      double val = elem.toDoubleValue();
-      if (val < min) {
-        min = val;
-      }
-    }
-
-    boolean allInt = elements.stream().allMatch(e -> e instanceof OCLElement.IntValue);
-    return allInt ? Value.intValue((int) min) : Value.doubleValue(min);
+    return collections.min(ctx);
   }
 
-  /**
-   * Evaluates the {@code avg()} operation.
-   *
-   * <p>Returns the arithmetic mean of all elements as a Double. Supports Integer, Float, and Double
-   * element types. Uses double arithmetic to avoid integer division truncation.
-   *
-   * <p><b>Example:</b> {@code Sequence{1,2,3,4}.avg()} → {@code 2.5}
-   *
-   * @param ctx The avg operation node
-   * @return A singleton Double value, or empty if the collection is empty
-   */
+  /** Evaluates {@code avg()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAvgOp(VitruvOCLParser.AvgOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.DOUBLE);
-    }
-    double sum = 0.0;
-    for (OCLElement elem : receiver.getElements()) {
-      if (!OCLElement.isNumeric(elem)) {
-        continue;
-      }
-      sum += elem.toDoubleValue();
-    }
-    return Value.doubleValue(sum / receiver.size());
+    return collections.avg(ctx);
   }
 
-  /**
-   * Evaluates the {@code abs()} operation.
-   *
-   * <p>Returns the absolute value of each element. Supports Integer, Float, and Double receivers.
-   *
-   * <p><b>Example:</b> {@code (-3).abs()} → {@code 3}, {@code (-2.5).abs()} → {@code 2.5}
-   *
-   * @param ctx The abs operation node
-   * @return A collection with absolute values
-   */
+  /** Evaluates {@code abs()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitAbsOp(VitruvOCLParser.AbsOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(new OCLElement.IntValue(Math.abs(elem.tryGetInt())));
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.FloatValue(Math.abs(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.abs(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return numerics.abs(ctx);
   }
 
-  /**
-   * Evaluates the {@code floor()} operation.
-   *
-   * <p>For integers, this is a no-op. For Float and Double, applies {@link Math#floor}.
-   *
-   * <p><b>Example:</b> {@code 2.7.floor()} → {@code 2.0}, {@code 5.floor()} → {@code 5}
-   *
-   * @param ctx The floor operation node
-   * @return A collection with floored values
-   */
+  /** Evaluates {@code floor()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitFloorOp(VitruvOCLParser.FloorOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem); // no-op for integers
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.floor(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.floor(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return numerics.floor(ctx);
   }
 
-  /**
-   * Evaluates the {@code ceil()} operation.
-   *
-   * <p>For integers, this is a no-op. For Float and Double, applies {@link Math#ceil}.
-   *
-   * <p><b>Example:</b> {@code 2.3.ceil()} → {@code 3.0}, {@code 5.ceil()} → {@code 5}
-   *
-   * @param ctx The ceil operation node
-   * @return A collection with ceiled values
-   */
+  /** Evaluates {@code ceil()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitCeilOp(VitruvOCLParser.CeilOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem); // no-op for integers
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return numerics.ceil(ctx);
   }
 
-  /**
-   * Evaluates the {@code round()} operation.
-   *
-   * <p>For integers, this is a no-op. For Float and Double, rounds to the nearest integer using
-   * "round half up" semantics ({@link Math#round}).
-   *
-   * <p><b>Example:</b> {@code 2.5.round()} → {@code 3.0}, {@code 2.4.round()} → {@code 2.0}
-   *
-   * @param ctx The round operation node
-   * @return A collection with rounded values
-   */
+  /** Evaluates {@code round()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitRoundOp(VitruvOCLParser.RoundOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem); // no-op for integers
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.round(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.round(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return numerics.round(ctx);
   }
 
   // ==================== String Operations ====================
 
-  /**
-   * Evaluates the {@code length()} operation on a String receiver.
-   *
-   * <p>Expects a singleton receiver containing a {@code String} value. Returns the number of
-   * characters in the string as an {@code INTEGER} singleton.
-   *
-   * @param ctx the parse tree node for the {@code length()} operation
-   * @return a singleton {@code INTEGER} value representing the string length, or an error value if
-   *     the receiver is not a singleton {@code String}
-   */
+  /** Evaluates {@code length()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitLengthOp(VitruvOCLParser.LengthOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.size() == 1) {
-      String str = receiver.getElements().get(0).tryGetString();
-      if (str != null) {
-        return Value.intValue(str.length());
-      }
-    }
-    return Value.intValue(0);
+    return strings.length(ctx);
   }
 
-  /**
-   * Evaluates the {@code concat()} operation.
-   *
-   * <p>Concatenates two strings together.
-   *
-   * <p><b>Example:</b> {@code 'Hello'.concat(' World')} → {@code 'Hello World'}
-   *
-   * @param ctx The concat operation node
-   * @return A singleton string value
-   */
+  /** Evaluates {@code concat()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitConcatOp(VitruvOCLParser.ConcatOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return receiver;
-    }
-
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return receiver;
-    }
-
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return receiver;
-    }
-
-    String argStr = arg.getElements().get(0).tryGetString();
-    if (argStr == null) {
-      return receiver;
-    }
-
-    return Value.stringValue(str + argStr);
+    return strings.concat(ctx);
   }
 
-  /**
-   * Evaluates the substring operation on string values.
-   *
-   * <p>Extracts a substring from each string in the receiver collection using 1-based OCL indexing.
-   * The operation takes two integer arguments: start position (inclusive) and end position
-   * (exclusive in Java terms).
-   *
-   * <p>Example: "Hello".substring(2, 4) returns "el" (positions 2-3 in OCL's 1-based indexing)
-   *
-   * @param ctx The substring operation context containing start and end expressions
-   * @return A collection of substring values, empty if arguments are invalid or out of bounds
-   */
+  /** Evaluates {@code substring()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitSubstringOp(VitruvOCLParser.SubstringOpContext ctx) {
-    // Get receiver from parent context
-    Value receiver = receiverStack.peek();
-
-    Value startVal = visit(ctx.start);
-    Value endVal = visit(ctx.end);
-
-    if (startVal.isEmpty() || endVal.isEmpty()) {
-      return Value.of(List.of(), Type.STRING);
-    }
-
-    int start = ((OCLElement.IntValue) startVal.getElements().get(0)).value();
-    int end = ((OCLElement.IntValue) endVal.getElements().get(0)).value();
-
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem instanceof OCLElement.StringValue(String str)) {
-        int javaStart = start - 1;
-        int javaEnd = end;
-
-        if (javaStart >= 0 && javaEnd <= str.length() && javaStart < javaEnd) {
-          results.add(new OCLElement.StringValue(str.substring(javaStart, javaEnd)));
-        }
-      }
-    }
-
-    return Value.of(results, Type.STRING);
+    return strings.substring(ctx);
   }
 
-  /**
-   * Evaluates the {@code toUpper()} operation.
-   *
-   * <p>Converts a string to uppercase.
-   *
-   * <p><b>Example:</b> {@code 'hello'.toUpper()} → {@code 'HELLO'}
-   *
-   * @param ctx The toUpper operation node
-   * @return A singleton string value in uppercase
-   */
+  /** Evaluates {@code toUpper()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitToUpperOp(VitruvOCLParser.ToUpperOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return receiver;
-    }
-
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return receiver;
-    }
-
-    return Value.stringValue(str.toUpperCase());
+    return strings.toUpper(ctx);
   }
 
-  /**
-   * Evaluates the {@code toLower()} operation.
-   *
-   * <p>Converts a string to lowercase.
-   *
-   * <p><b>Example:</b> {@code 'HELLO'.toLower()} → {@code 'hello'}
-   *
-   * @param ctx The toLower operation node
-   * @return A singleton string value in lowercase
-   */
+  /** Evaluates {@code toLower()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitToLowerOp(VitruvOCLParser.ToLowerOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return receiver;
-    }
-
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return receiver;
-    }
-
-    return Value.stringValue(str.toLowerCase());
+    return strings.toLower(ctx);
   }
 
-  /**
-   * Evaluates the {@code indexOf()} operation.
-   *
-   * <p>Returns the 1-based index of the first occurrence of a substring, or 0 if not found.
-   *
-   * <p><b>Example:</b> {@code 'hello'.indexOf('ll')} → {@code 3}
-   *
-   * @param ctx The indexOf operation node
-   * @return A singleton integer value (1-based index, or 0 if not found)
-   */
+  /** Evaluates {@code indexOf()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitIndexOfOp(VitruvOCLParser.IndexOfOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.intValue(0);
-    }
-
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.intValue(0);
-    }
-
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return Value.intValue(0);
-    }
-
-    String searchStr = arg.getElements().get(0).tryGetString();
-    if (searchStr == null) {
-      return Value.intValue(0);
-    }
-
-    // Convert Java's 0-based index to OCL's 1-based index
-    int javaIndex = str.indexOf(searchStr);
-    int oclIndex = (javaIndex == -1) ? 0 : javaIndex + 1;
-    return Value.intValue(oclIndex);
+    return strings.indexOf(ctx);
   }
 
-  /**
-   * Evaluates the {@code equalsIgnoreCase()} operation.
-   *
-   * <p>Compares two strings ignoring case differences.
-   *
-   * <p><b>Example:</b> {@code 'Hello'.equalsIgnoreCase('HELLO')} → {@code true}
-   *
-   * @param ctx The equalsIgnoreCase operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code equalsIgnoreCase()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitEqualsIgnoreCaseOp(VitruvOCLParser.EqualsIgnoreCaseOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.boolValue(false);
-    }
-
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.boolValue(false);
-    }
-
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return Value.boolValue(false);
-    }
-
-    String compareStr = arg.getElements().get(0).tryGetString();
-    if (compareStr == null) {
-      return Value.boolValue(false);
-    }
-
-    return Value.boolValue(str.equalsIgnoreCase(compareStr));
+    return strings.equalsIgnoreCase(ctx);
   }
 
   // ==================== Iterator Operations ====================
 
-  /**
-   * Evaluates the {@code select()} iterator operation.
-   *
-   * <p>Filters the collection, keeping only elements that satisfy the predicate.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3,4}.select(x | x > 2)} → {@code Bag{3,4}}
-   *
-   * @param ctx The select operation node
-   * @return A filtered collection
-   */
+  /** Evaluates {@code select()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitSelectOp(VitruvOCLParser.SelectOpContext ctx) {
-    Value receiver = receiverStack.peek();
-
-    // Get iterator variables
-    List<String> iterVars = new ArrayList<>();
-    if (ctx.iteratorVars != null) {
-      for (TerminalNode id : ctx.iteratorVarList().ID()) {
-        iterVars.add(id.getText());
-      }
-    }
-
-    if (iterVars.size() == 2) {
-      return evaluateSelectTwoVars(ctx, receiver, iterVars.get(0), iterVars.get(1));
-    }
-
-    if (!iterVars.isEmpty()) {
-      return evaluateSelectSingleVar(ctx, receiver, iterVars.get(0));
-    }
-    return Value.of(List.of(), receiver.getRuntimeType());
+    return iterators.select(ctx);
   }
 
-  /**
-   * Evaluates the {@code one()} iterator operation on a collection receiver.
-   *
-   * <p>Iterates over all elements of the receiver collection, binding each element to the iterator
-   * variable in a fresh local scope, and evaluates the body expression. Returns {@code true} if and
-   * only if exactly one element satisfies the condition.
-   *
-   * <p>Example: {@code employees->one(e | e.age > 60)}
-   *
-   * @param ctx the parse tree node for the {@code one()} operation, including the iterator variable
-   *     list and body expression
-   * @return a singleton {@code BOOLEAN} value — {@code true} if exactly one element satisfies the
-   *     body condition, {@code false} otherwise; or an error value if no iterator variable is
-   *     declared
-   */
+  /** Evaluates {@code one()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitOneOp(VitruvOCLParser.OneOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<String> iterVars = new ArrayList<>();
-    for (TerminalNode id : ctx.iteratorVarList().ID()) {
-      iterVars.add(id.getText());
-    }
-    if (iterVars.isEmpty()) {
-      return Value.boolValue(false);
-    }
-
-    // Category 2 (early termination, worst case strict): pulls receiver.elementIterator()
-    // instead of getElements(), and - new - stops as soon as a *second* match is found, since
-    // "exactly one" is already disproven at that point. Previously this loop always ran to
-    // completion (no early return at all), so even after switching to elementIterator() the
-    // upstream chain would still have been fully drained; both the internal early return and the
-    // streaming receiver access are needed together for the abort to actually reduce upstream
-    // consumption.
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
-    int count = 0;
-    Iterator<OCLElement> it = receiver.elementIterator();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      // evalInScope enters/exits iterScope around exactly this element's body evaluation (not
-      // once around the whole loop): visit(ctx.body) may itself materialize an unrelated lazy
-      // Value bound elsewhere, whose own scope dance restores symbolTable.currentScope to *its*
-      // parent, not to iterScope - re-entering iterScope per element is what keeps that safe.
-      Value bodyResult =
-          evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
-      Boolean condition = bodyResult.getElements().get(0).tryGetBool();
-      if (condition != null && condition) {
-        count++;
-        if (count == 2) {
-          return Value.boolValue(false); // "exactly one" already disproven - stop early
-        }
-      }
-    }
-    return Value.boolValue(count == 1);
+    return iterators.one(ctx);
   }
 
-  /**
-   * Evaluates the {@code any()} iterator operation on a collection receiver.
-   *
-   * <p>Iterates over the elements of the receiver collection, binding each element to the iterator
-   * variable in a fresh local scope, and evaluates the body expression. Returns the first element
-   * that satisfies the condition as an {@code Optional} singleton, or an empty value if no element
-   * matches.
-   *
-   * <p>Example: {@code employees->any(e | e.age > 60)}
-   *
-   * @param ctx the parse tree node for the {@code any()} operation, including the iterator variable
-   *     list and body expression
-   * @return an {@code Optional} singleton containing the first matching element, or an empty {@code
-   *     Optional} if no element satisfies the body condition; or an error value if no iterator
-   *     variable is declared
-   */
+  /** Evaluates {@code any()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitAnyOp(VitruvOCLParser.AnyOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<String> iterVars = new ArrayList<>();
-    for (TerminalNode id : ctx.iteratorVarList().ID()) {
-      iterVars.add(id.getText());
-    }
-    if (iterVars.isEmpty()) {
-      return Value.empty(Type.optional(Type.ANY));
-    }
-
-    // Category 2 (early termination, worst case strict): pulls receiver.elementIterator()
-    // instead of getElements() so an upstream lazy chain also stops at the first match.
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
-    Iterator<OCLElement> it = receiver.elementIterator();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      Value bodyResult =
-          evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
-      Boolean condition = bodyResult.getElements().get(0).tryGetBool();
-      if (condition != null && condition) {
-        return new Value(List.of(elem), Type.optional(elemType));
-      }
-    }
-    return Value.empty(Type.singleton(elemType));
+    return iterators.any(ctx);
   }
 
-  /**
-   * Evaluates the {@code isUnique()} iterator operation on a collection receiver.
-   *
-   * <p>Iterates over all elements of the receiver collection, binding each element to the iterator
-   * variable in a fresh local scope, and evaluates the body expression. Returns {@code true} if and
-   * only if all body results are mutually distinct, using {@link OCLElement#semanticEquals} for
-   * value equality.
-   *
-   * <p>Example: {@code employees->isUnique(e | e.employeeId)}
-   *
-   * @param ctx the parse tree node for the {@code isUnique()} operation, including the iterator
-   *     variable list and body expression
-   * @return a singleton {@code BOOLEAN} value — {@code true} if all projected values are distinct,
-   *     {@code false} as soon as a duplicate is detected; or an error value if no iterator variable
-   *     is declared
-   */
+  /** Evaluates {@code isUnique()}; see {@link IteratorOperationEvaluation}. */
   @Override
-  @SuppressWarnings("java:S3776")
   public Value visitIsUniqueOp(VitruvOCLParser.IsUniqueOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<String> iterVars = new ArrayList<>();
-    for (TerminalNode id : ctx.iteratorVarList().ID()) {
-      iterVars.add(id.getText());
-    }
-    if (iterVars.isEmpty()) {
-      return Value.boolValue(true);
-    }
-
-    // Category 2 (early termination, worst case strict): pulls receiver.elementIterator()
-    // instead of getElements() so an upstream lazy chain also stops as soon as the first
-    // duplicate is found - the internal early return below was already present, but was
-    // previously moot: getElements() forced the whole upstream chain to materialize before this
-    // loop (and its early return) ever ran.
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
-    // Singleton body results (the common case, e.g. isUnique(p | p.name)) are tracked in a hash
-    // index: O(n) instead of O(n^2). Empty and multi-element results keep the pairwise scan.
-    LazyOperations.HashedBuffer seenSingletons = LazyOperations.newSemanticBuffer();
-    boolean seenEmpty = false;
-    List<Value> seen = new ArrayList<>();
-    Iterator<OCLElement> it = receiver.elementIterator();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      Value bodyResult =
-          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
-      List<OCLElement> resultElements = bodyResult.getElements();
-      if (resultElements.size() <= 1) {
-        boolean duplicate =
-            resultElements.isEmpty() ? seenEmpty : seenSingletons.contains(resultElements.get(0));
-        if (duplicate) {
-          return Value.boolValue(false);
-        }
-        if (resultElements.isEmpty()) {
-          seenEmpty = true;
-        } else {
-          seenSingletons.add(resultElements.get(0));
-        }
-        continue;
-      }
-      for (Value s : seen) {
-        if (s.getElements().size() == bodyResult.getElements().size()) {
-          boolean allEqual = true;
-          for (int i = 0; i < s.getElements().size(); i++) {
-            if (!OCLElement.semanticEquals(
-                s.getElements().get(i), bodyResult.getElements().get(i))) {
-              allEqual = false;
-              break;
-            }
-          }
-          if (allEqual) {
-            return Value.boolValue(false);
-          }
-        }
-      }
-      seen.add(bodyResult);
-    }
-    return Value.boolValue(true);
+    return iterators.isUnique(ctx);
   }
 
-  /**
-   * Evaluates the {@code sortedBy()} iterator operation on a collection receiver.
-   *
-   * <p>Projects each element of the receiver collection through the body expression to obtain a
-   * sort key, then returns the elements in ascending key order. Key comparison uses {@link
-   * OCLElement#compareRelational}. The result is a {@code Sequence} for Bag/Sequence receivers
-   * (duplicates are kept) and an {@code OrderedSet} otherwise, see {@link Type#sortedByResult}.
-   *
-   * <p>Example: {@code employees->sortedBy(e | e.lastName)}
-   *
-   * @param ctx the parse tree node for the {@code sortedBy()} operation, including the iterator
-   *     variable list and body expression
-   * @return a {@code Sequence} or {@code OrderedSet} containing all receiver elements sorted in
-   *     ascending order of their projected key values; or an empty value if no iterator variable
-   *     is declared
-   */
+  /** Evaluates {@code sortedBy()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitSortedByOp(VitruvOCLParser.SortedByOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<String> iterVars = new ArrayList<>();
-    for (TerminalNode id : ctx.iteratorVarList().ID()) {
-      iterVars.add(id.getText());
-    }
-    if (iterVars.isEmpty()) {
-      return Value.of(List.of(), Type.sortedByResult(receiver.getRuntimeType()));
-    }
-
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-
-    // iterScope MUST be constructed before touching the receiver at all - not just before this
-    // operation's own loop body runs. Draining a lazy receiver (e.g. a preceding select()) walks
-    // *its own* predicate scope(s), parented off wherever that select() was originally evaluated -
-    // an entirely different (sibling) scope from the one active right here. Each such predicate
-    // call correctly restores symbolTable's current scope to *its own* parent when it finishes,
-    // not back to whatever was active before the drain started here. So if `new
-    // LocalScope(symbolTable.getCurrentScope())` ran *after* draining, it would silently capture
-    // that unrelated sibling scope as iterScope's parent instead of the correct enclosing one -
-    // this was a real, reproducible bug (empirically confirmed by reverting this exact ordering
-    // and re-running LazyChainRegressionTest's shadowing test for sortedBy(), which then failed
-    // with the exact same wrong result as originally discovered), not just a theoretical concern.
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
-
-    // Streams the (possibly lazy) receiver via elementIterator() into exactly one local list,
-    // instead of receiver.getElements() (which would materialize-and-cache its own internal copy
-    // via Value.materialize()) followed by a *second*, separate new ArrayList<>(...) copy of that
-    // same data. sortedBy() needs its own mutable, randomly-addressable list either way (for the
-    // key-based index sort below) - draining straight from elementIterator() into that one list
-    // avoids allocating the receiver's own internal cache array for data nobody else will ever
-    // read back through `receiver` again.
-    List<OCLElement> elements = new ArrayList<>();
-    receiver.elementIterator().forEachRemaining(elements::add);
-    List<Value> keys = new ArrayList<>();
-
-    for (OCLElement elem : elements) {
-      // Keys are compared later, outside this loop, after iterSymbol has been rebound many more
-      // times - must materialize now, not defer.
-      keys.add(
-          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body)));
-    }
-
-    List<Integer> indices = new ArrayList<>();
-    for (int i = 0; i < elements.size(); i++) {
-      indices.add(i);
-    }
-    // An empty key (e.g. from 6.div(0)) is null here and sorts before every other key
-    indices.sort(
-        (a, b) ->
-            OCLElement.compareRelational(firstOrNull(keys.get(a)), firstOrNull(keys.get(b))));
-
-    List<OCLElement> sorted = new ArrayList<>();
-    for (int i : indices) {
-      sorted.add(elements.get(i));
-    }
-    return Value.of(sorted, Type.sortedByResult(receiver.getRuntimeType()));
+    return iterators.sortedBy(ctx);
   }
 
-  /**
-   * Returns the compiled pattern for {@code regex}, cached across calls, or {@code null} if the
-   * pattern is syntactically invalid (then {@code matches()} reports an evaluation error instead
-   * of aborting with an uncaught {@link java.util.regex.PatternSyntaxException}).
-   */
-  private static java.util.regex.Pattern compileCached(String regex) {
-    if (REGEX_CACHE.size() > REGEX_CACHE_LIMIT) {
-      REGEX_CACHE.clear();
-    }
-    return REGEX_CACHE
-        .computeIfAbsent(
-            regex,
-            key -> {
-              try {
-                return java.util.Optional.of(java.util.regex.Pattern.compile(key));
-              } catch (java.util.regex.PatternSyntaxException e) {
-                return java.util.Optional.empty();
-              }
-            })
-        .orElse(null);
-  }
-
-  private static OCLElement firstOrNull(Value value) {
-    List<OCLElement> elements = value.getElements();
-    return elements.isEmpty() ? null : elements.get(0);
-  }
-
-  /**
-   * Evaluates the {@code collectNested()} iterator operation on a collection receiver.
-   *
-   * <p>Projects each element of the receiver collection through the body expression and wraps each
-   * result as a {@link OCLElement.NestedCollection}, preserving the collection structure of each
-   * projected value rather than flattening it. This distinguishes {@code collectNested()} from
-   * {@code collect()}, which flattens one level. The result is always a {@code Bag}.
-   *
-   * <p>Example: {@code teams->collectNested(t | t.members)}
-   *
-   * @param ctx the parse tree node for the {@code collectNested()} operation, including the
-   *     iterator variable list and body expression
-   * @return a {@code Bag} of {@link OCLElement.NestedCollection} wrappers, one per receiver
-   *     element, each holding the unevaluated collection produced by the body expression; or an
-   *     error value if no iterator variable is declared
-   */
+  /** Evaluates {@code collectNested()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitCollectNestedOp(VitruvOCLParser.CollectNestedOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<String> iterVars = new ArrayList<>();
-    for (TerminalNode id : ctx.iteratorVarList().ID()) {
-      iterVars.add(id.getText());
-    }
-    if (iterVars.isEmpty()) {
-      return Value.of(List.of(), Type.bag(receiver.getRuntimeType().getElementType()));
-    }
-
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-    // iterScope MUST be constructed before touching the receiver at all - see visitSortedByOp's
-    // identical comment for why (draining a lazy receiver walks its own, unrelated sibling
-    // scope(s), which would otherwise get silently captured as iterScope's parent instead of the
-    // correct enclosing one). Empirically confirmed as a real bug here too (reverting this
-    // ordering makes LazyChainRegressionTest's shadowing test for collectNested() return
-    // [-3, -2, -1] instead of [1, 2, 3]).
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVars.get(0), iterVarType, iterScope);
-    // Streams the (possibly lazy) receiver via elementIterator() instead of getElements(), so a
-    // preceding select()/collect() chain is pulled one element at a time instead of forced into
-    // its own fully materialized ArrayList before this loop even starts.
-    Iterator<OCLElement> it = receiver.elementIterator();
-    List<OCLElement> results = new ArrayList<>();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      // The NestedCollection wraps bodyResult for indefinite later consumption (e.g. by a
-      // subsequent flatten()), well after iterSymbol has been rebound to later elements - must
-      // materialize now, not defer.
-      Value bodyResult =
-          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
-      results.add(new OCLElement.NestedCollection(bodyResult));
-    }
-    return Value.of(results, Type.bag(elemType));
+    return iterators.collectNested(ctx);
   }
 
-  /**
-   * Evaluates the {@code iterate()} operation on a collection receiver.
-   *
-   * <p>The most general collection iterator, from which all other iterator operations can be
-   * derived. Initializes an accumulator variable to a given seed value, then iterates over each
-   * element of the receiver collection, binding it to the iterator variable and evaluating the body
-   * expression. The body result becomes the new accumulator value after each step. Returns the
-   * final accumulator value.
-   *
-   * <p>Example: {@code numbers->iterate(n; acc : Integer = 0 | acc + n)}
-   *
-   * @param ctx the parse tree node for the {@code iterate()} operation, including the {@link
-   *     VitruvOCLParser.IterateVarSpecContext} with iterator variable, accumulator variable,
-   *     initializer expression, and body
-   * @return the final value of the accumulator after all elements have been processed
-   */
+  /** Evaluates {@code iterate()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitIterateOp(VitruvOCLParser.IterateOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    VitruvOCLParser.IterateVarSpecContext varSpec = ctx.iterateVarSpec();
-
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-
-    Value accValue = visit(varSpec.accInit);
-
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol accSymbol =
-        new VariableSymbol(varSpec.accVar.getText(), accValue.getRuntimeType(), iterScope, false);
-    iterScope.defineVariable(accSymbol);
-    accSymbol.setValue(accValue);
-    VariableSymbol iterSymbol = defineIterVar(varSpec.iterVar.getText(), iterVarType, iterScope);
-
-    // Streams the (possibly lazy) receiver via elementIterator() instead of forcing it into one
-    // fully materialized List up front: a preceding select()->collect() chain is pulled one
-    // element at a time instead of copied into its own intermediate ArrayList before iterate()
-    // even starts. This is safe because evalInScope unconditionally re-enters iterScope as its
-    // very first action - regardless of what currentScope drifted to while pulling the next
-    // element from an upstream chain with its own, unrelated scope (e.g. a preceding select()'s
-    // predicate scope, parented off wherever the receiver was originally evaluated, not off
-    // iterScope) - so nothing here ever depends on currentScope already being correct going into
-    // an iteration step. The accumulator itself is still forced to materialize each step (see
-    // evalInScopeMaterialized) - iterate() remains structurally strict, only its source streams.
-    //
-    // Verified empirically in both directions (see the LazyChainRegressionTest of an iterate body
-    // that resolves a shadowed outer variable on every step while pulling from a lazy select):
-    // streaming via elementIterator() and the previous getElements()-based materialization produce
-    // identical results for a targeted shadowing/gap construction - this change fixes no
-    // correctness bug (there wasn't one), it is a pure memory/streaming optimization.
-    Iterator<OCLElement> it = receiver.elementIterator();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      // The accumulator carries into the *next* iteration's body evaluation (e.g. `acc + n`),
-      // which rebinds iterSymbol before resolving it - must materialize now, not defer.
-      Value bodyResult =
-          evalInScopeMaterialized(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body));
-      accSymbol.setValue(bodyResult);
-    }
-    return accSymbol.getValue();
+    return iterators.iterate(ctx);
   }
 
-  /**
-   * Evaluates the {@code reject()} iterator operation.
-   *
-   * <p>Filters the collection, keeping only elements that do NOT satisfy the predicate.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3,4}.reject(x | x > 2)} → {@code Bag{1,2}}
-   *
-   * @param ctx The reject operation node
-   * @return A filtered collection
-   */
+  /** Evaluates {@code reject()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitRejectOp(VitruvOCLParser.RejectOpContext ctx) {
-    Value receiver = receiverStack.peek();
-
-    // Get iterator variables
-    List<String> iterVars = new ArrayList<>();
-    if (ctx.iteratorVars != null) {
-      for (TerminalNode id : ctx.iteratorVarList().ID()) {
-        iterVars.add(id.getText());
-      }
-    }
-
-    if (iterVars.size() == 2) {
-      return evaluateRejectTwoVars(ctx, receiver, iterVars.get(0), iterVars.get(1));
-    }
-
-    if (!iterVars.isEmpty()) {
-      return evaluateRejectSingleVar(ctx, receiver, iterVars.get(0));
-    }
-    return Value.of(List.of(), receiver.getRuntimeType());
+    return iterators.reject(ctx);
   }
 
-  /**
-   * Evaluates the {@code collect()} iterator operation.
-   *
-   * <p>Transforms each element in the collection using the provided expression.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.collect(x | x * 2)} → {@code Bag{2,4,6}}
-   *
-   * @param ctx The collect operation node
-   * @return A new collection with transformed elements
-   */
+  /** Evaluates {@code collect()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitCollectOp(VitruvOCLParser.CollectOpContext ctx) {
-    Value receiver = receiverStack.peek();
-
-    // Get iterator variables
-    List<String> iterVars = new ArrayList<>();
-    if (ctx.iteratorVars != null) {
-      for (TerminalNode id : ctx.iteratorVarList().ID()) {
-        iterVars.add(id.getText());
-      }
-    }
-
-    if (iterVars.size() == 2) {
-      return evaluateCollectTwoVars(ctx, receiver, iterVars.get(0), iterVars.get(1));
-    }
-
-    if (!iterVars.isEmpty()) {
-      return evaluateCollectSingleVar(ctx, receiver, iterVars.get(0));
-    }
-    return Value.of(List.of(), receiver.getRuntimeType());
+    return iterators.collect(ctx);
   }
 
-  /**
-   * Evaluates the {@code forAll()} iterator operation.
-   *
-   * <p>Returns true if the predicate holds for ALL elements in the collection. Short-circuits on
-   * first false.
-   *
-   * <p><b>Example:</b> {@code Bag{2,4,6}.forAll(x | x > 0)} → {@code true}
-   *
-   * @param ctx The forAll operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code forAll()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitForAllOp(VitruvOCLParser.ForAllOpContext ctx) {
-    Value receiver = receiverStack.peek();
-
-    // Get iterator variables
-    List<String> iterVars = new ArrayList<>();
-    if (ctx.iteratorVars != null) {
-      for (TerminalNode id : ctx.iteratorVarList().ID()) {
-        iterVars.add(id.getText());
-      }
-    }
-
-    if (iterVars.size() == 2) {
-      return evaluateForAllTwoVars(ctx, receiver, iterVars.get(0), iterVars.get(1));
-    }
-
-    if (!iterVars.isEmpty()) {
-      return evaluateForAllSingleVar(ctx, receiver, iterVars.get(0));
-    }
-    return Value.boolValue(true);
+    return iterators.forAll(ctx);
   }
 
-  /**
-   * Evaluates the {@code exists()} iterator operation.
-   *
-   * <p>Returns true if the predicate holds for AT LEAST ONE element in the collection.
-   * Short-circuits on first true.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.exists(x | x > 2)} → {@code true}
-   *
-   * @param ctx The exists operation node
-   * @return A singleton boolean value
-   */
+  /** Evaluates {@code exists()}; see {@link IteratorOperationEvaluation}. */
   @Override
   public Value visitExistsOp(VitruvOCLParser.ExistsOpContext ctx) {
-    Value receiver = receiverStack.peek();
-
-    // Get iterator variables
-    List<String> iterVars = new ArrayList<>();
-    if (ctx.iteratorVars != null) {
-      for (TerminalNode id : ctx.iteratorVarList().ID()) {
-        iterVars.add(id.getText());
-      }
-    }
-
-    if (iterVars.size() == 2) {
-      return evaluateExistsTwoVars(ctx, receiver, iterVars.get(0), iterVars.get(1));
-    }
-
-    if (!iterVars.isEmpty()) {
-      return evaluateExistsSingleVar(ctx, receiver, iterVars.get(0));
-    }
-    return Value.boolValue(false);
+    return iterators.exists(ctx);
   }
 
   /**
@@ -2059,7 +1022,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     // Primitive type cast: re-annotate with target element type, preserve
     // collection kind
     if (!targetElemType.isMetaclassType()) {
-      Type resultType = preserveCollectionKind(receiver.getRuntimeType(), targetElemType);
+      Type resultType = Type.preserveCollectionKind(receiver.getRuntimeType(), targetElemType);
       return Value.of(receiver.getElements(), resultType);
     }
 
@@ -2092,7 +1055,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     if (receiver.getRuntimeType().isSingleton() || !receiver.getRuntimeType().isCollection()) {
       resultType = Type.singleton(targetElemType);
     } else {
-      resultType = preserveCollectionKind(receiver.getRuntimeType(), targetElemType);
+      resultType = Type.preserveCollectionKind(receiver.getRuntimeType(), targetElemType);
     }
     return Value.of(results, resultType);
   }
@@ -2131,191 +1094,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /**
-   * Creates and registers a fresh iterator-variable symbol directly in {@code scope}'s own symbol
-   * map (bypassing {@code symbolTable.defineVariable}, which would require {@code scope} to
-   * already be the active current scope). Call this exactly once per iteration expression, then
-   * use {@link #rebindIterVar} to update the same symbol's value for each subsequent element —
-   * allocating a fresh {@link VariableSymbol} (and re-inserting it into the scope's map) per
-   * element is pure waste, since the identical name/scope/type is being re-registered every time.
-   *
-   * @param name the iterator variable's name
-   * @param iterVarType the singleton type the variable is bound at
-   * @param scope the scope to register the symbol in
-   * @return the newly registered, as-yet-unbound symbol
-   */
-  private VariableSymbol defineIterVar(String name, Type iterVarType, LocalScope scope) {
-    VariableSymbol symbol = new VariableSymbol(name, iterVarType, scope, true);
-    scope.defineVariable(symbol);
-    return symbol;
-  }
-
-  /**
-   * Rebinds an already-registered iterator-variable symbol (from {@link #defineIterVar}) to
-   * {@code elem}, without reallocating the symbol or touching its scope's variable map again.
-   */
-  private static void rebindIterVar(VariableSymbol symbol, Type iterVarType, OCLElement elem) {
-    symbol.setValue(new Value(List.of(elem), iterVarType));
-  }
-
-  /**
-   * Creates and registers both iterator-variable symbols of a two-var (Cartesian product)
-   * iteration once; use {@link #rebindTwoVars} to update their values for each subsequent pair.
-   */
-  private VariableSymbol[] defineTwoVars(
-      String var1, String var2, Type iterVarType, LocalScope scope) {
-    return new VariableSymbol[] {
-      defineIterVar(var1, iterVarType, scope), defineIterVar(var2, iterVarType, scope)
-    };
-  }
-
-  /**
-   * Rebinds both iterator-variable symbols of a two-var iteration (from {@link #defineTwoVars}).
-   */
-  private static void rebindTwoVars(
-      VariableSymbol[] symbols, Type iterVarType, OCLElement elem1, OCLElement elem2) {
-    rebindIterVar(symbols[0], iterVarType, elem1);
-    rebindIterVar(symbols[1], iterVarType, elem2);
-  }
-
-  /** Evaluates {@code body} and extracts its result as a boolean predicate (default false). */
-  private boolean evalBooleanBody(ParserRuleContext body) {
-    Value bodyResult = visit(body);
-    Boolean condition =
-        bodyResult.isEmpty() ? Boolean.FALSE : bodyResult.getElements().get(0).tryGetBool();
-    return condition != null && condition;
-  }
-
-  /**
-   * Evaluates forAll operation with a single iterator variable.
-   *
-   * <p>In each iterated element is a singleton ¡T!, so the iterator variable is bound with Value
-   * type singleton(elemType) to match the TypeCheckVisitor's normalizeToSingleton() treatment of
-   * iterator variables.
-   *
-   * @param ctx Parser context for forAll operation
-   * @param receiver Collection to check
-   * @param iterVar Name of iterator variable to bind
-   * @return Singleton Boolean: true if all elements satisfy predicate, false if any fails
-   */
-  private Value evaluateForAllSingleVar(
-      VitruvOCLParser.ForAllOpContext ctx, Value receiver, String iterVar) {
-    // Category 2 (early termination, worst case strict): pulls from receiver.elementIterator()
-    // instead of getElements(), so an upstream lazy chain (e.g. a preceding select()) is also
-    // only consumed as far as the first `false` result requires. In the success case every
-    // element must still be checked - structurally strict, matching the classification.
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
-    Iterator<OCLElement> it = receiver.elementIterator();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      if (!evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body))) {
-        return Value.boolValue(false); // short-circuit on first false result
-      }
-    }
-    return Value.boolValue(true);
-  }
-
-  /**
-   * Evaluates forAll operation with two iterator variables (Cartesian product).
-   *
-   * <p>Iterator variables are bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for forAll operation
-   * @param receiver Collection to iterate over
-   * @param var1 Name of first iterator variable
-   * @param var2 Name of second iterator variable
-   * @return Singleton Boolean: true if predicate holds for all pairs, false if any pair fails
-   */
-  private Value evaluateForAllTwoVars(
-      VitruvOCLParser.ForAllOpContext ctx, Value receiver, String var1, String var2) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    // iterScope MUST be constructed before touching the receiver at all, not just before this
-    // operation's own scope is entered: draining a lazy receiver (e.g. a preceding select())
-    // walks its own predicate scope(s), parented off wherever that select() was originally
-    // evaluated - an unrelated sibling scope. Each such predicate call correctly restores
-    // symbolTable's current scope to *its own* parent when done, not back to whatever was active
-    // before the drain started here - so constructing iterScope only *after* draining would
-    // silently capture that unrelated sibling scope as its parent instead of the correct
-    // enclosing one. (Empirically confirmed as a real, reproducible bug for sortedBy()/
-    // collectNested() when this ordering was wrong; fixed the same way here.)
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    List<OCLElement> elements = receiver.getElements();
-    symbolTable.enterScope(iterScope);
-    try {
-      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
-      for (OCLElement elem1 : elements) {
-        for (OCLElement elem2 : elements) {
-          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
-          symbolTable.enterScope(iterScope);
-          rebindTwoVars(symbols, iterVarType, elem1, elem2);
-          if (!evalBooleanBody(ctx.body)) {
-            return Value.boolValue(false); // short-circuit on first false result
-          }
-        }
-      }
-      return Value.boolValue(true);
-    } finally {
-      exitScope(iterScope);
-    }
-  }
-
-  /**
-   * Evaluates select operation with a single iterator variable.
-   *
-   * <p>Iterator variable is bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for select operation
-   * @param receiver Collection to filter
-   * @param iterVar Name of iterator variable to bind
-   * @return Collection of elements satisfying the predicate
-   */
-  private Value evaluateSelectSingleVar(
-      VitruvOCLParser.SelectOpContext ctx, Value receiver, String iterVar) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
-    Predicate<OCLElement> predicate =
-        elem ->
-            evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body));
-    OCLElementSource filtered = LazyOperations.filter(receiver.asSource(), predicate);
-    return Value.lazy(filtered, receiver.getRuntimeType());
-  }
-
-  /**
-   * Evaluates {@code body} with {@code iterSymbol} rebound to {@code elem} in {@code scope}.
-   *
-   * <p>Scope entry/exit is bracketed around exactly this one element's evaluation (not around a
-   * whole enclosing loop), so that a lazy consumer which stops pulling early (e.g. {@code exists})
-   * never leaves a dangling entered scope: each call is self-contained regardless of how many
-   * elements, if any, are pulled afterwards. {@code enterScope}/{@code exitScope} are a single
-   * field assignment each in this codebase's {@code SymbolTableImpl}, so bracketing them per
-   * element is cheap; {@code iterSymbol} itself is allocated once by the caller (via {@link
-   * #defineIterVar}) and only rebound here, avoiding a {@link VariableSymbol} allocation per
-   * element.
-   *
-   * @param scope the iterator variable's scope; may be reused across multiple elements/traversals
-   *     — see {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations} for why this is
-   *     safe with lazy chains (each element's full evaluation, including any nested lazy
-   *     sub-chains, completes before the next element is pulled)
-   * @param iterSymbol the already-registered symbol to rebind (from {@link #defineIterVar})
-   */
-  private <T> T evalInScope(
-      LocalScope scope,
-      VariableSymbol iterSymbol,
-      Type iterVarType,
-      OCLElement elem,
-      Supplier<T> body) {
-    symbolTable.enterScope(scope);
-    try {
-      rebindIterVar(iterSymbol, iterVarType, elem);
-      return body.get();
-    } finally {
-      exitScope(scope);
-    }
-  }
-
-  /**
    * Restores {@code symbolTable}'s current scope to {@code enteredScope}'s enclosing scope,
    * explicitly — <b>not</b> via the symbol table's own {@code exitScope()}, which ascends from
    * whatever scope happens to be current rather than from {@code enteredScope} specifically.
@@ -2337,523 +1115,54 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     symbolTable.enterScope(enteredScope.getEnclosingScope());
   }
 
-  /**
-   * Like {@link #evalInScope}, but additionally forces the resulting {@link Value} to materialize
-   * (and cache) before returning, while {@code scope} is still correctly bound to {@code elem}.
-   *
-   * <p>Use this whenever the result will be <em>stored</em> and consumed later — after the loop,
-   * or during a later iteration that has since rebound the same iterator-variable symbol — rather
-   * than drained immediately within the same element's evaluation. A stored, still-lazy {@link
-   * Value} would otherwise resolve its iterator variable against whatever {@code iterSymbol}
-   * happens to be bound to at the time it is eventually consumed, not the element it was actually
-   * computed for. (This is safe to skip when the result is consumed synchronously and fully within
-   * the current element's evaluation — e.g. {@code select}/{@code reject}'s predicates reduce to a
-   * plain {@code boolean} immediately, and {@code collect}'s flatMap fully drains one element's
-   * expansion before the next upstream pull rebinds the symbol.)
-   */
-  private Value evalInScopeMaterialized(
-      LocalScope scope,
-      VariableSymbol iterSymbol,
-      Type iterVarType,
-      OCLElement elem,
-      Supplier<Value> body) {
-    Value result = evalInScope(scope, iterSymbol, iterVarType, elem, body);
-    result.getElements(); // force + cache materialization now, before the symbol is rebound again
-    return result;
-  }
-
-  /**
-   * Evaluates select operation with two iterator variables (Cartesian product).
-   *
-   * <p>Iterator variables are bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for select operation
-   * @param receiver Collection to iterate over
-   * @param var1 Name of first iterator variable
-   * @param var2 Name of second iterator variable
-   * @return Collection containing both elements of each matching pair
-   */
-  private Value evaluateSelectTwoVars(
-      VitruvOCLParser.SelectOpContext ctx, Value receiver, String var1, String var2) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
-    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    List<OCLElement> elements = receiver.getElements();
-    symbolTable.enterScope(iterScope);
-    try {
-      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem1 : elements) {
-        for (OCLElement elem2 : elements) {
-          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
-          symbolTable.enterScope(iterScope);
-          rebindTwoVars(symbols, iterVarType, elem1, elem2);
-          if (evalBooleanBody(ctx.body)) {
-            results.add(elem1);
-            results.add(elem2);
-          }
-        }
-      }
-      return Value.of(results, receiver.getRuntimeType());
-    } finally {
-      exitScope(iterScope);
-    }
-  }
-
-  /**
-   * Evaluates reject operation with a single iterator variable.
-   *
-   * <p>Iterator variable is bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for reject operation
-   * @param receiver Collection to filter
-   * @param iterVar Name of iterator variable to bind
-   * @return Collection of elements NOT satisfying the predicate
-   */
-  private Value evaluateRejectSingleVar(
-      VitruvOCLParser.RejectOpContext ctx, Value receiver, String iterVar) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
-    Predicate<OCLElement> predicate =
-        elem ->
-            !evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body));
-    OCLElementSource filtered = LazyOperations.filter(receiver.asSource(), predicate);
-    return Value.lazy(filtered, receiver.getRuntimeType());
-  }
-
-  /**
-   * Evaluates reject operation with two iterator variables (Cartesian product).
-   *
-   * <p>Iterator variables are bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for reject operation
-   * @param receiver Collection to iterate over
-   * @param var1 Name of first iterator variable
-   * @param var2 Name of second iterator variable
-   * @return Collection containing both elements of each non-matching pair
-   */
-  private Value evaluateRejectTwoVars(
-      VitruvOCLParser.RejectOpContext ctx, Value receiver, String var1, String var2) {
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Type iterVarType = Type.singleton(elemType);
-    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
-    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    List<OCLElement> elements = receiver.getElements();
-    symbolTable.enterScope(iterScope);
-
-    try {
-      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem1 : elements) {
-        for (OCLElement elem2 : elements) {
-          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
-          symbolTable.enterScope(iterScope);
-          rebindTwoVars(symbols, iterVarType, elem1, elem2);
-          if (!evalBooleanBody(ctx.body)) {
-            results.add(elem1);
-            results.add(elem2);
-          }
-        }
-      }
-      return Value.of(results, receiver.getRuntimeType());
-    } finally {
-      exitScope(iterScope);
-    }
-  }
-
-  /**
-   * Evaluates collect operation with a single iterator variable.
-   *
-   * <p>Iterator variable is bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for collect operation
-   * @param receiver Collection to transform
-   * @param iterVar Name of iterator variable to bind
-   * @return Flattened collection of all transformation results
-   */
-  private Value evaluateCollectSingleVar(
-      VitruvOCLParser.CollectOpContext ctx, Value receiver, String iterVar) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
-    Function<OCLElement, Iterator<OCLElement>> expand =
-        elem ->
-            evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> visit(ctx.body))
-                .elementIterator();
-    OCLElementSource mapped = LazyOperations.flatMap(receiver.asSource(), expand);
-    Type resultType = nodeTypes.get(ctx);
-    return Value.lazy(mapped, resultType != null ? resultType : Type.set(Type.ANY));
-  }
-
-  /**
-   * Evaluates collect operation with two iterator variables (Cartesian product).
-   *
-   * <p>Iterator variables are bound as singleton ¡T! per semantics.
-   *
-   * @param ctx Parser context for collect operation
-   * @param receiver Collection to iterate over
-   * @param var1 Name of first iterator variable
-   * @param var2 Name of second iterator variable
-   * @return Flattened collection of all transformation results from each pair
-   */
-  private Value evaluateCollectTwoVars(
-      VitruvOCLParser.CollectOpContext ctx, Value receiver, String var1, String var2) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
-    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    List<OCLElement> elements = receiver.getElements();
-    symbolTable.enterScope(iterScope);
-    try {
-      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
-      List<OCLElement> results = new ArrayList<>();
-      for (OCLElement elem1 : elements) {
-        for (OCLElement elem2 : elements) {
-          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
-          symbolTable.enterScope(iterScope);
-          rebindTwoVars(symbols, iterVarType, elem1, elem2);
-          results.addAll(visit(ctx.body).getElements());
-        }
-      }
-      Type resultType = nodeTypes.get(ctx);
-      return Value.of(results, resultType != null ? resultType : Type.set(Type.ANY));
-    } finally {
-      exitScope(iterScope);
-    }
-  }
-
-  /**
-   * Evaluates exists operation with a single iterator variable.
-   *
-   * <p>Iterator variable is bound as singleton ¡T!.
-   *
-   * @param ctx Parser context for exists operation
-   * @param receiver Collection to iterate over
-   * @param iterVar Name of iterator variable to bind
-   * @return Singleton Boolean: true if any element satisfies predicate, false if none do
-   */
-  private Value evaluateExistsSingleVar(
-      VitruvOCLParser.ExistsOpContext ctx, Value receiver, String iterVar) {
-    // Category 2 (early termination, worst case strict): see evaluateForAllSingleVar.
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    VariableSymbol iterSymbol = defineIterVar(iterVar, iterVarType, iterScope);
-    Iterator<OCLElement> it = receiver.elementIterator();
-    while (it.hasNext()) {
-      OCLElement elem = it.next();
-      if (evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body))) {
-        return Value.boolValue(true); // short-circuit on first true result
-      }
-    }
-    return Value.boolValue(false);
-  }
-
-  /**
-   * Evaluates exists operation with two iterator variables (Cartesian product).
-   *
-   * <p>Iterator variables are bound as singleton ¡T!.
-   *
-   * @param ctx Parser context for exists operation
-   * @param receiver Collection to iterate over
-   * @param var1 Name of first iterator variable
-   * @param var2 Name of second iterator variable
-   * @return Singleton Boolean: true if any pair satisfies predicate, false if no pairs do
-   */
-  private Value evaluateExistsTwoVars(
-      VitruvOCLParser.ExistsOpContext ctx, Value receiver, String var1, String var2) {
-    Type iterVarType = Type.singleton(receiver.getRuntimeType().getElementType());
-    // iterScope MUST be constructed before touching the receiver - see evaluateForAllTwoVars's
-    // comment for why (empirically confirmed as a real bug when this ordering was wrong).
-    LocalScope iterScope = new LocalScope(symbolTable.getCurrentScope());
-    List<OCLElement> elements = receiver.getElements();
-    symbolTable.enterScope(iterScope);
-    try {
-      VariableSymbol[] symbols = defineTwoVars(var1, var2, iterVarType, iterScope);
-      for (OCLElement elem1 : elements) {
-        for (OCLElement elem2 : elements) {
-          // Re-enter defensively before each pair - see EvaluationVisitor#exitScope(Scope).
-          symbolTable.enterScope(iterScope);
-          rebindTwoVars(symbols, iterVarType, elem1, elem2);
-          if (evalBooleanBody(ctx.body)) {
-            return Value.boolValue(true); // short-circuit on first true result
-          }
-        }
-      }
-      return Value.boolValue(false);
-    } finally {
-      exitScope(iterScope);
-    }
-  }
-
   // ==================== Arithmetic Operations ====================
 
-  /**
-   * Evaluates the {@code includesAll()} operation on a collection receiver.
-   *
-   * <p>Checks whether the receiver collection contains every element of the argument collection,
-   * using {@link Value#includes} for element membership tests.
-   *
-   * <p>Example: {@code bag->includesAll(Set{1, 2, 3})}
-   *
-   * @param ctx the parse tree node for the {@code includesAll()} operation, including the argument
-   *     expression
-   * @return a singleton {@code BOOLEAN} value — {@code true} if every element of the argument
-   *     collection is contained in the receiver, {@code false} as soon as any element is missing
-   */
+  /** Evaluates {@code includesAll()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitIncludesAllOp(VitruvOCLParser.IncludesAllOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    return Value.boolValue(receiver.includesAll(arg));
+    return collections.includesAll(ctx);
   }
 
-  /**
-   * Evaluates the {@code excludesAll()} operation on a collection receiver.
-   *
-   * <p>Checks whether the receiver collection contains none of the elements of the argument
-   * collection, using {@link Value#includes} for membership tests.
-   *
-   * <p>Example: {@code bag->excludesAll(Set{1, 2, 3})}
-   *
-   * @param ctx the parse tree node for the {@code excludesAll()} operation, including the argument
-   *     expression
-   * @return a singleton {@code BOOLEAN} value — {@code true} if none of the argument's elements are
-   *     contained in the receiver, {@code false} as soon as any argument element is found in the
-   *     receiver
-   */
+  /** Evaluates {@code excludesAll()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitExcludesAllOp(VitruvOCLParser.ExcludesAllOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    return Value.boolValue(receiver.excludesAll(arg));
+    return collections.excludesAll(ctx);
   }
 
-  /**
-   * Evaluates the {@code count()} operation on a collection receiver.
-   *
-   * <p>Counts how many times the given singleton argument occurs in the receiver collection, using
-   * {@link OCLElement#semanticEquals} for element equality.
-   *
-   * <p>Example: {@code Bag{1, 2, 2, 3}->count(2)}
-   *
-   * @param ctx the parse tree node for the {@code count()} operation, including the argument
-   *     expression
-   * @return a singleton {@code INTEGER} value representing the number of occurrences of the
-   *     argument in the receiver collection; or an error value if the argument is not a singleton
-   */
+  /** Evaluates {@code count()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitCountOp(VitruvOCLParser.CountOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return Value.intValue(0);
-    }
-    OCLElement searchElem = arg.getElements().get(0);
-    int count = 0;
-    for (OCLElement elem : receiver.getElements()) {
-      if (OCLElement.semanticEquals(elem, searchElem)) {
-        count++;
-      }
-    }
-    return Value.intValue(count);
+    return collections.count(ctx);
   }
 
-  /**
-   * Evaluates the {@code prepend()} operation on a sequence receiver.
-   *
-   * <p>Inserts the given singleton argument at the front of the receiver collection. The result
-   * type is taken from the type-checker annotation on the node if available, falling back to the
-   * receiver's runtime type. If the result type enforces uniqueness (e.g. {@code OrderedSet}),
-   * duplicates are removed after insertion.
-   *
-   * <p>Example: {@code Sequence{2, 3}->prepend(1)} yields {@code Sequence{1, 2, 3}}
-   *
-   * @param ctx the parse tree node for the {@code prepend()} operation, including the argument
-   *     expression
-   * @return a collection of the same kind as the receiver with the argument prepended as the first
-   *     element, deduplicated if the type requires uniqueness; or an error value if the argument is
-   *     not a singleton
-   */
+  /** Evaluates {@code prepend()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitPrependOp(VitruvOCLParser.PrependOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (arg.isEmpty()) {
-      return receiver;
-    }
-    List<OCLElement> elements = new ArrayList<>();
-    elements.add(arg.getElements().get(0));
-    elements.addAll(receiver.getElements());
-    Type resultType = nodeTypes.get(ctx);
-    Value result = Value.of(elements, resultType != null ? resultType : receiver.getRuntimeType());
-    if (result.getRuntimeType().isUnique()) {
-      result = result.removeDuplicates();
-    }
-    return result;
+    return collections.prepend(ctx);
   }
 
-  /**
-   * Evaluates the {@code insertAt()} operation on a sequence receiver.
-   *
-   * <p>Inserts the given singleton element at the specified 1-based index position into the
-   * receiver collection. Valid index range is {@code [1, size+1]}. The result type is taken from
-   * the type-checker annotation on the node if available, falling back to the receiver's runtime
-   * type. If the result type enforces uniqueness (e.g. {@code OrderedSet}), duplicates are removed
-   * after insertion.
-   *
-   * <p>Example: {@code Sequence{1, 3}->insertAt(2, 2)} yields {@code Sequence{1, 2, 3}}
-   *
-   * @param ctx the parse tree node for the {@code insertAt()} operation, including the index
-   *     expression and the element argument expression
-   * @return a collection of the same kind as the receiver with the argument inserted at the given
-   *     position, deduplicated if the type requires uniqueness; or an error value if the index or
-   *     argument is not a singleton, the index is not an {@code Integer}, or the index is out of
-   *     bounds
-   */
+  /** Evaluates {@code insertAt()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitInsertAtOp(VitruvOCLParser.InsertAtOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value indexVal = visit(ctx.index);
-    Value arg = visit(ctx.arg);
-    if (indexVal.isEmpty()) {
-      return receiver;
-    }
-    Integer index = indexVal.getElements().get(0).tryGetInt();
-    if (index == null) {
-      return receiver;
-    }
-    if (arg.isEmpty()) {
-      return receiver;
-    }
-    if (index < 1 || index > receiver.size() + 1) {
-      return receiver;
-    }
-    List<OCLElement> elements = new ArrayList<>(receiver.getElements());
-    elements.add(index - 1, arg.getElements().get(0));
-    Type resultType = nodeTypes.get(ctx);
-    Value result = Value.of(elements, resultType != null ? resultType : receiver.getRuntimeType());
-    if (result.getRuntimeType().isUnique()) {
-      result = result.removeDuplicates();
-    }
-    return result;
+    return collections.insertAt(ctx);
   }
 
-  /**
-   * Evaluates the {@code symmetricDifference()} operation on a collection receiver.
-   *
-   * <p>Returns a collection containing all elements that are in either the receiver or the argument
-   * collection, but not in both — i.e. the set-theoretic symmetric difference. Membership is tested
-   * via {@link Value#includes}. The result type is taken from the type-checker annotation on the
-   * node if available, falling back to the receiver's runtime type. If the result type enforces
-   * uniqueness (e.g. {@code Set}), duplicates are removed after construction.
-   *
-   * <p>Example: {@code Set{1, 2, 3}->symmetricDifference(Set{2, 3, 4})} yields {@code Set{1, 4}}
-   *
-   * @param ctx the parse tree node for the {@code symmetricDifference()} operation, including the
-   *     argument expression
-   * @return a collection containing all elements exclusive to either operand, deduplicated if the
-   *     result type requires uniqueness
-   */
+  /** Evaluates {@code symmetricDifference()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitSymmetricDifferenceOp(VitruvOCLParser.SymmetricDifferenceOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    // Index each side once: O(n + m) instead of O(n * m) membership scans
-    LazyOperations.HashedBuffer receiverIndex =
-        LazyOperations.semanticIndex(receiver.elementIterator());
-    LazyOperations.HashedBuffer argIndex = LazyOperations.semanticIndex(arg.elementIterator());
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (!argIndex.contains(elem)) {
-        results.add(elem);
-      }
-    }
-    for (OCLElement elem : arg.getElements()) {
-      if (!receiverIndex.contains(elem)) {
-        results.add(elem);
-      }
-    }
-    Type resultType = nodeTypes.get(ctx);
-    Value result = Value.of(results, resultType != null ? resultType : receiver.getRuntimeType());
-    if (result.getRuntimeType().isUnique()) {
-      result = result.removeDuplicates();
-    }
-    return result;
+    return collections.symmetricDifference(ctx);
   }
 
-  /**
-   * Evaluates the {@code div()} integer division operation.
-   *
-   * <p>Performs truncating integer division of the receiver by the argument. Both operands must be
-   * singleton {@code INTEGER} values and the divisor must be non-zero.
-   *
-   * <p>Example: {@code 7->div(2)} yields {@code 3}
-   *
-   * <p>Follows OCL#'s "no object" propagation: an empty receiver/argument, a non-integer operand,
-   * or a zero divisor all yield an empty result rather than a numeric placeholder, so that the
-   * absence is never mistaken for a genuine computed value downstream.
-   *
-   * @param ctx the parse tree node for the {@code div()} operation, including the argument
-   *     expression
-   * @return a singleton {@code INTEGER} value representing the truncated quotient; or an empty
-   *     {@code INTEGER} value ("no object") if either operand is not a singleton {@code Integer},
-   *     or the divisor is zero
-   */
+  /** Evaluates {@code div()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitDivOp(VitruvOCLParser.DivOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (receiver.isEmpty() || arg.isEmpty()) {
-      return Value.empty(Type.INTEGER);
-    }
-    Integer left = receiver.getElements().get(0).tryGetInt();
-    Integer right = arg.getElements().get(0).tryGetInt();
-    if (left == null || right == null) {
-      return Value.empty(Type.INTEGER);
-    }
-    if (right == 0) {
-      return Value.empty(Type.INTEGER);
-    }
-    return Value.intValue(left / right);
+    return numerics.div(ctx);
   }
 
-  /**
-   * Evaluates the {@code mod()} integer remainder operation.
-   *
-   * <p>Computes the remainder of dividing the receiver by the argument using Java's {@code %}
-   * operator. Both operands must be singleton {@code INTEGER} values.
-   *
-   * <p>Example: {@code 7->mod(3)} yields {@code 1}
-   *
-   * <p>Follows OCL#'s "no object" propagation: an empty receiver/argument, a non-integer operand,
-   * or a zero divisor all yield an empty result rather than a numeric placeholder, so that the
-   * absence is never mistaken for a genuine computed value downstream.
-   *
-   * @param ctx the parse tree node for the {@code mod()} operation, including the argument
-   *     expression
-   * @return a singleton {@code INTEGER} value representing the remainder; or an empty {@code
-   *     INTEGER} value ("no object") if either operand is not a singleton {@code Integer}, or the
-   *     divisor is zero
-   */
+  /** Evaluates {@code mod()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitModOp(VitruvOCLParser.ModOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-    if (receiver.isEmpty() || arg.isEmpty()) {
-      return Value.empty(Type.INTEGER);
-    }
-    Integer left = receiver.getElements().get(0).tryGetInt();
-    Integer right = arg.getElements().get(0).tryGetInt();
-    if (left == null || right == null) {
-      return Value.empty(Type.INTEGER);
-    }
-    if (right == 0) {
-      return Value.empty(Type.INTEGER);
-    }
-    return Value.intValue(left % right);
+    return numerics.mod(ctx);
   }
 
   /**
@@ -3797,19 +2106,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Value.of(results, resultType != null ? resultType : Type.set(Type.BOOLEAN));
   }
 
-  /** Preserves collection kind of receiver while changing element type. */
-  private Type preserveCollectionKind(Type collectionType, Type newElementType) {
-    if (collectionType.isUnique() && collectionType.isOrdered()) {
-      return Type.orderedSet(newElementType);
-    } else if (collectionType.isUnique()) {
-      return Type.set(newElementType);
-    } else if (collectionType.isOrdered()) {
-      return Type.sequence(newElementType);
-    } else {
-      return Type.bag(newElementType);
-    }
-  }
-
   /**
    * Helper method to check if an element is of a given type.
    *
@@ -3821,6 +2117,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * @return true if the element is of the target type (or a subtype)
    */
   private boolean checkIsKindOf(OCLElement elem, Type targetType) {
+    if (targetType == Type.ANY) {
+      return true; // OclAny is the supertype of every value
+    }
     if (targetType == Type.INTEGER) {
       return elem.tryGetInt() != null;
     } else if (targetType == Type.STRING) {
@@ -3828,7 +2127,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     } else if (targetType == Type.BOOLEAN) {
       return elem.tryGetBool() != null;
     } else if (targetType == Type.DOUBLE) {
-      return elem.tryGetDouble() != null;
+      // Real: Integer and Float values are kinds of Real (OCL: Integer conforms to Real)
+      return elem.tryGetDouble() != null || elem.tryGetFloat() != null || elem.tryGetInt() != null;
     } else if (targetType == Type.FLOAT) {
       return elem.tryGetFloat() != null || elem.tryGetDouble() != null || elem.tryGetInt() != null;
     }
@@ -3991,34 +2291,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return new Value(elements, Type.ANY);
   }
 
-  /**
-   * Evaluates the {@code ceiling()} operation on a numeric receiver.
-   *
-   * <p>Applies {@link Math#ceil} element-wise to the receiver collection. {@code INTEGER} elements
-   * are returned unchanged; {@code FLOAT} and {@code DOUBLE} elements are rounded up to the nearest
-   * integer value and returned as {@code DOUBLE}. The result preserves the receiver's collection
-   * kind and multiplicity.
-   *
-   * <p>Example: {@code 2.3->ceiling()} yields {@code 3.0}
-   *
-   * @param ctx the parse tree node for the {@code ceiling()} operation
-   * @return a collection of the same kind as the receiver with each element rounded up to the
-   *     nearest integer value; or an error value if any element is not numeric
-   */
+  /** Evaluates {@code ceiling()}; see {@link NumericOperationEvaluation}. */
   @Override
   public Value visitCeilingOp(VitruvOCLParser.CeilingOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem);
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return numerics.ceiling(ctx);
   }
 
   /**
@@ -4080,24 +2356,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   // ==================== Advanced Collection Operations ====================
 
-  /**
-   * Evaluates the {@code lift()} operation.
-   *
-   * <p>Wraps the receiver collection in a nested collection structure. Used for creating
-   * collections of collections.
-   *
-   * <p><b>Example:</b> {@code Bag{1,2,3}.lift()} → {@code Bag{Bag{1,2,3}}}
-   *
-   * @param ctx The lift operation node
-   * @return A singleton containing the receiver as a nested collection
-   */
+  /** Evaluates {@code lift()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitLiftOp(VitruvOCLParser.LiftOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    OCLElement.NestedCollection wrapped = new OCLElement.NestedCollection(receiver);
-    Type outerType = nodeTypes.get(ctx);
-    return Value.of(
-        List.of(wrapped), outerType != null ? outerType : Type.set(receiver.getRuntimeType()));
+    return collections.lift(ctx);
   }
 
   // ==================== Literal Values ====================
@@ -4816,493 +3078,88 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Value.empty(Type.ANY);
   }
 
-  // ==================== Utility Methods ====================
-
-  /** No-op — token stream is not used by the evaluator. */
-  @SuppressWarnings("java:S1186")
-  public void setTokenStream(org.antlr.v4.runtime.TokenStream tokens) {}
-
-  /**
-   * Evaluates the {@code asSet()} conversion operation on a collection receiver.
-   *
-   * <p>Converts the receiver collection to a {@code Set} by wrapping its elements in a new {@code
-   * Set}-typed value and removing duplicates via {@link Value#removeDuplicates()}. The element type
-   * is preserved.
-   *
-   * <p>Example: {@code Sequence{1, 2, 2, 3}->asSet()} yields {@code Set{1, 2, 3}}
-   *
-   * @param ctx the parse tree node for the {@code asSet()} operation
-   * @return a {@code Set} containing the receiver's elements with duplicates removed
-   */
+  /** Evaluates {@code asSet()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAsSetOp(VitruvOCLParser.AsSetOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> elements = new ArrayList<>(receiver.getElements());
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Value result = Value.of(elements, Type.set(elemType));
-    return result.removeDuplicates();
+    return collections.asSet(ctx);
   }
 
-  /**
-   * Evaluates the {@code asBag()} conversion operation on a collection receiver.
-   *
-   * <p>Converts the receiver collection to a {@code Bag} by wrapping its elements in a new {@code
-   * Bag}-typed value. All elements including duplicates are preserved; no deduplication is
-   * performed. The element type is preserved.
-   *
-   * <p>Example: {@code Set{1, 2, 3}->asBag()} yields {@code Bag{1, 2, 3}}
-   *
-   * @param ctx the parse tree node for the {@code asBag()} operation
-   * @return a {@code Bag} containing all elements of the receiver, including duplicates
-   */
+  /** Evaluates {@code asBag()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAsBagOp(VitruvOCLParser.AsBagOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> elements = new ArrayList<>(receiver.getElements());
-    Type elemType = receiver.getRuntimeType().getElementType();
-    return Value.of(elements, Type.bag(elemType));
+    return collections.asBag(ctx);
   }
 
-  /**
-   * Evaluates the {@code asSequence()} conversion operation on a collection receiver.
-   *
-   * <p>Converts the receiver collection to a {@code Sequence} by wrapping its elements in a new
-   * {@code Sequence}-typed value. Element order and duplicates are preserved as-is from the
-   * receiver. The element type is preserved.
-   *
-   * <p>Example: {@code Set{3, 1, 2}->asSequence()} yields {@code Sequence{3, 1, 2}}
-   *
-   * @param ctx the parse tree node for the {@code asSequence()} operation
-   * @return a {@code Sequence} containing all elements of the receiver in their current order,
-   *     including any duplicates
-   */
+  /** Evaluates {@code asSequence()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAsSequenceOp(VitruvOCLParser.AsSequenceOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> elements = new ArrayList<>(receiver.getElements());
-    Type elemType = receiver.getRuntimeType().getElementType();
-    return Value.of(elements, Type.sequence(elemType));
+    return collections.asSequence(ctx);
   }
 
-  /**
-   * Evaluates the {@code asOrderedSet()} conversion operation on a collection receiver.
-   *
-   * <p>Converts the receiver collection to an {@code OrderedSet} by wrapping its elements in a new
-   * {@code OrderedSet}-typed value and removing duplicates via {@link Value#removeDuplicates()},
-   * preserving the relative order of first occurrences. The element type is preserved.
-   *
-   * <p>Example: {@code Sequence{3, 1, 2, 1}->asOrderedSet()} yields {@code OrderedSet{3, 1, 2}}
-   *
-   * @param ctx the parse tree node for the {@code asOrderedSet()} operation
-   * @return an {@code OrderedSet} containing the receiver's elements in their original order with
-   *     duplicates removed
-   */
+  /** Evaluates {@code asOrderedSet()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAsOrderedSetOp(VitruvOCLParser.AsOrderedSetOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> elements = new ArrayList<>(receiver.getElements());
-    Type elemType = receiver.getRuntimeType().getElementType();
-    Value result = Value.of(elements, Type.orderedSet(elemType));
-    return result.removeDuplicates();
+    return collections.asOrderedSet(ctx);
   }
 
-  /**
-   * Evaluates the {@code at()} operation on a String or ordered collection receiver.
-   *
-   * <p>Retrieves the element at the given 1-based index. Two receiver kinds are supported:
-   *
-   * <ul>
-   *   <li><b>String</b> — returns the character at position {@code index} as a singleton {@code
-   *       STRING}. Valid range: {@code [1, length]}.
-   *   <li><b>Ordered collection</b> — returns the element at position {@code index} as a singleton
-   *       of the collection's element type. Valid range: {@code [1, size]}.
-   * </ul>
-   *
-   * <p>Example: {@code Sequence{10, 20, 30}->at(2)} yields {@code 20}<br>
-   * Example: {@code 'hello'->at(1)} yields {@code 'h'}
-   *
-   * @param ctx the parse tree node for the {@code at()} operation, including the index argument
-   *     expression
-   * @return a singleton value containing the element or character at the given position; or an
-   *     error value if the index is not a singleton {@code Integer}, or the index is out of bounds
-   *     for the receiver
-   */
+  /** Evaluates {@code at()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitAtOp(VitruvOCLParser.AtOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value indexVal = visit(ctx.index);
-
-    if (indexVal.isEmpty()) {
-      return Value.empty(Type.ANY);
-    }
-    Integer index = indexVal.getElements().get(0).tryGetInt();
-    if (index == null) {
-      return Value.empty(Type.ANY);
-    }
-
-    // String case
-    String str = receiver.isEmpty() ? null : receiver.getElements().get(0).tryGetString();
-    if (str != null) {
-      if (index < 1 || index > str.length()) {
-        return Value.empty(Type.STRING);
-      }
-      return Value.stringValue(String.valueOf(str.charAt(index - 1)));
-    }
-
-    // Collection case (1-based)
-    if (index < 1 || index > receiver.size()) {
-      return Value.empty(Type.ANY);
-    }
-    OCLElement elem = receiver.getElements().get(index - 1);
-    Type elemType = receiver.getRuntimeType().getElementType();
-    return new Value(List.of(elem), Type.singleton(elemType));
+    return collections.at(ctx);
   }
 
-  /**
-   * Evaluates the {@code subSequence()} operation on an ordered collection receiver.
-   *
-   * <p>Returns a contiguous sub-collection from the receiver using 1-based, inclusive bounds {@code
-   * [start, end]}. The result preserves the receiver's collection kind and element type.
-   *
-   * <p>Example: {@code Sequence{10, 20, 30, 40}->subSequence(2, 3)} yields {@code Sequence{20, 30}}
-   *
-   * @param ctx the parse tree node for the {@code subSequence()} operation, including the start and
-   *     end bound expressions
-   * @return a collection of the same kind as the receiver containing the elements at positions
-   *     {@code start} through {@code end} inclusive; or an error value if either bound is not a
-   *     singleton {@code Integer}, or the bounds are out of range ({@code start < 1}, {@code end >
-   *     size}, or {@code start > end})
-   */
+  /** Evaluates {@code subSequence()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitSubSequenceOp(VitruvOCLParser.SubSequenceOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value startVal = visit(ctx.start);
-    Value endVal = visit(ctx.end);
-
-    if (startVal.isEmpty() || endVal.isEmpty()) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-    if (startVal.size() != 1 || endVal.size() != 1) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-
-    Integer start = startVal.getElements().get(0).tryGetInt();
-    Integer end = endVal.getElements().get(0).tryGetInt();
-
-    if (start == null || end == null) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-    if (start < 1 || end > receiver.size() || start > end) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-
-    // 1-based, inclusive on both ends
-    List<OCLElement> sub = receiver.getElements().subList(start - 1, end);
-    return Value.of(new ArrayList<>(sub), receiver.getRuntimeType());
+    return collections.subSequence(ctx);
   }
 
-  /**
-   * Evaluates the {@code characters()} operation on a String receiver.
-   *
-   * <p>Splits the receiver string into its individual characters and returns them as a {@code
-   * Sequence<String>}, preserving order and allowing duplicates.
-   *
-   * <p>Example: {@code 'hello'->characters()} yields {@code Sequence{'h','e','l','l','o'}}
-   *
-   * @param ctx the parse tree node for the {@code characters()} operation
-   * @return a {@code Sequence<String>} of single-character strings in source order; or an error
-   *     value if the receiver is not a singleton {@code String}
-   */
+  /** Evaluates {@code characters()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitCharactersOp(VitruvOCLParser.CharactersOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.of(List.of(), Type.sequence(Type.STRING));
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.of(List.of(), Type.sequence(Type.STRING));
-    }
-    List<OCLElement> chars = new ArrayList<>();
-    for (char c : str.toCharArray()) {
-      chars.add(new OCLElement.StringValue(String.valueOf(c)));
-    }
-    return Value.of(chars, Type.sequence(Type.STRING));
+    return strings.characters(ctx);
   }
 
-  /**
-   * Evaluates the {@code tokenize()} operation on a String receiver.
-   *
-   * <p>Splits the receiver string on each literal occurrence of the delimiter string, returning the
-   * resulting tokens as a {@code Sequence<String>}. The delimiter is treated as a plain substring
-   * (not a regex) via {@link java.util.regex.Pattern#quote}. Trailing empty tokens are preserved
-   * ({@code limit = -1}). If the delimiter is empty, the receiver string is returned as a
-   * single-element sequence.
-   *
-   * <p>Example: {@code 'a,b,,c'->tokenize(',')} yields {@code Sequence{'a','b','','c'}}
-   *
-   * @param ctx the parse tree node for the {@code tokenize()} operation, including the delimiter
-   *     argument expression
-   * @return a {@code Sequence<String>} of tokens produced by splitting on the delimiter; or an
-   *     error value if the receiver or delimiter is not a singleton {@code String}
-   */
+  /** Evaluates {@code tokenize()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitTokenizeOp(VitruvOCLParser.TokenizeOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.of(List.of(), Type.sequence(Type.STRING));
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.of(List.of(), Type.sequence(Type.STRING));
-    }
-    Value argVal = visit(ctx.arg);
-    if (argVal.isEmpty()) {
-      return Value.of(List.of(new OCLElement.StringValue(str)), Type.sequence(Type.STRING));
-    }
-    String delimiter = argVal.getElements().get(0).tryGetString();
-    if (delimiter == null) {
-      return Value.of(List.of(new OCLElement.StringValue(str)), Type.sequence(Type.STRING));
-    }
-    List<OCLElement> tokens = new ArrayList<>();
-    if (delimiter.isEmpty()) {
-      tokens.add(new OCLElement.StringValue(str));
-    } else {
-      for (String token : str.split(java.util.regex.Pattern.quote(delimiter), -1)) {
-        tokens.add(new OCLElement.StringValue(token));
-      }
-    }
-    return Value.of(tokens, Type.sequence(Type.STRING));
+    return strings.tokenize(ctx);
   }
 
-  /**
-   * Evaluates the {@code intersection()} operation on a collection receiver.
-   *
-   * <p>Category 3 (lazy, incremental buffer reconciliation): delegates to {@link
-   * Value#intersection}, which pulls from both sides in alternation via {@link
-   * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#intersect} instead of fully
-   * materializing either side first. The result type is taken from the type-checker annotation on
-   * the node if available, falling back to the receiver's runtime type. If the result type
-   * enforces uniqueness (e.g. {@code Set}), duplicates are removed afterward (also lazily, see
-   * {@link Value#removeDuplicates}).
-   *
-   * <p>Example: {@code Set{1, 2, 3}->intersection(Set{2, 3, 4})} yields {@code Set{2, 3}}
-   *
-   * <p><b>Note:</b> the alternating dual-buffer algorithm matches elements pairwise (multiset
-   * intersection), which is equivalent to the receiver-membership-filter semantics used here
-   * previously whenever at least one side has no internal duplicates — true for every {@code
-   * Set}/{@code OrderedSet} receiver or argument, i.e. the standard case. It can differ from that
-   * prior behavior for a {@code Bag}/{@code Sequence} receiver <em>and</em> argument that both
-   * contain duplicates of the same value; a non-unique result type is then no longer guaranteed to
-   * reproduce every receiver occurrence that has some match, only up to the argument's matching
-   * multiplicity. A unique ({@code Set}/{@code OrderedSet}) result type is unaffected either way.
-   *
-   * @param ctx the parse tree node for the {@code intersection()} operation, including the argument
-   *     expression
-   * @return a collection containing all elements present in both the receiver and the argument,
-   *     deduplicated if the result type requires uniqueness
-   */
+  /** Evaluates {@code intersection()}; see {@link CollectionOperationEvaluation}. */
   @Override
   public Value visitIntersectionOp(VitruvOCLParser.IntersectionOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Value arg = visit(ctx.arg);
-
-    Type resultType = nodeTypes.get(ctx);
-    Value result =
-        Value.lazy(
-            receiver.intersection(arg).asSource(),
-            resultType != null ? resultType : receiver.getRuntimeType());
-
-    if (result.getRuntimeType().isUnique()) {
-      result = result.removeDuplicates();
-    }
-    return result;
+    return collections.intersection(ctx);
   }
 
-  /**
-   * Evaluates the {@code toInteger()} conversion operation on a String receiver.
-   *
-   * <p>Parses the receiver string as a decimal integer using {@link Integer#parseInt}, trimming
-   * leading and trailing whitespace before parsing. The result is returned as an {@code INTEGER}
-   * singleton.
-   *
-   * <p>Example: {@code ' 42 '->toInteger()} yields {@code 42}
-   *
-   * @param ctx the parse tree node for the {@code toInteger()} operation
-   * @return a singleton {@code INTEGER} value parsed from the receiver string; or an empty {@code
-   *     INTEGER} value ("no object") if the receiver is not a singleton {@code String} or the
-   *     string cannot be parsed as a decimal integer
-   */
+  /** Evaluates {@code toInteger()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitToIntegerOp(VitruvOCLParser.ToIntegerOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.INTEGER);
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.empty(Type.INTEGER);
-    }
-    try {
-      return Value.intValue(Integer.parseInt(str.trim()));
-    } catch (NumberFormatException e) {
-      return Value.empty(Type.INTEGER); // unparsable: "no object", like div by zero
-    }
+    return strings.toInteger(ctx);
   }
 
-  /**
-   * Evaluates the {@code toReal()} conversion operation on a String receiver.
-   *
-   * <p>Parses the receiver string as a floating-point number using {@link Double#parseDouble},
-   * trimming leading and trailing whitespace before parsing. The result is returned as a {@code
-   * DOUBLE} singleton.
-   *
-   * <p>Example: {@code ' 3.14 '->toReal()} yields {@code 3.14}
-   *
-   * @param ctx the parse tree node for the {@code toReal()} operation
-   * @return a singleton {@code DOUBLE} value parsed from the receiver string; or an empty {@code
-   *     DOUBLE} value ("no object") if the receiver is not a singleton {@code String} or the
-   *     string cannot be parsed as a floating-point number
-   */
+  /** Evaluates {@code toReal()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitToRealOp(VitruvOCLParser.ToRealOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.empty(Type.DOUBLE);
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.empty(Type.DOUBLE);
-    }
-    try {
-      return Value.doubleValue(Double.parseDouble(str.trim()));
-    } catch (NumberFormatException e) {
-      return Value.empty(Type.DOUBLE); // unparsable: "no object", like div by zero
-    }
+    return strings.toReal(ctx);
   }
 
-  /**
-   * Evaluates the {@code substituteAll()} operation on a String receiver.
-   *
-   * <p>Replaces every literal occurrence of the pattern string within the receiver with the
-   * replacement string using {@link String#replace}. No regex interpretation is applied — the
-   * pattern is matched as a plain substring. If the pattern is not found, the receiver string is
-   * returned unchanged.
-   *
-   * <p>Example: {@code 'abcabc'->substituteAll('b', 'X')} yields {@code 'aXcaXc'}
-   *
-   * @param ctx the parse tree node for the {@code substituteAll()} operation, including the pattern
-   *     and replacement argument expressions
-   * @return a singleton {@code STRING} value with all occurrences of the pattern replaced, or the
-   *     original string if the pattern is not found; or an error value if the receiver, pattern, or
-   *     replacement is not a singleton {@code String}
-   */
+  /** Evaluates {@code substituteAll()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitSubstituteAllOp(VitruvOCLParser.SubstituteAllOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return receiver;
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return receiver;
-    }
-    Value patternVal = visit(ctx.pattern);
-    Value replacementVal = visit(ctx.replacement);
-    if (patternVal.isEmpty() || replacementVal.isEmpty()) {
-      return receiver;
-    }
-    String pattern = patternVal.getElements().get(0).tryGetString();
-    String replacement = replacementVal.getElements().get(0).tryGetString();
-    if (pattern == null || replacement == null) {
-      return receiver;
-    }
-    return Value.stringValue(str.replace(pattern, replacement));
+    return strings.substituteAll(ctx);
   }
 
-  /**
-   * Evaluates the {@code substituteFirst()} operation on a String receiver.
-   *
-   * <p>Replaces the first literal occurrence of the pattern string within the receiver with the
-   * replacement string. Unlike {@code replaceAll()}, no regex interpretation is applied — the
-   * pattern is matched as a plain substring via {@link String#indexOf}. If the pattern is not
-   * found, the receiver string is returned unchanged.
-   *
-   * <p>Example: {@code 'abcabc'->substituteFirst('b', 'X')} yields {@code 'aXcabc'}
-   *
-   * @param ctx the parse tree node for the {@code substituteFirst()} operation, including the
-   *     pattern and replacement argument expressions
-   * @return a singleton {@code STRING} value with the first occurrence of the pattern replaced, or
-   *     the original string if the pattern is not found; or an error value if the receiver,
-   *     pattern, or replacement is not a singleton {@code String}
-   */
+  /** Evaluates {@code substituteFirst()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitSubstituteFirstOp(VitruvOCLParser.SubstituteFirstOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return receiver;
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return receiver;
-    }
-    Value patternVal = visit(ctx.pattern);
-    Value replacementVal = visit(ctx.replacement);
-    if (patternVal.isEmpty() || replacementVal.isEmpty()) {
-      return receiver;
-    }
-    String pattern = patternVal.getElements().get(0).tryGetString();
-    String replacement = replacementVal.getElements().get(0).tryGetString();
-    if (pattern == null || replacement == null) {
-      return receiver;
-    }
-    int idx = str.indexOf(pattern);
-    if (idx == -1) {
-      return Value.stringValue(str);
-    }
-    return Value.stringValue(
-        str.substring(0, idx) + replacement + str.substring(idx + pattern.length()));
+    return strings.substituteFirst(ctx);
   }
 
-  /**
-   * Evaluates the {@code matches()} operation on a String receiver.
-   *
-   * <p>Tests whether the receiver string matches the given regular expression pattern using {@link
-   * String#matches}, which requires the pattern to match the entire string. Both the receiver and
-   * the argument must be singleton {@code String} values.
-   *
-   * <p>Example: {@code 'hello123'->matches('[a-z]+\\d+')} yields {@code true}
-   *
-   * @param ctx the parse tree node for the {@code matches()} operation, including the pattern
-   *     argument expression
-   * @return a singleton {@code BOOLEAN} value — {@code true} if the receiver string matches the
-   *     entire pattern, {@code false} otherwise; or an error value if the receiver or argument is
-   *     not a singleton {@code String}
-   */
+  /** Evaluates {@code matches()}; see {@link StringOperationEvaluation}. */
   @Override
   public Value visitMatchesOp(VitruvOCLParser.MatchesOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    if (receiver.isEmpty()) {
-      return Value.boolValue(false);
-    }
-    String str = receiver.getElements().get(0).tryGetString();
-    if (str == null) {
-      return Value.boolValue(false);
-    }
-    Value argVal = visit(ctx.arg);
-    if (argVal.isEmpty()) {
-      return Value.boolValue(false);
-    }
-    String pattern = argVal.getElements().get(0).tryGetString();
-    if (pattern == null) {
-      return Value.boolValue(false);
-    }
-    java.util.regex.Pattern compiled = compileCached(pattern);
-    if (compiled == null) {
-      reportError(ctx, "Invalid regular expression in matches(): " + pattern);
-      return Value.empty(Type.ERROR);
-    }
-    return Value.boolValue(compiled.matcher(str).matches());
+    return strings.matches(ctx);
   }
 
   @Override
@@ -5469,5 +3326,33 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     }
     // No filter: plain bidirectional correspondence check
     return checkCorrespondence(selfObject, elemObject);
+  }
+
+  /** Exposes this visitor's state to the operation-family evaluators. */
+  private final class EvaluationContext implements OperationEvaluationContext {
+    @Override
+    public Value receiver() {
+      return receiverStack.peek();
+    }
+
+    @Override
+    public Value evaluate(ParserRuleContext expression) {
+      return visit(expression);
+    }
+
+    @Override
+    public void error(ParserRuleContext ctx, String message) {
+      reportError(ctx, message);
+    }
+
+    @Override
+    public Type nodeType(ParserRuleContext ctx) {
+      return nodeTypes.get(ctx);
+    }
+
+    @Override
+    public SymbolTable symbolTable() {
+      return symbolTable;
+    }
   }
 }

@@ -27,6 +27,8 @@ import org.eclipse.emf.ecore.EcoreFactory;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 
@@ -186,6 +188,55 @@ class CorrectnessRegressionTest extends DummyTestSpecification {
     void validConversionsStillWork() {
       assertSingleInt(compile("\" 42 \".toInteger()"), 42);
       assertSingleDouble(compile("\"0\".toReal()"), 0.0);
+    }
+  }
+
+  @Nested
+  class TypeTests {
+
+    @Test
+    void everyValueIsKindOfOclAny() {
+      assertSingleBool(compile("1.5.oclIsKindOf(OclAny)"), true);
+      assertSingleBool(compile("1.oclIsKindOf(OclAny)"), true);
+      assertSingleBool(compile("\"a\".oclIsKindOf(OclAny)"), true);
+      assertSingleBool(compile("true.oclIsKindOf(OclAny)"), true);
+    }
+
+    @Test
+    void noValueHasExactTypeOclAny() {
+      assertSingleBool(compile("1.5.oclIsTypeOf(OclAny)"), false);
+    }
+
+    @Test
+    void integerIsKindOfRealButNotTypeOfReal() {
+      // Integer conforms to Real (as in the type checker's conformance rules)
+      assertSingleBool(compile("1.oclIsKindOf(Real)"), true);
+      assertSingleBool(compile("1.oclIsTypeOf(Real)"), false);
+    }
+
+    @Test
+    void realIsNotKindOfInteger() {
+      assertSingleBool(compile("1.5.oclIsKindOf(Integer)"), false);
+    }
+
+    /** Every primitive spelling resolves, both as keyword and as plain type name. */
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        value = {
+          "Real | 1.5",
+          "Double | 1.5",
+          "Float | 1.5",
+          "Integer | 1",
+          "UnlimitedNatural | 1",
+          "String | \"a\"",
+          "ID | \"a\"",
+          "Boolean | true",
+          "OclAny | 1.5"
+        })
+    void primitiveTypeNamesResolve(String typeName, String value) {
+      assertSize(compile("let x : " + typeName + " = " + value + " in x"), 1);
+      assertSize(compile("Sequence{" + value + "}.oclAsType(Sequence(" + typeName + "))"), 1);
     }
   }
 

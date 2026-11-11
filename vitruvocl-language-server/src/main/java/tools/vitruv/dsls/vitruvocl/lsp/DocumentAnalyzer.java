@@ -26,6 +26,7 @@ import org.eclipse.lsp4j.Range;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;

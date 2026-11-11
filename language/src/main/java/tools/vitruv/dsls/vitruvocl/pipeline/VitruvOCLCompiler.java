@@ -114,16 +114,6 @@ public class VitruvOCLCompiler {
   }
 
   /**
-   * Compiles constraint from path (treating path as string source).
-   *
-   * @param sourcePath Path object used as constraint source
-   * @return Evaluation result, or null if any pass fails
-   */
-  public Value compile(Path sourcePath) {
-    return runPipeline(CharStreams.fromString(sourcePath.toString()));
-  }
-
-  /**
    * Compiles constraint from configured file path.
    *
    * @return Validation result with errors (evaluation results not captured)

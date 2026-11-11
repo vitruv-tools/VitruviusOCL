@@ -138,6 +138,18 @@ public abstract class Type {
   }
 
   /**
+   * Creates an OrderedSet type &lt;T&gt; with explicit cardinality bounds.
+   *
+   * @param elementType The type of elements in the ordered set
+   * @param lowerBound minimum number of elements (0 if unknown)
+   * @param upperBound maximum number of elements, or {@link #UNBOUNDED}
+   * @return A collection type with ORDERED_SET multiplicity and the given bounds
+   */
+  public static Type orderedSet(Type elementType, int lowerBound, int upperBound) {
+    return new CollectionType(elementType, Multiplicity.ORDERED_SET, lowerBound, upperBound);
+  }
+
+  /**
    * Result type of {@code sortedBy} on a receiver of type {@code receiverType}, as in the OCL
    * standard: a non-unique collection (Bag, Sequence) keeps its duplicates and yields a {@code
    * Sequence}; every other receiver (Set, OrderedSet, singleton, optional) yields an {@code
@@ -153,15 +165,44 @@ public abstract class Type {
   }
 
   /**
-   * Creates an OrderedSet type &lt;T&gt; with explicit cardinality bounds.
+   * Maps a primitive type keyword of the grammar ({@code primitiveTypeCS}) to its type.
    *
-   * @param elementType The type of elements in the ordered set
-   * @param lowerBound minimum number of elements (0 if unknown)
-   * @param upperBound maximum number of elements, or {@link #UNBOUNDED}
-   * @return A collection type with ORDERED_SET multiplicity and the given bounds
+   * <p>{@code ID} and {@code UnlimitedNatural} are keywords, so they only ever reach this table,
+   * never {@link #fromPrimitiveTypeName}.
+   *
+   * @param keyword the keyword text, e.g. {@code "Real"}
+   * @return the primitive type, or {@code null} if {@code keyword} is not a primitive keyword
    */
-  public static Type orderedSet(Type elementType, int lowerBound, int upperBound) {
-    return new CollectionType(elementType, Multiplicity.ORDERED_SET, lowerBound, upperBound);
+  public static Type fromPrimitiveKeyword(String keyword) {
+    return switch (keyword) {
+      case "Boolean" -> BOOLEAN;
+      case "Integer", "UnlimitedNatural" -> INTEGER;
+      case "Real" -> DOUBLE;
+      case "String", "ID" -> STRING;
+      case "OclAny" -> ANY;
+      default -> null;
+    };
+  }
+
+  /**
+   * Maps a primitive type written as a type name ({@code typeNameExpCS}, or a name looked up in the
+   * symbol table) to its type. Besides the keyword spellings this accepts {@code Double} and {@code
+   * Float}, which are ordinary identifiers in the grammar. {@code ID} and {@code UnlimitedNatural}
+   * are deliberately absent: here they would shadow metaclasses of that name.
+   *
+   * @param name the type name, e.g. {@code "Double"}
+   * @return the primitive type, or {@code null} if {@code name} names no primitive type
+   */
+  public static Type fromPrimitiveTypeName(String name) {
+    return switch (name) {
+      case "Integer" -> INTEGER;
+      case "Double", "Real" -> DOUBLE;
+      case "Float" -> FLOAT;
+      case "String" -> STRING;
+      case "Boolean" -> BOOLEAN;
+      case "OclAny" -> ANY;
+      default -> null;
+    };
   }
 
   /**
@@ -1052,5 +1093,63 @@ public abstract class Type {
       result = 31 * result + getElementType().hashCode();
     }
     return result;
+  }
+
+  /**
+   * Builds a collection type from explicit unique/ordered flags: {@code (true, true)} → OrderedSet,
+   * {@code (true, false)} → Set, {@code (false, true)} → Sequence, {@code (false, false)} → Bag.
+   *
+   * @param unique whether the resulting collection should be duplicate-free
+   * @param ordered whether the resulting collection should be ordered
+   * @param elementType the element type of the resulting collection
+   * @return the collection type for the given Ctype combination
+   */
+  public static Type collectionKindFor(boolean unique, boolean ordered, Type elementType) {
+    if (unique && ordered) {
+      return orderedSet(elementType);
+    } else if (unique) {
+      return set(elementType);
+    } else if (ordered) {
+      return sequence(elementType);
+    } else {
+      return bag(elementType);
+    }
+  }
+
+  /**
+   * Returns a collection of the same kind (unique/ordered properties) as {@code collectionType}
+   * with element type {@code newElementType}.
+   *
+   * @param collectionType the original collection type
+   * @param newElementType the new element type
+   * @return a collection of the same kind with the new element type
+   */
+  public static Type preserveCollectionKind(Type collectionType, Type newElementType) {
+    return collectionKindFor(collectionType.isUnique(), collectionType.isOrdered(), newElementType);
+  }
+
+  /**
+   * Checks conformance after the singleton/optional unwrapping rules for variable bindings.
+   *
+   * <p>The rules are:
+   *
+   * <ul>
+   *   <li>{@code !cad::Box!} conforms to {@code cad::Box} (oclAsType result in let)
+   *   <li>{@code cad::Box} conforms to {@code !cad::Box!} (bare type to singleton decl)
+   *   <li>{@code ?Any?} conforms to {@code cad::Coordinate} (null comparison context)
+   * </ul>
+   *
+   * @param initType the type of the initializer expression
+   * @param declared the declared type of the variable
+   * @return true if initType conforms to declared after unwrapping rules
+   */
+  public static boolean conformsWithUnwrapping(Type initType, Type declared) {
+    if (initType.isSingleton() && initType.getElementType().isConformantTo(declared)) {
+      return true;
+    }
+    if (declared.isSingleton() && initType.isConformantTo(declared.getElementType())) {
+      return true;
+    }
+    return initType.isOptional() && initType.getElementType().isConformantTo(declared);
   }
 }

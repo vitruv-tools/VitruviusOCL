@@ -197,7 +197,6 @@ class StringOperationsTest extends DummyTestSpecification {
 
     EvaluationVisitor evaluator =
         new EvaluationVisitor(symbolTable, dummySpec, errors, typeChecker.getNodeTypes());
-    evaluator.setTokenStream(tokens);
     Value result = evaluator.visit(tree);
 
     if (evaluator.hasErrors()) {

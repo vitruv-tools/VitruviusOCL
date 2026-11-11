@@ -500,21 +500,7 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
       return Type.ANY;
     }
 
-    // Check primitive types first
-    Type primitiveType = switch (typeName) {
-      case "Integer" -> Type.INTEGER;
-      case "String" -> Type.STRING;
-      case "Boolean" -> Type.BOOLEAN;
-      case "Real", "Double" -> Type.DOUBLE;
-      case "OclAny" -> Type.ANY;
-      default -> null;
-    };
-
-    if (primitiveType != null) {
-      return primitiveType;
-    }
-
-    // Lookup metamodel type in TypeRegistry
+    // Primitive names (Double, Float, ...) and metamodel types; see SymbolTable#lookupType
     Type resolvedType = symbolTable.lookupType(typeName);
     return (resolvedType != null) ? resolvedType : Type.ANY;
   }
@@ -552,17 +538,8 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
    * @return The primitive Type constant
    */
   private Type resolvePrimitiveType(VitruvOCLParser.PrimitiveTypeCSContext ctx) {
-    String typeName = ctx.getText();
-    return switch (typeName) {
-      case "Boolean" -> Type.BOOLEAN;
-      case "Integer" -> Type.INTEGER;
-      case "Real" -> Type.DOUBLE;
-      case "String" -> Type.STRING;
-      case "ID" -> Type.STRING;
-      case "UnlimitedNatural" -> Type.INTEGER;
-      case "OclAny" -> Type.ANY;
-      default -> Type.ANY;
-    };
+    Type primitiveType = Type.fromPrimitiveKeyword(ctx.getText());
+    return primitiveType != null ? primitiveType : Type.ANY;
   }
 
   /**
