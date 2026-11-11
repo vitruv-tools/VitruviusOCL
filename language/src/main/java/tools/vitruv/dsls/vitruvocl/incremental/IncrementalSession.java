@@ -118,9 +118,41 @@ public final class IncrementalSession implements AutoCloseable {
     this.distinctConstraints = List.copyOf(new LinkedHashSet<>(constraints));
     this.wrapper = wrapper;
     this.config = config;
-    this.executor = config.threads() > 1 ? Executors.newFixedThreadPool(config.threads()) : null;
+    this.executor =
+        config.threads() > 1
+            ? Executors.newFixedThreadPool(config.threads(), IncrementalSession::workerThread)
+            : null;
     this.reverseIndex = new ReverseIndex(wrapper::getAllRootObjects);
     this.resolver = new RelevantInstanceResolver(() -> evaluationWrapper, reverseIndex);
+  }
+
+  /**
+   * Creates a session and performs its initial evaluation ({@link #initialize()}). If that fails,
+   * the session is closed (its worker threads stopped) before the failure is rethrown.
+   *
+   * @return the initialised session; close it when done
+   */
+  public static IncrementalSession open(
+      List<String> constraints, MetamodelWrapperInterface wrapper, IncrementalConfig config) {
+    IncrementalSession session = new IncrementalSession(constraints, wrapper, config);
+    try {
+      session.initialize();
+      return session;
+    } catch (RuntimeException | Error e) {
+      try {
+        session.close();
+      } catch (RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
+  }
+
+  /** Daemon worker, so that a session that is never closed cannot keep the JVM alive. */
+  private static Thread workerThread(Runnable task) {
+    Thread thread = new Thread(task, "vitruvocl-incremental-worker");
+    thread.setDaemon(true);
+    return thread;
   }
 
   /** The configuration this session runs with. */

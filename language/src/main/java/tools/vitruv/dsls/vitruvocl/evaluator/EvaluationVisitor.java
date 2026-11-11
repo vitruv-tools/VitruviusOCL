@@ -2714,11 +2714,13 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * is evaluated can report a runtime error or throw because of the constraint's own content.
    *
    * <p>The evaluator reports runtime errors only for comparisons whose operands are not singletons
-   * at runtime and for unbound variables (excluded by the type checker), and throws for integer
+   * at runtime, for invalid regular expressions in {@code matches()} and for unbound variables
+   * (excluded by the type checker), and throws for integer
    * literals that do not fit an {@code int} and for {@code substring} bounds that are no integers.
    * The check covers the <em>whole constraint</em>, not just {@code operand}, because lazily
    * evaluated {@code let} values from outside can be forced inside it. It requires: no {@code
-   * append}/{@code iterate} (result types not trusted, as in the incremental analysis), no node
+   * append}/{@code iterate} (result types not trusted, as in the incremental analysis), no {@code
+   * matches}, no node
    * typed {@code OclAny} or erroneous (an {@code OclAny} may hold a collection), every comparison
    * operand of a non-collection type, and every integer literal within {@code int} range.
    * Exceptions from the model access itself (the wrapper) are infrastructure failures and are not
@@ -2730,8 +2732,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   private boolean isErrorFree(ParseTree node) {
     if (node instanceof VitruvOCLParser.AppendOpContext
-        || node instanceof VitruvOCLParser.IterateOpContext) {
-      return false;
+        || node instanceof VitruvOCLParser.IterateOpContext
+        || node instanceof VitruvOCLParser.MatchesOpContext) {
+      return false; // matches() reports an invalid regular expression at runtime
     }
     if (isUntyped(nodeTypes.get(node))) {
       return false;

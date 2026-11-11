@@ -16,6 +16,7 @@ package tools.vitruv.dsls.vitruvocl.typechecker;
 import org.antlr.v4.runtime.ParserRuleContext;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
+import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
 
 /**
  * What an operation-family type checker (e.g. {@link StringOperationTyping}) needs from {@link
@@ -29,6 +30,12 @@ interface OperationTypingContext {
 
   /** Type checks an argument expression and returns its type. */
   Type check(ParserRuleContext expression);
+
+  /**
+   * Type checks an initializer that is evaluated before {@code unbound} are bound; inside it, their
+   * names refer to the variables they shadow, and are an error if there are none.
+   */
+  Type checkInitializer(ParserRuleContext initializer, VariableSymbol... unbound);
 
   /** Reports a type error at {@code ctx}. */
   void error(ParserRuleContext ctx, String message);

@@ -154,25 +154,19 @@ public final class LazyOperations {
 
   /**
    * Category 3 (incremental buffer): computes the intersection of {@code left} and {@code right}
-   * by pulling from both sides in alternation instead of fully materializing either one first.
+   * in receiver order.
    *
-   * <p>Algorithm: starting on the left side, each step pulls the next element from the current
-   * side and checks it against the buffer of already-seen (and not-yet-matched) elements of the
-   * <em>other</em> side. On a match, the element is emitted and the next step switches sides. On a
-   * miss, the element is added to its own side's buffer and the next step switches sides. Once one
-   * side is exhausted, its buffer is complete (equivalent to full membership), so the remaining
-   * side is drained against it directly.
+   * <p>Algorithm: {@code left} is streamed. Each receiver element is matched against a buffer of
+   * argument elements pulled earlier but not matched yet; if none matches, {@code right} is pulled
+   * until a match is found (or it is exhausted), buffering what it skips. A matching receiver
+   * element is emitted and consumes its match. Neither side is read further than needed, so a
+   * short-circuit consumer such as {@code first()} stops at the first common receiver element.
    *
    * <p>Note this is a multiset (pairwise-matching) intersection: each match consumes one element
-   * from each side's buffer. This coincides exactly with a simple "keep receiver elements that
-   * have some match in the argument" filter whenever at least one side has no internal duplicate
-   * values (always true for a {@code Set}/{@code OrderedSet} operand) — the standard case — but
-   * can differ when both sides contain duplicates of the same value; see the caller for details.
+   * of the argument, so a Bag result has the minimum multiplicity of both sides.
    *
-   * @param left the receiver-side source
-   * @param right the argument-side source; whichever side's copy of a matching value was pulled at
-   *     match time is the one emitted (for primitive values this is indistinguishable; for
-   *     metaclass values both sides typically already reference the same underlying instance)
+   * @param left the receiver-side source; its elements (and their order) form the result
+   * @param right the argument-side source, pulled only as far as needed
    * @param semanticEquals equality test used to compare elements across sides
    * @return a source yielding one element per pairwise match between the two sides
    */
@@ -408,15 +402,12 @@ public final class LazyOperations {
     }
   }
 
-  /** Alternating dual-buffer intersection; see {@link #intersect}. */
+  /** Receiver-ordered intersection against an index of the argument; see {@link #intersect}. */
   private static final class IntersectIterator implements Iterator<OCLElement> {
     private final Iterator<OCLElement> left;
     private final Iterator<OCLElement> right;
-    private final HashedBuffer leftSeen;
-    private final HashedBuffer rightSeen;
-    private boolean onLeft = true;
-    private boolean leftExhausted;
-    private boolean rightExhausted;
+    private final BiPredicate<OCLElement, OCLElement> semanticEquals;
+    private final HashedBuffer rightUnmatched;
     private OCLElement pending;
     private boolean hasPending;
 
@@ -427,53 +418,37 @@ public final class LazyOperations {
         ToIntFunction<OCLElement> semanticHash) {
       this.left = left;
       this.right = right;
-      this.leftSeen = new HashedBuffer(semanticEquals, semanticHash);
-      this.rightSeen = new HashedBuffer(semanticEquals, semanticHash);
+      this.semanticEquals = semanticEquals;
+      this.rightUnmatched = new HashedBuffer(semanticEquals, semanticHash);
       advance();
     }
 
-    @SuppressWarnings("java:S3776")
+    /**
+     * Emits the receiver's elements in receiver order, each only while the argument still has an
+     * unmatched occurrence of it (Bag result = min multiplicity). The argument is pulled only as far
+     * as needed to find the current receiver element; skipped argument elements are buffered.
+     */
     private void advance() {
       hasPending = false;
-      while (!leftExhausted || !rightExhausted) {
-        if (onLeft && leftExhausted) {
-          onLeft = false;
-          continue;
-        }
-        if (!onLeft && rightExhausted) {
-          onLeft = true;
-          continue;
-        }
-
-        if (onLeft) {
-          if (!left.hasNext()) {
-            leftExhausted = true;
-            continue;
-          }
-          OCLElement candidate = left.next();
-          onLeft = rightExhausted; // switch sides, unless the other side is already drained
-          // Consume the match so each occurrence pairs once: Bag result = min multiplicity
-          if (rightSeen.removeOne(candidate)) {
-            pending = candidate;
-            hasPending = true;
-            return;
-          }
-          leftSeen.add(candidate);
-        } else {
-          if (!right.hasNext()) {
-            rightExhausted = true;
-            continue;
-          }
-          OCLElement candidate = right.next();
-          onLeft = !leftExhausted; // switch sides, unless the other side is already drained
-          if (leftSeen.removeOne(candidate)) {
-            pending = candidate;
-            hasPending = true;
-            return;
-          }
-          rightSeen.add(candidate);
+      while (left.hasNext()) {
+        OCLElement candidate = left.next();
+        if (rightUnmatched.removeOne(candidate) || pullMatchFromRight(candidate)) {
+          pending = candidate;
+          hasPending = true;
+          return;
         }
       }
+    }
+
+    private boolean pullMatchFromRight(OCLElement candidate) {
+      while (right.hasNext()) {
+        OCLElement next = right.next();
+        if (semanticEquals.test(candidate, next)) {
+          return true;
+        }
+        rightUnmatched.add(next);
+      }
+      return false;
     }
 
     @Override

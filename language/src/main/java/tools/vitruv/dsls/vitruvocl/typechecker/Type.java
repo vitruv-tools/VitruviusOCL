@@ -952,6 +952,9 @@ public abstract class Type {
     boolean t2Primitive =
         (t2 == INTEGER || t2 == STRING || t2 == BOOLEAN || t2 == DOUBLE || t2 == FLOAT);
 
+    if (TypeResolver.isNumeric(t1) && TypeResolver.isNumeric(t2)) {
+      return TypeResolver.widenNumeric(t1, t2); // INTEGER ⊂ FLOAT ⊂ DOUBLE
+    }
     if (t1Primitive && t2Primitive && !t1.equals(t2)) { // NOSONAR S2589: types may equal at runtime
       return ANY;
     }

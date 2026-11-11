@@ -169,12 +169,18 @@ public sealed interface OCLElement
     @Override
     public Double tryGetDouble() {
       // Expose as double for comparison helpers that only know tryGetDouble()
-      return (double) value;
+      return toDoubleValue();
     }
 
+    /**
+     * The double this float stands for: the shortest decimal that rounds to it, so an EFloat
+     * attribute set to {@code 0.1} yields the double {@code 0.1}, not {@code 0.10000000149011612}.
+     * Comparing and hashing this double keeps equality exact and transitive across Integer, Float
+     * and Real.
+     */
     @Override
     public double toDoubleValue() {
-      return value;
+      return Double.parseDouble(Float.toString(value));
     }
   }
 
@@ -342,9 +348,11 @@ public sealed interface OCLElement
    *
    * <ul>
    *   <li>{@code IntValue == IntValue} → integer comparison
-   *   <li>{@code IntValue == FloatValue / DoubleValue} → promote to double
+   *   <li>{@code IntValue == DoubleValue} → promote to double
    *   <li>{@code FloatValue == FloatValue} → float comparison
-   *   <li>{@code FloatValue == DoubleValue} → promote to double
+   *   <li>{@code FloatValue == DoubleValue / IntValue} → compare the float's decimal value
+   *       ({@link FloatValue#toDoubleValue}: an EFloat attribute set to {@code 0.1} equals the
+   *       literal {@code 0.1})
    *   <li>{@code DoubleValue == DoubleValue} → double comparison
    * </ul>
    *
@@ -417,7 +425,8 @@ public sealed interface OCLElement
    * hashes. Lets buffers of already-seen elements be looked up by hash bucket instead of by a
    * linear scan.
    *
-   * <p>Numbers hash by their {@code double} value (cross-type numeric equality), strings and enum
+   * <p>Numbers hash by their {@code double} value (cross-type numeric equality; a float by its
+   * decimal value), strings and enum
    * literals by their (literal) name (enum/string equality by name), metaclass values by their
    * instance. Nested collections hash by size plus the order-independent sum of their element
    * hashes: semantically equal collections hold pairwise equal elements (after normalization), so
@@ -430,7 +439,7 @@ public sealed interface OCLElement
     return switch (element) {
       case null -> 0;
       case IntValue(int v) -> Double.hashCode(v);
-      case FloatValue(float v) -> Double.hashCode(v);
+      case FloatValue f -> Double.hashCode(f.toDoubleValue());
       case DoubleValue(double v) -> Double.hashCode(v);
       case BoolValue(boolean v) -> Boolean.hashCode(v);
       case StringValue(String v) -> v.hashCode();

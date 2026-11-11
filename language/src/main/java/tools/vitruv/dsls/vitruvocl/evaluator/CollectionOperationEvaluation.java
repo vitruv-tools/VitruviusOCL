@@ -691,8 +691,9 @@ final class CollectionOperationEvaluation {
   /**
    * Evaluates the {@code sum()} operation.
    *
-   * <p>Returns the sum of all numeric elements. If all elements are integers, returns an Integer;
-   * if any element is Float or Double, returns a Double.
+   * <p>Returns the sum of all numeric elements. If all elements are integers, returns an Integer
+   * that wraps on overflow like Integer {@code +}; if any element is Float or Double, returns a
+   * Double.
    *
    * <p><b>Example:</b> {@code Bag{1,2,3}.sum()} → {@code 6}, {@code Set{1.5,2.5}.sum()} → {@code
    * 4.0}
@@ -707,19 +708,22 @@ final class CollectionOperationEvaluation {
     }
     boolean hasFloating = false;
     double sum = 0.0;
+    int intSum = 0;
     for (OCLElement elem : receiver.getElements()) {
       if (!OCLElement.isNumeric(elem)) {
         continue;
       }
       if (elem.tryGetFloat() != null || elem.tryGetDouble() != null) {
         hasFloating = true;
+      } else if (elem.tryGetInt() != null) {
+        intSum += elem.tryGetInt(); // wraps on overflow, exactly like Integer '+'
       }
       sum += elem.toDoubleValue();
     }
     if (hasFloating) {
       return Value.doubleValue(sum);
     }
-    return Value.intValue((int) sum);
+    return Value.intValue(intSum);
   }
 
   /**

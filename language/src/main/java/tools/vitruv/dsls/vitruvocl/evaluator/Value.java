@@ -89,6 +89,12 @@ public class Value implements Comparable<Value> {
   /** The runtime type - includes Ctype information (unique, ordered). */
   private final Type runtimeType;
 
+  /**
+   * Cached {@link #normalize()} result of an unordered value; sorting nested collections compares
+   * (and thus normalizes) the same values many times. Volatile: values may be shared by threads.
+   */
+  private volatile Value normalized;
+
   // ==================== Constructors ====================
 
   /** Creates a Value from a list of elements. This is the main constructor for OCL values. */
@@ -646,9 +652,14 @@ public class Value implements Comparable<Value> {
       return this; // Already canonical
     }
 
-    List<OCLElement> sorted = new ArrayList<>(getElements());
-    sorted.sort(OCLElement::compare);
-    return new Value(sorted, runtimeType);
+    Value cached = normalized;
+    if (cached == null) {
+      List<OCLElement> sorted = new ArrayList<>(getElements());
+      sorted.sort(OCLElement::compare);
+      cached = new Value(sorted, runtimeType);
+      normalized = cached;
+    }
+    return cached;
   }
 
   /**
@@ -695,6 +706,9 @@ public class Value implements Comparable<Value> {
   /**
    * Compares two Values for ordering (used in nested collections). Required by OCLElement.compare()
    * for NestedCollection comparison.
+   *
+   * <p>Unordered operands are normalized first, so semantically equal sets and bags compare as
+   * equal regardless of element order, also when nested (normalization sorts with this method).
    */
   public static int compare(Value v1, Value v2) {
     if (v1 == v2) {
@@ -706,24 +720,7 @@ public class Value implements Comparable<Value> {
     if (v2 == null) {
       return 1;
     }
-
-    // First compare by size
-    int sizeCompare = Integer.compare(v1.size(), v2.size());
-    if (sizeCompare != 0) {
-      return sizeCompare;
-    }
-
-    // Same size - compare elements pairwise
-    List<OCLElement> elems1 = v1.getElements();
-    List<OCLElement> elems2 = v2.getElements();
-    for (int i = 0; i < elems1.size(); i++) {
-      int elemCompare = OCLElement.compare(elems1.get(i), elems2.get(i));
-      if (elemCompare != 0) {
-        return elemCompare;
-      }
-    }
-
-    return 0; // Equal
+    return v1.normalize().compareTo(v2.normalize());
   }
 
   // ==================== String Representation ====================

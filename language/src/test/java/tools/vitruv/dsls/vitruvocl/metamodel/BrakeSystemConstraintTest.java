@@ -680,7 +680,7 @@ class BrakeSystemConstraintTest {
         """,
         """
         context cad::Cone inv noIntersectWithBox:
-          let foreignShapes: Set(Shape) =
+          let foreignShapes: Bag(Shape) =
             cad::Namespace.allInstances()
               .reject(ns | ns.shapes.includes(self))
               .collect(ns | ns.shapes).flatten()
@@ -722,7 +722,7 @@ class BrakeSystemConstraintTest {
         """,
         """
         context cad::Cone inv noIntersectWithPrism:
-          let foreignShapes: Set(Shape) =
+          let foreignShapes: Bag(Shape) =
             cad::Namespace.allInstances()
               .reject(ns | ns.shapes.includes(self))
               .collect(ns | ns.shapes).flatten()

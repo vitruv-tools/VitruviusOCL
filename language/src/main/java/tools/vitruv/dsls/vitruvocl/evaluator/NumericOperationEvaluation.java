@@ -15,6 +15,7 @@ package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.antlr.v4.runtime.ParserRuleContext;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 
@@ -61,24 +62,13 @@ final class NumericOperationEvaluation {
    *
    * <p>For integers, this is a no-op. For Float and Double, applies {@link Math#floor}.
    *
-   * <p><b>Example:</b> {@code 2.7.floor()} → {@code 2.0}, {@code 5.floor()} → {@code 5}
+   * <p><b>Example:</b> {@code 2.7.floor()} → {@code 2}, {@code 5.floor()} → {@code 5}
    *
    * @param ctx The floor operation node
    * @return A collection with floored values
    */
   Value floor(VitruvOCLParser.FloorOpContext ctx) {
-    Value receiver = context.receiver();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem); // no-op for integers
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.floor(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.floor(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return rounded(ctx, Math::floor);
   }
 
   /**
@@ -86,24 +76,13 @@ final class NumericOperationEvaluation {
    *
    * <p>For integers, this is a no-op. For Float and Double, applies {@link Math#ceil}.
    *
-   * <p><b>Example:</b> {@code 2.3.ceil()} → {@code 3.0}, {@code 5.ceil()} → {@code 5}
+   * <p><b>Example:</b> {@code 2.3.ceil()} → {@code 3}, {@code 5.ceil()} → {@code 5}
    *
    * @param ctx The ceil operation node
    * @return A collection with ceiled values
    */
   Value ceil(VitruvOCLParser.CeilOpContext ctx) {
-    Value receiver = context.receiver();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem); // no-op for integers
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return rounded(ctx, Math::ceil);
   }
 
   /**
@@ -111,28 +90,17 @@ final class NumericOperationEvaluation {
    *
    * <p>Applies {@link Math#ceil} element-wise to the receiver collection. {@code INTEGER} elements
    * are returned unchanged; {@code FLOAT} and {@code DOUBLE} elements are rounded up to the nearest
-   * integer value and returned as {@code DOUBLE}. The result preserves the receiver's collection
+   * integer value and returned as {@code INTEGER}. The result preserves the receiver's collection
    * kind and multiplicity.
    *
-   * <p>Example: {@code 2.3->ceiling()} yields {@code 3.0}
+   * <p>Example: {@code 2.3->ceiling()} yields {@code 3}
    *
    * @param ctx the parse tree node for the {@code ceiling()} operation
    * @return a collection of the same kind as the receiver with each element rounded up to the
    *     nearest integer value; or an error value if any element is not numeric
    */
   Value ceiling(VitruvOCLParser.CeilingOpContext ctx) {
-    Value receiver = context.receiver();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem);
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.ceil(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    return rounded(ctx, Math::ceil);
   }
 
   /**
@@ -141,24 +109,14 @@ final class NumericOperationEvaluation {
    * <p>For integers, this is a no-op. For Float and Double, rounds to the nearest integer using
    * "round half up" semantics ({@link Math#round}).
    *
-   * <p><b>Example:</b> {@code 2.5.round()} → {@code 3.0}, {@code 2.4.round()} → {@code 2.0}
+   * <p><b>Example:</b> {@code 2.5.round()} → {@code 3}, {@code 2.4.round()} → {@code 2}
    *
    * @param ctx The round operation node
    * @return A collection with rounded values
    */
   Value round(VitruvOCLParser.RoundOpContext ctx) {
-    Value receiver = context.receiver();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem.tryGetInt() != null) {
-        results.add(elem); // no-op for integers
-      } else if (elem.tryGetFloat() != null) {
-        results.add(new OCLElement.DoubleValue(Math.round(elem.tryGetFloat())));
-      } else if (elem.tryGetDouble() != null) {
-        results.add(new OCLElement.DoubleValue(Math.round(elem.tryGetDouble())));
-      }
-    }
-    return Value.of(results, receiver.getRuntimeType());
+    // half up (Math.round); NaN and huge values pass unchanged and fail the range check
+    return rounded(ctx, d -> Math.abs(d) <= 1e18 ? Math.round(d) : d);
   }
 
   /**
@@ -229,5 +187,27 @@ final class NumericOperationEvaluation {
       return Value.empty(Type.INTEGER);
     }
     return Value.intValue(left % right);
+  }
+
+  /**
+   * Applies {@code rounding} to every numeric element of the receiver; integers stay unchanged. The
+   * result is an Integer (OCL); a value that is NaN or does not fit an Integer is undefined and
+   * left out, as {@code div} does for undefined results.
+   */
+  private Value rounded(ParserRuleContext ctx, java.util.function.DoubleUnaryOperator rounding) {
+    Value receiver = context.receiver();
+    List<OCLElement> results = new ArrayList<>();
+    for (OCLElement elem : receiver.getElements()) {
+      if (elem.tryGetInt() != null) {
+        results.add(elem);
+      } else if (OCLElement.isNumeric(elem)) {
+        double value = rounding.applyAsDouble(elem.toDoubleValue());
+        if (!Double.isNaN(value) && value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE) {
+          results.add(new OCLElement.IntValue((int) value));
+        }
+      }
+    }
+    Type type = context.nodeType(ctx);
+    return Value.of(results, type != null ? type : Type.singleton(Type.INTEGER));
   }
 }

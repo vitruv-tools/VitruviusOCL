@@ -47,7 +47,7 @@ final class NumericOperationTyping {
    * @return the resulting numeric type of the operation
    */
   Type floor(VitruvOCLParser.FloorOpContext ctx) {
-    return scalarNumeric(ctx, "floor");
+    return rounding(ctx, "floor");
   }
 
   /**
@@ -60,17 +60,17 @@ final class NumericOperationTyping {
    * @return the resulting numeric type of the operation
    */
   Type ceil(VitruvOCLParser.CeilOpContext ctx) {
-    return scalarNumeric(ctx, "ceil");
+    return rounding(ctx, "ceil");
   }
 
   /**
    * Type checks the {@code ceiling()} operation (alias for ceil).
    *
    * @param ctx The ceiling operation node
-   * @return Receiver type unchanged
+   * @return Integer, with the receiver's multiplicity
    */
   Type ceiling(VitruvOCLParser.CeilingOpContext ctx) {
-    return scalarNumeric(ctx, "ceiling");
+    return rounding(ctx, "ceiling");
   }
 
   /**
@@ -83,7 +83,7 @@ final class NumericOperationTyping {
    * @return the resulting numeric type of the operation
    */
   Type round(VitruvOCLParser.RoundOpContext ctx) {
-    return scalarNumeric(ctx, "round");
+    return rounding(ctx, "round");
   }
 
   /**
@@ -140,6 +140,20 @@ final class NumericOperationTyping {
     }
     context.recordType(ctx, Type.INTEGER);
     return Type.INTEGER;
+  }
+
+  /**
+   * Type checks a rounding operation ({@code floor}, {@code ceil}, {@code ceiling}, {@code round}):
+   * like {@link #scalarNumeric}, but the result is an Integer, as in OCL.
+   */
+  private Type rounding(ParserRuleContext ctx, String opName) {
+    Type receiverType = scalarNumeric(ctx, opName);
+    if (receiverType == Type.ERROR) {
+      return Type.ERROR;
+    }
+    Type resultType = receiverType.isSingleton() ? Type.singleton(Type.INTEGER) : Type.INTEGER;
+    context.recordType(ctx, resultType);
+    return resultType;
   }
 
   /**

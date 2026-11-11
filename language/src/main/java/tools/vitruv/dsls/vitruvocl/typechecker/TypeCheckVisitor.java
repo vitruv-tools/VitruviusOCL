@@ -4,7 +4,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
@@ -149,6 +151,9 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    * operations.
    */
   private final ParseTreeProperty<Type> nodeTypes = new ParseTreeProperty<>();
+
+  /** Variables whose initializer is being checked; referencing them there is an error. */
+  private final Map<VariableSymbol, Boolean> initializing = new IdentityHashMap<>();
 
   /** Type rules of the String operations, see {@link StringOperationTyping}. */
   private final StringOperationTyping strings =
@@ -855,8 +860,17 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     Type rightType = visit(ctx.right);
     Type resultType = Type.BOOLEAN;
 
-    // Check if types are comparable
-    if (!areComparable(leftType, rightType)) {
+    if (isMultiValued(leftType) || isMultiValued(rightType)) {
+      // the evaluator compares single values only and fails at runtime for collections
+      addBinaryTypeError(
+          ctx.left,
+          ctx.right,
+          "Equality requires single values, not collections: "
+              + leftType
+              + AND_SEPARATOR
+              + rightType);
+      resultType = Type.ERROR;
+    } else if (!areComparable(leftType, rightType)) {
       addBinaryTypeError(
           ctx.left,
           ctx.right,
@@ -887,8 +901,17 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     Type rightType = visit(ctx.right);
     Type resultType = Type.BOOLEAN;
 
-    // Check if types are comparable
-    if (!areComparable(leftType, rightType)) {
+    if (isMultiValued(leftType) || isMultiValued(rightType)) {
+      // the evaluator compares single values only and fails at runtime for collections
+      addBinaryTypeError(
+          ctx.left,
+          ctx.right,
+          "Equality requires single values, not collections: "
+              + leftType
+              + AND_SEPARATOR
+              + rightType);
+      resultType = Type.ERROR;
+    } else if (!areComparable(leftType, rightType)) {
       addBinaryTypeError(
           ctx.left,
           ctx.right,
@@ -1123,6 +1146,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
     nodeTypes.put(ctx, resultType);
     return resultType;
+  }
+
+  /** Whether {@code type} is a collection that may hold more than one element. */
+  private static boolean isMultiValued(Type type) {
+    return type.isCollection() && type.getUpperBound() != 1;
   }
 
   /**
@@ -2261,7 +2289,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
 
     // Type-check initializer
-    Type initType = visit(ctx.varInit);
+    Type initType = checkInitializer(ctx.varInit, symbol);
 
     // Check explicit type if present
     Type declaredType = symbol.getType();
@@ -2339,6 +2367,25 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   // ==================== Variable References ====================
 
   /**
+   * Type checks {@code initializer} while {@code unbound} are marked as being initialized: there,
+   * {@link #visitVariableExpCS} resolves their names to the variables they shadow, or reports an
+   * error if there are none (the reference would fail at runtime as unbound).
+   */
+  private Type checkInitializer(ParserRuleContext initializer, VariableSymbol... unbound) {
+    List<VariableSymbol> marked = new ArrayList<>();
+    for (VariableSymbol variable : unbound) {
+      if (variable != null && initializing.put(variable, Boolean.TRUE) == null) {
+        marked.add(variable);
+      }
+    }
+    try {
+      return visit(initializer);
+    } finally {
+      marked.forEach(initializing::remove);
+    }
+  }
+
+  /**
    * Type checks variable references.
    *
    * <p>Handles the special {@code null} keyword, which is the empty optional {@code ?Any?} = {@code
@@ -2364,6 +2411,17 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     VariableSymbol symbol = symbolTable.resolveVariable(varName);
     if (symbol == null) {
       handleUndefinedSymbol(varName, ctx);
+      nodeTypes.put(ctx, Type.ERROR);
+      return Type.ERROR;
+    }
+    // inside its own initializer a name refers to the variable it shadows, as at runtime
+    VariableSymbol own = symbol;
+    while (symbol != null && initializing.containsKey(symbol)) {
+      Scope outer = symbol.getDefiningScope().getEnclosingScope();
+      symbol = outer == null ? null : outer.resolveVariable(varName);
+    }
+    if (symbol == null) {
+      reportError(ctx, "Variable '" + own.getName() + "' is used in its own initializer");
       nodeTypes.put(ctx, Type.ERROR);
       return Type.ERROR;
     }
@@ -4410,6 +4468,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     @Override
     public Type check(ParserRuleContext expression) {
       return visit(expression);
+    }
+
+    @Override
+    public Type checkInitializer(ParserRuleContext initializer, VariableSymbol... unbound) {
+      return TypeCheckVisitor.this.checkInitializer(initializer, unbound);
     }
 
     @Override

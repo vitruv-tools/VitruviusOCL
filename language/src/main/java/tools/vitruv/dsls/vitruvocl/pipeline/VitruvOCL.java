@@ -503,9 +503,7 @@ public class VitruvOCL {
    */
   public static IncrementalSession openIncrementalSession(
       List<String> constraints, IncrementalConfig config) {
-    IncrementalSession session = new IncrementalSession(constraints, getVsumWrapper(), config);
-    session.initialize();
-    return session;
+    return IncrementalSession.open(constraints, getVsumWrapper(), config);
   }
 
   /**
@@ -535,9 +533,7 @@ public class VitruvOCL {
     if (loadResult.hasErrors()) {
       throw new IllegalStateException("Could not load model files: " + loadResult.fileErrors);
     }
-    IncrementalSession session = new IncrementalSession(constraints, loadResult.wrapper, config);
-    session.initialize();
-    return session;
+    return IncrementalSession.open(constraints, loadResult.wrapper, config);
   }
 
   /**
@@ -573,10 +569,14 @@ public class VitruvOCL {
       throw new IllegalStateException(
           "attachIncrementalSession requires a VSUM registered via VitruvOCL.registerVSUM(vsum)");
     }
-    IncrementalSession session = new IncrementalSession(constraints, wrapper, config);
-    session.initialize();
-    session.attachTo(wrapper, onResult, onFailure);
-    return session;
+    IncrementalSession session = IncrementalSession.open(constraints, wrapper, config);
+    try {
+      session.attachTo(wrapper, onResult, onFailure);
+      return session;
+    } catch (RuntimeException e) {
+      session.close();
+      throw e;
+    }
   }
 
   // ---------------------------------------------------------------------------

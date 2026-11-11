@@ -886,7 +886,13 @@ final class CollectionOperationTyping {
    * @return the resulting type of the aggregate operation
    */
   Type avg(VitruvOCLParser.AvgOpContext ctx) {
-    return aggregate(ctx, "avg");
+    Type checked = aggregate(ctx, "avg");
+    if (checked == Type.ERROR) {
+      return Type.ERROR;
+    }
+    Type resultType = Type.singleton(Type.DOUBLE); // the mean of integers is a Real
+    context.recordType(ctx, resultType);
+    return resultType;
   }
 
   /** Helper for asSet/asBag/asSequence/asOrderedSet — all follow the same pattern. */

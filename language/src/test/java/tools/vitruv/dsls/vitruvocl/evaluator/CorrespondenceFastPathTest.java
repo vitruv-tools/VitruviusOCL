@@ -77,10 +77,10 @@ class CorrespondenceFastPathTest {
 
   @Test
   void rightSideThatMayReportAnErrorIsAlwaysEvaluated() {
-    // i.refs is a collection: == on it can report "Comparison requires singleton operands"
+    // an invalid regular expression is only reported when matches() is evaluated
     String c =
-        "context edge::Other inv: edge::Item.allInstances().forAll(i | self ~ i implies i.refs =="
-            + " i.refs)";
+        "context edge::Other inv: edge::Item.allInstances().forAll(i | self ~ i implies"
+            + " i.name.matches(\"(\"))";
     VitruvOCLCompiler compiler =
         new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
     compiler.compile(c);

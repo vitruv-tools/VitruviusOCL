@@ -195,16 +195,18 @@ final class IteratorOperationTyping {
             return Type.ERROR;
           }
 
-          // collect result: preserve collection kind, element type from body
-          // If body returns ¡T!, the element type is T (unwrap singleton)
+          // element type from the body; ¡T! unwraps to T (collection bodies stay nested and are
+          // flattened explicitly with flatten())
           Type resultElemType = bodyType.isSingleton() ? bodyType.getElementType() : bodyType;
           Type resultType;
           if (receiverType.isSingleton()) {
             resultType = Type.singleton(resultElemType); // ¡T! → ¡U!
           } else if (receiverType.isOptional()) {
             resultType = Type.optional(resultElemType); // ¿T? → ¿U?
+          } else if (receiverType.isOrdered()) {
+            resultType = Type.sequence(resultElemType); // Sequence/OrderedSet → Sequence
           } else {
-            resultType = Type.preserveCollectionKind(receiverType, resultElemType);
+            resultType = Type.bag(resultElemType); // Set/Bag → Bag: results may repeat
           }
           context.recordType(ctx, resultType);
           return resultType;
@@ -570,21 +572,18 @@ final class IteratorOperationTyping {
         iterSym.setType(iterVarType);
       }
 
-      // Accumulator type — either explicit or inferred from init expression
-      Type accType;
-      if (spec.accType != null) {
-        accType = context.check(spec.accType);
-      } else {
-        accType = context.check(spec.accInit);
-      }
+      // Accumulator type — either explicit or inferred from the init expression, which is
+      // checked once and may not refer to the accumulator itself
       String accVarName = spec.accVar.getText();
       VariableSymbol accSym = context.symbolTable().resolveVariable(accVarName);
+      // evaluated before the iterator variable and the accumulator are bound
+      Type initType = context.checkInitializer(spec.accInit, accSym, iterSym);
+      Type accType = spec.accType != null ? context.check(spec.accType) : initType;
       if (accSym != null && accSym.getType() == Type.ANY) {
         accSym.setType(accType);
       }
 
       // Init expression must conform to accumulator type
-      Type initType = context.check(spec.accInit);
       if (!initType.isConformantTo(accType) && !Type.conformsWithUnwrapping(initType, accType)) {
         context.error(
             spec,
