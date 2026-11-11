@@ -62,11 +62,15 @@ public class OCLWorkspaceService implements WorkspaceService {
 
   @Override
   public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-    boolean anyChange = false;
-
-    for (FileEvent event : params.getChanges()) {
-      anyChange |= handleFileEvent(event);
-    }
+    boolean anyChange =
+        textDocumentService.withMetamodelLock(
+            () -> {
+              boolean changed = false;
+              for (FileEvent event : params.getChanges()) {
+                changed |= handleFileEvent(event);
+              }
+              return changed;
+            });
 
     // Kick off re-analysis of all open documents so diagnostics and type hints
     // reflect the updated metamodel without requiring a dummy edit.
@@ -107,7 +111,8 @@ public class OCLWorkspaceService implements WorkspaceService {
         wrapper.reloadMetamodel(ecorePath);
         LOG.fine(() -> "[OCL-LS] Metamodel reloaded: " + ecorePath);
         return true;
-      } catch (IOException e) {
+      } catch (IOException | RuntimeException e) {
+        // reloadMetamodel keeps the previously loaded version when the new file is broken.
         LOG.warning(
             () -> "[OCL-LS] Failed to reload metamodel " + ecorePath + ": " + e.getMessage());
       }

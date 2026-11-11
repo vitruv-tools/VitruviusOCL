@@ -221,18 +221,21 @@ function updateInlineErrors(editor: vscode.TextEditor, constraintDetails?: Map<s
                     inlineColor = SEVERITY_STYLE['WARNING'].color;
                 }
 
-                // Build hover with all violations as formatted blocks
+                // Build hover with all violations as formatted blocks. Messages can contain model
+                // data, so they are appended as plain text and the hover is neither trusted nor
+                // allowed to render HTML: no command links, no markup injection.
                 const hover = new vscode.MarkdownString();
-                hover.isTrusted = true;
-                hover.supportHtml = true;
                 if (details && details.length > 0) {
                     for (const d of details) {
                         const { severity, message } = parseViolationBlock(d);
                         const style = SEVERITY_STYLE[severity] ?? SEVERITY_STYLE['WARNING'];
-                        hover.appendMarkdown(`${style.symbol} **${severity}:** ${message}\n\n`);
+                        hover.appendMarkdown(`${style.symbol} **${severity}:** `);
+                        hover.appendText(message);
+                        hover.appendMarkdown('\n\n');
                     }
                 } else {
-                    hover.appendMarkdown(`⚠ **WARNING:** ${constraintName} violated`);
+                    hover.appendMarkdown('⚠ **WARNING:** ');
+                    hover.appendText(`${constraintName} violated`);
                 }
 
                 const decoration: vscode.DecorationOptions = {

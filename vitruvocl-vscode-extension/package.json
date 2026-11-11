@@ -12,6 +12,12 @@
     "Programming Languages"
   ],
   "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "VitruvOCL runs Java processes that load models and metamodels from the workspace."
+    }
+  },
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
@@ -99,12 +105,14 @@
         "vitruvocl.compilerPath": {
           "type": "string",
           "default": "",
-          "description": "Path to vitruvocl.jar (leave empty for auto-detection)"
+          "scope": "machine",
+          "description": "Path to vitruvocl.jar (leave empty for auto-detection). Only read from user settings, never from workspace settings, because the jar is executed."
         },
         "vitruvocl.languageServerPath": {
           "type": "string",
           "default": "",
-          "description": "Path to language-server.jar (leave empty for auto-detection from lib/)"
+          "scope": "machine",
+          "description": "Path to language-server.jar (leave empty for auto-detection from lib/). Only read from user settings, never from workspace settings, because the jar is executed."
         },
         "vitruvocl.vsumPath": {
           "type": "string",

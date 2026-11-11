@@ -135,13 +135,18 @@ public class DocumentAnalyzer {
       ErrorCollector errors = new ErrorCollector();
       SymbolTableImpl symbolTable = new SymbolTableImpl(wrapper);
       ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
+      boolean passCrashed = false;
 
       try {
         SymbolTableBuilder builder =
             new SymbolTableBuilder(symbolTable, wrapper, errors, scopeAnnotator);
         builder.visit(tree);
       } catch (Exception e) {
+        // Keep going so hover and completion still get what the later passes produce, but tell
+        // the user that the diagnostics below are incomplete.
         LOG.log(Level.WARNING, "[OCL-LS] SymbolTableBuilder crashed", e);
+        diagnostics.add(internalError("symbol table construction", e));
+        passCrashed = true;
       }
 
       // -----------------------------------------------------------------------
@@ -155,6 +160,9 @@ public class DocumentAnalyzer {
         nodeTypes = typeChecker.getNodeTypes();
       } catch (Exception e) {
         LOG.log(Level.WARNING, "[OCL-LS] TypeCheckVisitor crashed", e);
+        if (!passCrashed) { // one internal-error diagnostic per document is enough
+          diagnostics.add(internalError("type checking", e));
+        }
       }
 
       // -----------------------------------------------------------------------
@@ -192,15 +200,27 @@ public class DocumentAnalyzer {
     } catch (Exception e) {
       // Catch-all — return empty analysis with a single internal-error diagnostic.
       LOG.log(Level.WARNING, "[OCL-LS] Unexpected analysis error", e);
-      diagnostics.add(
-          new Diagnostic(
-              new Range(new Position(0, 0), new Position(0, 1)),
-              "Internal language server error: " + e.getMessage(),
-              DiagnosticSeverity.Error,
-              LANGUAGE_ID));
+      diagnostics.add(internalError("analysis", e));
     }
 
     return new DocumentAnalysis(tree, nodeTypes, diagnostics);
+  }
+
+  /**
+   * Builds the diagnostic for an analysis step that crashed, placed at the start of the document.
+   *
+   * @param step human-readable name of the step that failed
+   * @param e the exception it threw
+   */
+  private static Diagnostic internalError(String step, Exception e) {
+    return new Diagnostic(
+        new Range(new Position(0, 0), new Position(0, 1)),
+        "Internal language server error during "
+            + step
+            + " (diagnostics may be incomplete): "
+            + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()),
+        DiagnosticSeverity.Error,
+        LANGUAGE_ID);
   }
 
   // ---------------------------------------------------------------------------

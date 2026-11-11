@@ -183,7 +183,8 @@ public class OCLLanguageServer implements LanguageServer, LanguageClientAware {
       try {
         wrapper.loadMetamodel(ecoreFile);
         LOG.fine(() -> "[OCL-LS] Loaded metamodel: " + ecoreFile);
-      } catch (IOException e) {
+      } catch (IOException | RuntimeException e) {
+        // One broken metamodel must not keep the server from starting.
         LOG.warning(() -> "[OCL-LS] Could not load " + ecoreFile + ": " + e.getMessage());
       }
     }

@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.CodeAction;
@@ -30,6 +31,7 @@ import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
@@ -42,7 +44,9 @@ import org.eclipse.lsp4j.InlayHint;
 import org.eclipse.lsp4j.InlayHintParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureHelpParams;
 import org.eclipse.lsp4j.SymbolInformation;
@@ -86,6 +90,16 @@ public class OCLTextDocumentService implements TextDocumentService {
    * if its document is still open with the analyzed text.
    */
   private final Object lifecycleLock = new Object();
+
+  /**
+   * Serializes all access to the shared {@link MetamodelWrapper}: analyses run on the debounce
+   * thread, completions and metamodel hot-reloads on the lsp4j thread, and the wrapper's EMF
+   * resource set and registries are not thread-safe. Hover is included because it reads EClasses
+   * whose supertype and feature lists may resolve proxies through the resource set. Never held
+   * together with {@link #lifecycleLock}. Since lsp4j handles requests one after another, a long
+   * analysis delays completion and hover until it finishes.
+   */
+  private final Object metamodelLock = new Object();
 
   /** Pending debounce futures per URI — cancelled when a new edit arrives or the file closes. */
   private final Map<String, ScheduledFuture<?>> pending = new ConcurrentHashMap<>();
@@ -175,7 +189,8 @@ public class OCLTextDocumentService implements TextDocumentService {
     DocumentAnalysis analysis = analyses.get(uri);
 
     List<CompletionItem> items =
-        completionProvider.getCompletions(text, params.getPosition(), analysis);
+        withMetamodelLock(
+            () -> completionProvider.getCompletions(text, params.getPosition(), analysis));
     return CompletableFuture.completedFuture(Either.forLeft(items));
   }
 
@@ -190,7 +205,7 @@ public class OCLTextDocumentService implements TextDocumentService {
     if (analysis == null) {
       return CompletableFuture.completedFuture(null);
     }
-    Hover hover = hoverProvider.getHover(params.getPosition(), analysis);
+    Hover hover = withMetamodelLock(() -> hoverProvider.getHover(params.getPosition(), analysis));
     return CompletableFuture.completedFuture(hover);
   }
 
@@ -264,7 +279,7 @@ public class OCLTextDocumentService implements TextDocumentService {
 
   private void runAnalysis(String uri, String text) {
     try {
-      DocumentAnalysis analysis = analyzer.analyze(text);
+      DocumentAnalysis analysis = withMetamodelLock(() -> analyzer.analyze(text));
       synchronized (lifecycleLock) {
         // Identity check on purpose: `text` is the exact instance stored by didOpen/didChange.
         // A closed document or a newer edit makes this result stale, so it is dropped.
@@ -276,8 +291,46 @@ public class OCLTextDocumentService implements TextDocumentService {
           client.publishDiagnostics(new PublishDiagnosticsParams(uri, analysis.getDiagnostics()));
         }
       }
+    } catch (StackOverflowError e) {
+      LOG.log(Level.WARNING, "[OCL-LS] Document too deeply nested to analyze: " + uri);
+      publishAnalysisFailure(
+          uri, text, "Expression is nested too deeply to be analyzed; split it into smaller parts.");
     } catch (Exception e) {
       LOG.log(Level.WARNING, "[OCL-LS] Analysis failed for " + uri, e);
+    }
+  }
+
+  /**
+   * Replaces the diagnostics of {@code uri} with a single error at the start of the document, for
+   * an analysis that could not complete. Skipped if the document was closed or edited meanwhile.
+   */
+  private void publishAnalysisFailure(String uri, String text, String message) {
+    synchronized (lifecycleLock) {
+      if (documents.get(uri) != text) {
+        return;
+      }
+      analyses.remove(uri);
+      if (client != null) {
+        Diagnostic diagnostic =
+            new Diagnostic(
+                new Range(new Position(0, 0), new Position(0, 0)),
+                message,
+                DiagnosticSeverity.Error,
+                "vitruvocl");
+        client.publishDiagnostics(new PublishDiagnosticsParams(uri, List.of(diagnostic)));
+      }
+    }
+  }
+
+  /**
+   * Runs {@code action} while holding the lock that guards the shared metamodel wrapper.
+   *
+   * @param action work that reads or changes loaded metamodels
+   * @return the action's result
+   */
+  <T> T withMetamodelLock(Supplier<T> action) {
+    synchronized (metamodelLock) {
+      return action.get();
     }
   }
 

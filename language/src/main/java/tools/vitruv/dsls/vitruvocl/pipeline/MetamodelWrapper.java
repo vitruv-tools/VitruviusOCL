@@ -407,14 +407,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @throws IOException If file cannot be read or is empty
    */
   public void loadMetamodel(String packageName, Path ecoreFile) throws IOException {
-    Resource resource =
-        resourceSet.getResource(URI.createFileURI(ecoreFile.toAbsolutePath().toString()), true);
-
-    if (resource.getContents().isEmpty()) {
-      throw new IOException("Empty .ecore file: " + ecoreFile);
-    }
-
-    EPackage ePackage = (EPackage) resource.getContents().get(0);
+    EPackage ePackage = loadRootPackage(resourceSet, ecoreFile);
     // packageName may refer to a nested eSubpackage (e.g. "repository" inside pcm.ecore), so
     // don't blindly bind it to the root package here — registerPackageRecursively() resolves
     // the correct (sub-)package for each name found in the file.
@@ -428,17 +421,47 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @throws IOException If file cannot be read or is empty
    */
   public void loadMetamodel(Path ecoreFile) throws IOException {
-    Resource resource =
-        resourceSet.getResource(URI.createFileURI(ecoreFile.toAbsolutePath().toString()), true);
-
-    if (resource.getContents().isEmpty()) {
-      throw new IOException("Empty .ecore file: " + ecoreFile);
-    }
-
-    EPackage ePackage = (EPackage) resource.getContents().get(0);
+    EPackage ePackage = loadRootPackage(resourceSet, ecoreFile);
     String name = ePackage.getName();
     metamodelRegistry.put(name, ePackage);
     registerPackageRecursively(ePackage);
+  }
+
+  /**
+   * Loads {@code ecoreFile} into {@code target} and returns its root package.
+   *
+   * <p>EMF reports malformed files with unchecked exceptions and keeps the failed resource in the
+   * resource set, where a later {@code getResource} would hand it out again. Every failure is
+   * therefore reported as an {@link IOException} and the failed resource is removed again.
+   *
+   * @throws IOException if the file cannot be read or parsed, is empty, or has no package root
+   */
+  private static EPackage loadRootPackage(ResourceSet target, Path ecoreFile) throws IOException {
+    URI uri = URI.createFileURI(ecoreFile.toAbsolutePath().toString());
+    Resource resource;
+    try {
+      resource = target.getResource(uri, true);
+    } catch (RuntimeException e) {
+      discardResource(target, uri);
+      throw new IOException("Cannot load " + ecoreFile + ": " + e.getMessage(), e);
+    }
+    if (resource.getContents().isEmpty()) {
+      discardResource(target, uri);
+      throw new IOException("Empty .ecore file: " + ecoreFile);
+    }
+    if (!(resource.getContents().get(0) instanceof EPackage ePackage)) {
+      discardResource(target, uri);
+      throw new IOException("No EPackage at the root of " + ecoreFile);
+    }
+    return ePackage;
+  }
+
+  private static void discardResource(ResourceSet target, URI uri) {
+    Resource resource = target.getResource(uri, false);
+    if (resource != null) {
+      resource.unload();
+      target.getResources().remove(resource);
+    }
   }
 
   /**
@@ -472,19 +495,37 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * #loadMetamodel(Path)}. Call this when the {@code .ecore} file has been modified on disk (e.g.
    * triggered by a {@code workspace/didChangeWatchedFiles} event from the language client).
    *
+   * <p>The new file is parsed in a separate resource set first. If it cannot be loaded, the
+   * previously loaded version stays in place, so a half-saved or broken file does not make every
+   * type from that metamodel disappear. On success the parsed resource itself replaces the old one,
+   * so the file is read only once and cannot change between the check and the swap.
+   *
    * @param ecoreFile path to the modified {@code .ecore} file
    * @throws IOException if the file cannot be read or is empty after modification
    */
   public void reloadMetamodel(Path ecoreFile) throws IOException {
+    ResourceSet probe = new ResourceSetImpl();
+    probe
+        .getResourceFactoryRegistry()
+        .getExtensionToFactoryMap()
+        .put("ecore", new EcoreResourceFactoryImpl());
+    probe.getURIConverter().getURIMap().putAll(resourceSet.getURIConverter().getURIMap());
+    EPackage fresh = loadRootPackage(probe, ecoreFile);
+    Resource freshResource = fresh.eResource();
+
     unloadMetamodel(ecoreFile);
-    loadMetamodel(ecoreFile);
+    probe.getResources().remove(freshResource);
+    resourceSet.getResources().add(freshResource);
+    metamodelRegistry.put(fresh.getName(), fresh);
+    registerPackageRecursively(fresh);
   }
 
   /**
    * Removes a previously loaded metamodel from the registry and the EMF resource set.
    *
-   * <p>The package is also removed from {@link EPackage.Registry#INSTANCE} so that subsequent loads
-   * start from a clean state. No-op if the file was never loaded.
+   * <p>The package and its sub-packages are also removed from {@link EPackage.Registry#INSTANCE} so
+   * that subsequent loads start from a clean state. Names and nsURIs that another loaded metamodel
+   * also provides are then handed to that metamodel again. No-op if the file was never loaded.
    *
    * @param ecoreFile path to the {@code .ecore} file to remove
    */
@@ -504,19 +545,50 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
       return; // file was never loaded — nothing to do
     }
 
-    // Remove the EPackage from our registry and from the global EMF registry.
+    // Remove the EPackage and all its sub-packages from our registry and the global EMF registry.
     if (!toRemove.getContents().isEmpty()
         && toRemove.getContents().get(0) instanceof EPackage pkg) {
-      metamodelRegistry.remove(pkg.getName());
-      if (pkg.getNsURI() != null) {
-        EPackage.Registry.INSTANCE.remove(pkg.getNsURI());
-      }
+      unregisterPackageRecursively(pkg);
       // The known metamodel package set shrank, invalidating any cached engine built from it.
       invalidateAllInstancesCache(true);
     }
+    // Before unload() turns them into proxies: the file's EClasses must not stay in the engine's
+    // type set, where they would keep the whole unloaded package graph alive.
+    forgetQueriedTypesOf(toRemove);
 
     toRemove.unload();
     resourceSet.getResources().remove(toRemove);
+
+    // A package shadowed by the removed one (same name or nsURI) becomes visible again.
+    for (Resource remaining : new ArrayList<>(resourceSet.getResources())) {
+      if (!remaining.getContents().isEmpty()
+          && remaining.getContents().get(0) instanceof EPackage remainingPkg) {
+        registerPackageRecursively(remainingPkg);
+      }
+    }
+  }
+
+  private synchronized void forgetQueriedTypesOf(Resource resource) {
+    queriedAllInstancesTypes.removeIf(type -> type.eResource() == resource);
+  }
+
+  /**
+   * Reverses {@link #registerPackageRecursively}: removes {@code pkg} and its sub-packages by name
+   * and by nsURI. Entries that meanwhile point to a package from another file are left alone.
+   *
+   * <p>Sub-packages must be removed too: registration uses {@code putIfAbsent}, so a stale
+   * sub-package entry would otherwise survive a reload and shadow the new version.
+   */
+  private void unregisterPackageRecursively(EPackage pkg) {
+    if (pkg.getName() != null) {
+      metamodelRegistry.remove(pkg.getName(), pkg);
+    }
+    if (pkg.getNsURI() != null && EPackage.Registry.INSTANCE.get(pkg.getNsURI()) == pkg) {
+      EPackage.Registry.INSTANCE.remove(pkg.getNsURI());
+    }
+    for (EPackage subPkg : pkg.getESubpackages()) {
+      unregisterPackageRecursively(subPkg);
+    }
   }
 
   /**
