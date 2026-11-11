@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EEnumLiteral;
@@ -30,12 +31,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
+import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
+import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
+import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
+import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
 import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Regression tests for correctness bugs found in the November 2026 audit: element equality and
  * ordering, hash/equals consistency, string-to-number conversion failures, {@code sortedBy} with
- * empty keys, and bag intersection multiplicities.
+ * empty keys, bag intersection multiplicities, {@code at()} on string sequences, {@code any}/{@code
+ * one} with undefined bodies, {@code or} with an undefined operand, and the type checking of
+ * Real-to-Integer conformance and {@code includes}/{@code excludes}/{@code excluding} arguments.
  */
 class CorrectnessRegressionTest extends DummyTestSpecification {
 
@@ -317,6 +327,143 @@ class CorrectnessRegressionTest extends DummyTestSpecification {
       assertSize(compile("Bag{1, 1}.intersection(Bag{1})"), 1);
       assertSize(compile("Bag{1, 1, 2}.intersection(Bag{1, 1, 1})"), 2);
       assertSize(compile("Bag{1, 2, 3}.intersection(Bag{3, 2, 2})"), 2);
+    }
+  }
+
+  /** Runs passes 1 and 2 only and returns the messages of all reported errors. */
+  private List<String> typeErrors(String input) {
+    ParseTree tree = parse(input);
+    ErrorCollector errors = new ErrorCollector();
+    var spec = buildDummySpec();
+    SymbolTable symbolTable = new SymbolTableImpl(spec);
+    ScopeAnnotator scopes = new ScopeAnnotator();
+    new SymbolTableBuilder(symbolTable, spec, errors, scopes).visit(tree);
+    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, spec, errors, scopes);
+    typeChecker.visit(tree);
+    return errors.getErrors().stream().map(CompileError::getMessage).toList();
+  }
+
+  /** Asserts that type checking reports an error whose message contains {@code fragment}. */
+  private void assertTypeError(String input, String fragment) {
+    List<String> messages = typeErrors(input);
+    assertTrue(
+        messages.stream().anyMatch(m -> m.contains(fragment)),
+        "Expected a type error containing '" + fragment + "' for: " + input + ", got " + messages);
+  }
+
+  @Nested
+  class AtOnStringSequence {
+
+    @Test
+    void atReturnsWholeStringElement() {
+      assertSingleString(compile("Sequence{\"ab\", \"cd\"}.at(1)"), "ab");
+      assertSingleString(compile("Sequence{\"ab\", \"cd\"}.at(2)"), "cd");
+    }
+
+    @Test
+    void atOnSingleStringStillReturnsCharacter() {
+      assertSingleString(compile("\"ab\".at(2)"), "b");
+    }
+  }
+
+  @Nested
+  class UndefinedIteratorBody {
+
+    @Test
+    void anyWithUndefinedBodyFindsNothing() {
+      assertSize(compile("Sequence{1, 2}.any(x | Sequence{true}.select(b | false).first())"), 0);
+    }
+
+    @Test
+    void oneWithUndefinedBodyIsFalse() {
+      assertSingleBool(compile("Sequence{1, 2}.one(x | Sequence{true}.select(b | false).first())"), false);
+    }
+  }
+
+  @Nested
+  class OrWithUndefinedOperand {
+
+    // compile() parses a prefixed expression, so infix expressions are parenthesized
+
+    @Test
+    void trueOrUndefinedIsTrue() {
+      assertSingleBool(compile("(true or Sequence{true}.select(b | false).first())"), true);
+      assertSingleBool(compile("(Sequence{true}.select(b | false).first() or true)"), true);
+    }
+
+    @Test
+    void falseOrUndefinedStaysFalse() {
+      assertSingleBool(compile("(false or Sequence{true}.select(b | false).first())"), false);
+    }
+  }
+
+  @Nested
+  class RealToIntegerConformance {
+
+    @Test
+    void realIsNotAssignableToInteger() {
+      assertTypeError("let x : Integer = 1.5 in x", "Type mismatch");
+    }
+
+    @Test
+    void realIsNotAValidIndex() {
+      assertTypeError("Sequence{1, 2}.at(1.5)", "index must be Integer");
+    }
+
+    @Test
+    void conditionalWithRealBranchIsNotInteger() {
+      assertTypeError("let x : Integer = if true then 1.5 else 1 endif in x", "Type mismatch");
+    }
+
+    @Test
+    void integerIsStillAssignableToReal() {
+      assertSize(compile("let x : Real = 1 in x"), 1);
+    }
+  }
+
+  @Nested
+  class MembershipArgumentTyping {
+
+    private static final String SINGLE_ELEMENT = "expects a single element";
+
+    @Test
+    void includesWithCollectionArgumentIsRejected() {
+      assertTypeError("Set{1}.includes(Set{1, 2}.select(x | x > 1))", SINGLE_ELEMENT);
+    }
+
+    @Test
+    void excludesWithCollectionArgumentIsRejected() {
+      assertTypeError("Set{1}.excludes(Set{1, 2}.select(x | x > 1))", SINGLE_ELEMENT);
+    }
+
+    @Test
+    void excludingWithCollectionArgumentIsRejected() {
+      assertTypeError("Set{1}.excluding(Set{1, 2}.select(x | x > 1))", SINGLE_ELEMENT);
+    }
+
+    @Test
+    void countWithCollectionArgumentIsRejected() {
+      assertTypeError("Set{1, 2}.count(Set{1, 2})", SINGLE_ELEMENT);
+    }
+
+    @Test
+    void argumentIsTypeChecked() {
+      // the argument used to be skipped entirely, so errors inside it went unreported
+      assertFalse(typeErrors("Set{1}.includes(undefinedVariable)").isEmpty());
+      assertFalse(typeErrors("Set{1}.excludes(undefinedVariable)").isEmpty());
+      assertFalse(typeErrors("Set{1}.excluding(undefinedVariable)").isEmpty());
+    }
+
+    @Test
+    void collectionArgumentIsAllowedForNestedReceiver() {
+      assertTrue(typeErrors("Sequence{Set{1}}.includes(Set{1})").isEmpty());
+    }
+
+    @Test
+    void membershipWithElementArgumentStillWorks() {
+      assertSingleBool(compile("Set{1, 2}.includes(2)"), true);
+      assertSingleBool(compile("Set{1, 2}.excludes(3)"), true);
+      assertSize(compile("Set{1, 2}.excluding(2)"), 1);
     }
   }
 }

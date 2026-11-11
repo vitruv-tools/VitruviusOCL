@@ -522,6 +522,33 @@ class CorrespondenceFilterTest {
     }
 
     @Test
+    @DisplayName("reject(~, Type=T) keeps the receiver's element type, not T")
+    void testRejectTildeType_doesNotNarrowElementType() {
+      // The result holds every element that is not a corresponding T, so it contains non-T
+      // elements (here: Females) and must not be typed as a collection of T.
+      ConstraintResult narrowed =
+          eval(
+              """
+              context family::Member inv:
+                let ms : Set(persons::Male) =
+                  persons::Person.allInstances().reject(~, Type = persons::Male) in true
+              """);
+      assertFalse(narrowed.isSuccess(), "reject(~, Type=Male) must not be typed as Set(Male)");
+      assertTrue(
+          narrowed.toDetailedErrorString().contains("Type mismatch"),
+          "Expected a let type mismatch, got: " + narrowed.toDetailedErrorString());
+
+      assertSatisfied(
+          eval(
+              """
+              context family::Member inv:
+                self.firstName == "Homer" implies
+                  persons::Person.allInstances().reject(~, Type = persons::Male)
+                    .exists(p | p.oclIsKindOf(persons::Female))
+              """));
+    }
+
+    @Test
     @DisplayName("testRejectTildeType_Female_sizeFourForFather — type mismatch, all kept")
     void testRejectTildeType_female_sizeFourForFather() {
       assertSatisfied(

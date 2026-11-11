@@ -310,7 +310,8 @@ final class IteratorOperationEvaluation {
       // parent, not to iterScope - re-entering iterScope per element is what keeps that safe.
       Value bodyResult =
           evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> context.evaluate(ctx.body));
-      Boolean condition = bodyResult.getElements().get(0).tryGetBool();
+      Boolean condition =
+          bodyResult.isEmpty() ? null : bodyResult.getElements().get(0).tryGetBool();
       if (condition != null && condition) {
         count++;
         if (count == 2) {
@@ -358,7 +359,8 @@ final class IteratorOperationEvaluation {
       OCLElement elem = it.next();
       Value bodyResult =
           evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> context.evaluate(ctx.body));
-      Boolean condition = bodyResult.getElements().get(0).tryGetBool();
+      Boolean condition =
+          bodyResult.isEmpty() ? null : bodyResult.getElements().get(0).tryGetBool();
       if (condition != null && condition) {
         return new Value(List.of(elem), Type.optional(elemType));
       }

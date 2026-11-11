@@ -550,9 +550,6 @@ public abstract class Type {
       if (other == DOUBLE) {
         return true;
       }
-      if (other == INTEGER) {
-        return true;
-      }
       if (other == ERROR) {
         return true;
       }
@@ -575,8 +572,8 @@ public abstract class Type {
   /**
    * Float type implementation with implicit SINGLETON multiplicity.
    *
-   * <p>Represents EFloat attributes from EMF metamodels (e.g., Coordinate.x). Conforms to Double
-   * and Integer for arithmetic compatibility.
+   * <p>Represents EFloat attributes from EMF metamodels (e.g., Coordinate.x). Conforms to Double.
+   * Like Double it does not conform to Integer: a real value is not a valid Integer.
    */
   private static class FloatType extends Type {
     @Override
@@ -585,9 +582,6 @@ public abstract class Type {
         return true;
       }
       if (other == DOUBLE) {
-        return true;
-      }
-      if (other == INTEGER) {
         return true;
       }
       if (other == ERROR) {

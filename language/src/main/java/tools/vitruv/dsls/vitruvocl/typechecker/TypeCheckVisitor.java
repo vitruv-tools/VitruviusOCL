@@ -3098,10 +3098,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   /**
    * Type checks reject(~) / reject(~, Type=T, Tag='x') shorthand.
    *
-   * <p>Type filter narrows the element type of the returned collection.
+   * <p>The type filter does not narrow the result: reject keeps the elements that are not a
+   * corresponding T, which includes every non-T element.
    *
    * @param ctx The rejectCorrespondence node
-   * @return Refined or unchanged receiver collection type, or Type.ERROR
+   * @return the unchanged receiver collection type, or Type.ERROR
    */
   @Override
   public Type visitRejectCorrespondence(VitruvOCLParser.RejectCorrespondenceContext ctx) {
@@ -3134,18 +3135,15 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
 
     int corrErrsBefore = errors.getErrors().size();
-    Type filterType = visit(ctx.corrFilter);
+    visit(ctx.corrFilter);
     if (reportCorrFilterParseError(ctx.corrFilter, ctx, OP_REJECT, corrErrsBefore)) {
       return Type.ERROR;
     }
 
-    Type resultType =
-        (filterType != Type.ANY && filterType != Type.ERROR)
-            ? Type.preserveCollectionKind(receiverType, filterType)
-            : receiverType;
-
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    // No narrowing: reject keeps every element that is not a corresponding T, so the result
+    // still contains non-T elements and has the receiver's element type.
+    nodeTypes.put(ctx, receiverType);
+    return receiverType;
   }
 
   /**

@@ -260,8 +260,11 @@ final class CollectionOperationEvaluation {
       return Value.empty(Type.ANY);
     }
 
-    // String case
-    String str = receiver.isEmpty() ? null : receiver.getElements().get(0).tryGetString();
+    // String case: only a single String receiver, never a collection that happens to hold Strings
+    String str =
+        receiver.getRuntimeType().isCollection() || receiver.isEmpty()
+            ? null
+            : receiver.getElements().get(0).tryGetString();
     if (str != null) {
       if (index < 1 || index > str.length()) {
         return Value.empty(Type.STRING);

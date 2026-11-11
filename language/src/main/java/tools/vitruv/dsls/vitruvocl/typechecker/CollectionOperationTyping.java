@@ -59,6 +59,7 @@ final class CollectionOperationTyping {
       context.error(ctx, "'includes' requires a collection, ¡T!, or ¿T? receiver");
       return Type.ERROR;
     }
+    checkElementArgument(ctx, "includes", receiverType, context.check(ctx.arg));
 
     context.recordType(ctx, Type.BOOLEAN);
     return Type.BOOLEAN;
@@ -93,6 +94,7 @@ final class CollectionOperationTyping {
       context.error(ctx, "'excludes' requires a collection, ¡T!, or ¿T? receiver");
       return Type.ERROR;
     }
+    checkElementArgument(ctx, "excludes", receiverType, context.check(ctx.arg));
 
     context.recordType(ctx, Type.BOOLEAN);
     return Type.BOOLEAN;
@@ -145,6 +147,42 @@ final class CollectionOperationTyping {
   }
 
   /**
+   * Checks the argument of an operation that takes a single element ({@code includes}, {@code
+   * excludes}, {@code excluding}, {@code count}).
+   *
+   * <p>The evaluator only looks at the first element of the argument, so a collection argument
+   * would silently be reduced to that element: it is an error unless the receiver itself holds
+   * collections. An argument whose type cannot occur in the receiver only gets a warning.
+   */
+  private void checkElementArgument(
+      ParserRuleContext ctx, String operation, Type receiverType, Type argType) {
+    if (argType == Type.ERROR) {
+      return; // already reported
+    }
+    Type elemType = receiverType.getElementType();
+    if (argType.isCollection() && !elemType.isCollection()) {
+      context.error(
+          ctx,
+          "'"
+              + operation
+              + "' expects a single element of type "
+              + elemType
+              + ", got collection "
+              + argType);
+      return;
+    }
+    if (!argType.isConformantTo(elemType) && !Type.conformsWithUnwrapping(argType, elemType)) {
+      context.warning(
+          ctx,
+          operation
+              + "() argument type "
+              + argType
+              + " incompatible with collection element type "
+              + elemType);
+    }
+  }
+
+  /**
    * Type checks the {@code count()} operation.
    *
    * <p>Returns how many times an element occurs in the collection.
@@ -161,18 +199,7 @@ final class CollectionOperationTyping {
       context.error(ctx, "'count' requires collection receiver");
       return Type.ERROR;
     }
-    Type argType = context.check(ctx.arg);
-    Type elemType = receiverType.getElementType();
-    if (!argType.isConformantTo(elemType)
-        && !Type.conformsWithUnwrapping(argType, elemType)
-        && argType != Type.ERROR) {
-      context.warning(
-          ctx,
-          "count() argument type "
-              + argType
-              + " incompatible with collection element type "
-              + elemType);
-    }
+    checkElementArgument(ctx, "count", receiverType, context.check(ctx.arg));
     context.recordType(ctx, Type.INTEGER);
     return Type.INTEGER;
   }
@@ -416,6 +443,7 @@ final class CollectionOperationTyping {
       context.error(ctx, "'excluding' requires collection");
       return Type.ERROR;
     }
+    checkElementArgument(ctx, "excluding", receiverType, context.check(ctx.arg));
 
     context.recordType(ctx, receiverType);
     return receiverType;

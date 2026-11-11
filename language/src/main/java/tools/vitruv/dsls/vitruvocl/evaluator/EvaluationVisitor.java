@@ -1443,7 +1443,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitLogicalOr(VitruvOCLParser.LogicalOrContext ctx) {
-    return evaluateBinaryLogical(ctx.left, ctx.right, (left, right) -> left || right);
+    Value leftValue = visit(ctx.left);
+    Value rightValue = visit(ctx.right);
+    if (isTrue(leftValue) || isTrue(rightValue)) {
+      return Value.boolValue(true); // true or R is true for every value of R, even an undefined one
+    }
+    return combineLogical(leftValue, rightValue, (left, right) -> left || right);
   }
 
   /**
@@ -2695,6 +2700,13 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return false;
     }
     return Boolean.FALSE.equals(value.getElements().get(0).tryGetBool());
+  }
+
+  private static boolean isTrue(Value value) {
+    if (value.isEmpty() || value.size() != 1) {
+      return false;
+    }
+    return Boolean.TRUE.equals(value.getElements().get(0).tryGetBool());
   }
 
   /**
