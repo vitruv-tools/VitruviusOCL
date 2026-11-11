@@ -122,6 +122,9 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    */
   private AllInstancesEngine allInstancesEngine;
 
+  /** The packages {@link #allInstancesEngine} was analysed with. */
+  private Set<EPackage> enginePackages = Set.of();
+
   /**
    * Result of the last single-pass traversal: the instances of every type in {@link
    * #queriedAllInstancesTypes}; {@code null} means stale/not-yet-computed.
@@ -477,12 +480,12 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     if (pkg.getNsURI() != null) {
       EPackage.Registry.INSTANCE.put(pkg.getNsURI(), pkg);
     }
-    // Also register by name so resolveEClass("tires", "Tire") works.
-    // A genuinely new package changes what computeTraversableReferences() can see, so it
-    // invalidates the cached engine (putIfAbsent returns null exactly when newly inserted).
-    if (pkg.getName() != null && metamodelRegistry.putIfAbsent(pkg.getName(), pkg) == null) {
-      invalidateAllInstancesCache(true);
+    // Also register by name so resolveEClass("tires", "Tire") works. Every loaded package changes
+    // what computeTraversableReferences() can see, also one whose name is already taken.
+    if (pkg.getName() != null) {
+      metamodelRegistry.putIfAbsent(pkg.getName(), pkg);
     }
+    invalidateAllInstancesCache(true);
     for (EPackage subPkg : pkg.getESubpackages()) {
       registerPackageRecursively(subPkg);
     }
@@ -737,9 +740,15 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     if (queriedAllInstancesTypes.addAll(types)) {
       invalidateAllInstancesCache(true); // newly-seen call site -> cache configuration is stale
     }
+    Set<EPackage> packages = analyzedPackages();
+    if (!enginePackages.containsAll(packages)) {
+      // a package the pruning does not know may hold instances below a pruned reference
+      invalidateAllInstancesCache(true);
+    }
     if (cachedInstancesByType == null) {
       if (allInstancesEngine == null) {
-        allInstancesEngine = buildAllInstancesEngine();
+        allInstancesEngine = buildAllInstancesEngine(packages);
+        enginePackages = packages;
       }
       trackExtensionChanges();
       cachedInstancesByType = freeze(allInstancesEngine.compute(contextObjects));
@@ -779,12 +788,33 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
   /**
    * Builds a fresh {@link AllInstancesEngine} from the currently known metamodels and call sites.
    */
-  private AllInstancesEngine buildAllInstancesEngine() {
+  private AllInstancesEngine buildAllInstancesEngine(Set<EPackage> packages) {
     List<AllInstancesCallSite> callSites = new ArrayList<>(queriedAllInstancesTypes.size());
     for (EClass type : queriedAllInstancesTypes) {
       callSites.add(new AllInstancesCallSite(type, AllInstancesCallSite.Kind.ALL_OF_KIND));
     }
-    return new AllInstancesEngine(new LinkedHashSet<>(metamodelRegistry.values()), callSites);
+    return new AllInstancesEngine(packages, callSites);
+  }
+
+  /**
+   * Every package instances can come from (see {@link AnalyzedPackages}): the name-keyed registry
+   * keeps only one package per name, so the root packages of all loaded {@code .ecore} resources,
+   * the packages of the model roots and the instantiated packages of the global and the resource
+   * set's package registry are added.
+   */
+  private Set<EPackage> analyzedPackages() {
+    List<EPackage> known = new ArrayList<>(metamodelRegistry.values());
+    for (Resource resource : resourceSet.getResources()) {
+      for (EObject content : resource.getContents()) {
+        if (content instanceof EPackage pkg) {
+          known.add(pkg);
+        }
+      }
+    }
+    List<Object> registered =
+        new ArrayList<>(AnalyzedPackages.snapshot(EPackage.Registry.INSTANCE));
+    registered.addAll(resourceSet.getPackageRegistry().values());
+    return AnalyzedPackages.collect(known, contextObjects, registered);
   }
 
   /**
