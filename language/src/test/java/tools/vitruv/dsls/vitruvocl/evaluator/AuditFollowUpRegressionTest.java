@@ -281,4 +281,54 @@ class AuditFollowUpRegressionTest extends DummyTestSpecification {
           () -> compile("Sequence{\"b\", \"(\"}.reject(p | \"a\".matches(p)).notEmpty()"));
     }
   }
+
+  @Nested
+  class IterateIncluding {
+
+    @Test
+    void sequenceAccumulatorKeepsOrderAndDuplicates() {
+      assertCollection(
+          compile(
+              "Sequence{3, 1, 3}.iterate(x; acc : Sequence(Integer) = Sequence{0} |"
+                  + " acc.including(x))"),
+          0, 3, 1, 3);
+    }
+
+    @Test
+    void setAccumulatorDropsDuplicates() {
+      assertSize(
+          compile(
+              "Sequence{3, 1, 3, 1}.iterate(x; acc : Set(Integer) = Set{1} | acc.including(x))"),
+          2);
+    }
+
+    @Test
+    void orderedSetAccumulatorKeepsFirstOccurrence() {
+      assertCollection(
+          compile(
+              "Sequence{2, 1, 2, 3}.iterate(x; acc : OrderedSet(Integer) = OrderedSet{2} |"
+                  + " acc.including(x))"),
+          2, 1, 3);
+    }
+
+    @Test
+    void argumentReadingTheAccumulatorStillWorks() {
+      assertCollection(
+          compile(
+              "Sequence{1, 2, 3}.iterate(x; acc : Sequence(Integer) = Sequence{7} |"
+                  + " acc.including(acc.size()))"),
+          7, 1, 2, 3);
+    }
+
+    @Test
+    void largeAccumulatorIsBuiltInLinearTime() {
+      long start = System.nanoTime();
+      Value result =
+          compile(
+              "Sequence{1..20000}.iterate(x; acc : Set(Integer) = Set{0} | acc.including(x))");
+      long millis = (System.nanoTime() - start) / 1_000_000;
+      assertSize(result, 20001);
+      assertTrue(millis < 5_000, "took " + millis + " ms");
+    }
+  }
 }

@@ -15,16 +15,21 @@ package tools.vitruv.dsls.vitruvocl.pipeline;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.OclLexers;
+import tools.vitruv.dsls.vitruvocl.evaluator.AllInstancesTypeScanner;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
@@ -195,6 +200,63 @@ public class VitruvOCLCompiler {
             transactionSupported);
     lastEvaluator = evaluator;
     return evaluator.visit(tree);
+  }
+
+  /**
+   * Returns the metaclasses whose instances evaluating {@code constraint} may request (its context
+   * types and {@code allInstances()} receivers), by running only parsing, symbol table and type
+   * checking. Used to fetch the instances of a whole batch of constraints in one traversal.
+   *
+   * @return the requested types; empty if the constraint does not compile
+   */
+  public static Set<EClass> requestedTypes(String constraint, MetamodelWrapperInterface wrapper) {
+    VitruvOCLLexer lexer = OclLexers.create(CharStreams.fromString(constraint));
+    lexer.removeErrorListeners(); // the evaluation reports syntax errors once
+    CommonTokenStream tokens = new CommonTokenStream(lexer);
+    VitruvOCLParser parser = new VitruvOCLParser(tokens);
+    parser.removeErrorListeners();
+    VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
+    if (parser.getNumberOfSyntaxErrors() > 0) {
+      return Set.of();
+    }
+    ErrorCollector scratch = new ErrorCollector();
+    SymbolTableImpl symbolTable = new SymbolTableImpl(wrapper);
+    ScopeAnnotator scopes = new ScopeAnnotator();
+    new SymbolTableBuilder(symbolTable, wrapper, scratch, scopes).visit(tree);
+    if (scratch.hasErrors()) {
+      return Set.of();
+    }
+    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, scratch, scopes);
+    typeChecker.setTokenStream(tokens);
+    typeChecker.visit(tree);
+    if (scratch.hasErrors()) {
+      return Set.of();
+    }
+    return AllInstancesTypeScanner.scan(tree, typeChecker.getNodeTypes());
+  }
+
+  /**
+   * Requests the instances of every type the {@code constraints} may need in one call, so that a
+   * single traversal serves the whole batch (Wei &amp; Kolovos' "one traversal serves all", across
+   * constraints) instead of one traversal per newly requested type. Costs an extra parse and type
+   * check per constraint, so it is skipped for a single constraint.
+   */
+  public static void prefetchInstances(
+      Collection<String> constraints, MetamodelWrapperInterface wrapper) {
+    if (constraints.size() < 2) {
+      return;
+    }
+    try {
+      Set<EClass> types = new LinkedHashSet<>();
+      for (String constraint : constraints) {
+        types.addAll(VitruvOCLCompiler.requestedTypes(constraint, wrapper));
+      }
+      if (types.size() > 1) {
+        wrapper.getAllInstances(types);
+      }
+    } catch (RuntimeException | StackOverflowError e) {
+      // only an optimization: each constraint's own evaluation reports the failure
+    }
   }
 
   /**

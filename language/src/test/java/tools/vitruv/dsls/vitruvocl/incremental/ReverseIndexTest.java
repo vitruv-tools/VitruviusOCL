@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
 import org.junit.jupiter.api.Test;
@@ -42,5 +43,25 @@ class ReverseIndexTest {
     index.apply(EChangeClassifier.classify(List.of(unknown)));
 
     assertTrue(index.holders(refs, a1).contains(b2), "b2 must be found as a holder of a1");
+  }
+
+  @Test
+  void declaredReferencesAreIndexedInOneWalk() {
+    EdgeFixture fx = EdgeFixture.create();
+    AtomicInteger walks = new AtomicInteger();
+    ReverseIndex index =
+        new ReverseIndex(
+            () -> {
+              walks.incrementAndGet();
+              return fx.model().wrapper().getAllRootObjects();
+            });
+    EObject a1 = fx.find("a1");
+    EReference refs = (EReference) EdgeFixture.feature(a1, "refs");
+    EReference next = (EReference) EdgeFixture.feature(a1, "next");
+    index.declare(List.of(refs, next));
+
+    assertEquals(List.of(fx.find("b1")), index.holders(refs, a1));
+    assertEquals(List.of(a1), index.holders(next, fx.find("b1")));
+    assertEquals(1, walks.get(), "both references must come from one model walk");
   }
 }

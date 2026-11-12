@@ -124,6 +124,13 @@ public class Value implements Comparable<Value> {
     this.runtimeType = runtimeType;
   }
 
+  /** Wraps an immutable singleton list without copying it; see {@link #singleton}. */
+  private Value(OCLElement element, Type runtimeType) {
+    this.elements = List.of(element);
+    this.lazySource = null;
+    this.runtimeType = runtimeType;
+  }
+
   /** Private constructor for a lazily-backed Value; use the {@link #lazy} factory. */
   private Value(OCLElementSource lazySource, Type runtimeType) {
     this.elements = null;
@@ -165,7 +172,7 @@ public class Value implements Comparable<Value> {
 
   /** Creates a singleton Value (¡τ!). */
   public static Value singleton(OCLElement elem, Type type) {
-    return new Value(List.of(elem), type);
+    return new Value(elem, type); // a null element fails here, as before
   }
 
   /** Creates a Value from multiple elements. */
@@ -180,8 +187,11 @@ public class Value implements Comparable<Value> {
 
   /** Convenience: Creates boolean singleton. */
   public static Value boolValue(boolean value) {
-    return singleton(new OCLElement.BoolValue(value), Type.BOOLEAN);
+    return value ? TRUE : FALSE; // immutable, so shared
   }
+
+  private static final Value TRUE = singleton(new OCLElement.BoolValue(true), Type.BOOLEAN);
+  private static final Value FALSE = singleton(new OCLElement.BoolValue(false), Type.BOOLEAN);
 
   /** Convenience: Creates string singleton. */
   public static Value stringValue(String value) {

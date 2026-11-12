@@ -226,6 +226,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /** Result of {@link #cannotReportErrors} per constraint (parse-tree root). */
   private final Map<ParseTree, Boolean> errorFreeConstraints = new IdentityHashMap<>();
 
+  /**
+   * Value of each number and string literal node, computed once instead of re-parsing the literal
+   * for every context instance and iteration step. Safe to share: values are immutable.
+   */
+  private final Map<ParserRuleContext, Value> literalValues = new IdentityHashMap<>();
+
   /** Right operands skipped because their correspondence guard was false (statistics). */
   private int correspondenceShortCircuits;
 
@@ -1422,15 +1428,20 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitLogicalAnd(VitruvOCLParser.LogicalAndContext ctx) {
-    if (isCorrespondenceGuard(ctx.left)) {
-      Value guard = visit(ctx.left);
-      if (isFalse(guard) && cannotReportErrors(ctx.right)) {
-        correspondenceShortCircuits++;
-        return Value.boolValue(false); // false and R is false for every value of R
-      }
-      return combineLogical(guard, visit(ctx.right), (left, right) -> left && right);
+    Value leftValue = visit(ctx.left);
+    // anything but a single true makes the conjunction false for every value of R
+    if (!isTrue(leftValue) && cannotReportErrors(ctx.right)) {
+      countShortCircuit(ctx.left);
+      return Value.boolValue(false);
     }
-    return evaluateBinaryLogical(ctx.left, ctx.right, (left, right) -> left && right);
+    return combineLogical(leftValue, visit(ctx.right), (left, right) -> left && right);
+  }
+
+  /** Counts a skipped right operand behind a correspondence guard (observable in tests). */
+  private void countShortCircuit(ParserRuleContext left) {
+    if (isCorrespondenceGuard(left)) {
+      correspondenceShortCircuits++;
+    }
   }
 
   /**
@@ -1444,9 +1455,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitLogicalOr(VitruvOCLParser.LogicalOrContext ctx) {
     Value leftValue = visit(ctx.left);
+    if (isTrue(leftValue) && cannotReportErrors(ctx.right)) {
+      return Value.boolValue(true); // true or R is true for every value of R, even an undefined one
+    }
     Value rightValue = visit(ctx.right);
     if (isTrue(leftValue) || isTrue(rightValue)) {
-      return Value.boolValue(true); // true or R is true for every value of R, even an undefined one
+      return Value.boolValue(true);
     }
     return combineLogical(leftValue, rightValue, (left, right) -> left || right);
   }
@@ -1531,9 +1545,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitImplication(VitruvOCLParser.ImplicationContext ctx) {
     Value leftValue = visit(ctx.left);
-    if (isCorrespondenceGuard(ctx.left) && isFalse(leftValue) && cannotReportErrors(ctx.right)) {
-      correspondenceShortCircuits++;
-      return Value.boolValue(true); // false implies R is true for every value of R
+    // anything but a single true makes the implication true for every value of R
+    if (!isTrue(leftValue) && cannotReportErrors(ctx.right)) {
+      countShortCircuit(ctx.left);
+      return Value.boolValue(true);
     }
     Value rightValue = visit(ctx.right);
 
@@ -2379,11 +2394,15 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitNumberLit(VitruvOCLParser.NumberLitContext ctx) {
-    String text = ctx.getText();
-    if (text.contains(".") || text.contains("e") || text.contains("E")) {
-      return Value.doubleValue(Double.parseDouble(text));
-    }
-    return Value.intValue(Integer.parseInt(text));
+    return literalValues.computeIfAbsent(
+        ctx,
+        literal -> {
+          String text = literal.getText();
+          if (text.contains(".") || text.contains("e") || text.contains("E")) {
+            return Value.doubleValue(Double.parseDouble(text));
+          }
+          return Value.intValue(Integer.parseInt(text));
+        });
   }
 
   /**
@@ -2396,9 +2415,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   @Override
   public Value visitStringLit(VitruvOCLParser.StringLitContext ctx) {
-    String text = ctx.getText();
-    String value = text.substring(1, text.length() - 1); // Remove quotes
-    return Value.stringValue(value);
+    return literalValues.computeIfAbsent(
+        ctx,
+        literal -> {
+          String text = literal.getText();
+          return Value.stringValue(text.substring(1, text.length() - 1)); // Remove quotes
+        });
   }
 
   /**
@@ -2693,13 +2715,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /** Whether {@code operand} is a binary {@code ~} and the fast paths are on. */
   private boolean isCorrespondenceGuard(ParserRuleContext operand) {
     return correspondenceFastPaths && operand instanceof VitruvOCLParser.CorrespondenceContext;
-  }
-
-  private static boolean isFalse(Value value) {
-    if (value.isEmpty() || value.size() != 1) {
-      return false;
-    }
-    return Boolean.FALSE.equals(value.getElements().get(0).tryGetBool());
   }
 
   private static boolean isTrue(Value value) {

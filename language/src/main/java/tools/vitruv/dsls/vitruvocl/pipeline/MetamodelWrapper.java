@@ -20,10 +20,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -153,6 +156,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
           super.notifyChanged(notification);
           if (!notification.isTouch() && affectsContainment(notification.getFeature())) {
             invalidateAllInstancesCache(false);
+            invalidateCorrespondenceIndex(); // fragment URIs may have changed
           }
         }
 
@@ -190,6 +194,15 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * Both directions are stored so lookups are O(1) regardless of order.
    */
   private final Map<String, Set<String>> correspondenceTagMap = new HashMap<>();
+
+  /**
+   * {@link #correspondenceUriMap} and {@link #correspondenceTagMap} resolved to objects: object →
+   * partner → tags of their correspondences (an untagged correspondence contributes {@code null}).
+   * Built on first use, so URIs are computed once instead of per lookup; {@code null} when stale,
+   * i.e. after loading or unloading models or correspondences and after a containment change
+   * (which changes fragment URIs).
+   */
+  private Map<EObject, Map<EObject, Set<String>>> correspondenceIndex;
 
   /** Ordered list of context-level (root) EObjects for index-based lookup from evaluator. */
   private final List<EObject> contextObjects = new ArrayList<>();
@@ -537,6 +550,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param ecoreFile path to the {@code .ecore} file to remove
    */
   public synchronized void unloadMetamodel(Path ecoreFile) {
+    invalidateCorrespondenceIndex(); // removed objects must leave the index
     String targetUri = URI.createFileURI(ecoreFile.toAbsolutePath().toString()).toString();
 
     // Find the cached Resource in the ResourceSet by URI.
@@ -557,6 +571,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
         && toRemove.getContents().get(0) instanceof EPackage pkg) {
       unregisterPackageRecursively(pkg);
       // The known metamodel package set shrank, invalidating any cached engine built from it.
+      invalidateCorrespondenceIndex();
       invalidateAllInstancesCache(true);
     }
     // Before unload() turns them into proxies: the file's EClasses must not stay in the engine's
@@ -638,6 +653,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     }
     // New roots extend the traversal root set, so every cached extension may have grown.
     invalidateAllInstancesCache(false);
+    invalidateCorrespondenceIndex(); // stored URIs may resolve to the new objects
   }
 
   /**
@@ -951,6 +967,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
         }
         for (String l : lefts) {
           for (String r : rights) {
+            correspondenceIndex = null;
             correspondenceUriMap.computeIfAbsent(l, k -> new LinkedHashSet<>()).add(r);
             correspondenceUriMap.computeIfAbsent(r, k -> new LinkedHashSet<>()).add(l);
             if (tag != null && !tag.isEmpty()) {
@@ -1014,43 +1031,130 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
 
   @Override
   public synchronized Set<EObject> getCorrespondingObjects(EObject source) {
-    // Resolve the source object's absolute URI (file URI + fragment)
-    URI sourceUri = EcoreUtil.getURI(source);
-    if (sourceUri == null) {
-      return Collections.emptySet();
-    }
-    String sourceUriStr = sourceUri.toString();
-
-    Set<String> correspondingUris = correspondenceUriMap.get(sourceUriStr);
-    if (correspondingUris == null || correspondingUris.isEmpty()) {
-      return Collections.emptySet();
-    }
-
-    Set<EObject> result = new LinkedHashSet<>();
-    for (String targetUriStr : correspondingUris) {
-      try {
-        URI targetUri = URI.createURI(targetUriStr);
-        EObject target = resourceSet.getEObject(targetUri, false);
-        if (target != null && !target.eIsProxy()) {
-          result.add(target);
-        }
-      } catch (Exception e) {
-        // unresolvable reference — skip
-      }
-    }
-    return result;
+    Map<EObject, Set<String>> partners = correspondenceIndex().get(source);
+    return partners == null ? Collections.emptySet() : new LinkedHashSet<>(partners.keySet());
   }
 
   @Override
   public synchronized boolean correspondenceHasTag(EObject obj1, EObject obj2, String tag) {
-    URI uri1 = EcoreUtil.getURI(obj1);
-    URI uri2 = EcoreUtil.getURI(obj2);
-    if (uri1 == null || uri2 == null) {
-      return false;
+    if (tag == null) {
+      return false; // as before: there is no correspondence with the tag null
     }
-    String key = uri1.toString() + "|" + uri2.toString();
-    Set<String> tags = correspondenceTagMap.get(key);
+    Map<EObject, Set<String>> partners = correspondenceIndex().get(obj1);
+    Set<String> tags = partners == null ? null : partners.get(obj2);
     return tags != null && tags.contains(tag);
+  }
+
+  @Override
+  public synchronized Set<EObject> getCorrespondingObjectsWithTag(EObject source, String tag) {
+    Set<EObject> result = new LinkedHashSet<>();
+    Map<EObject, Set<String>> partners = correspondenceIndex().get(source);
+    if (partners != null && tag != null) {
+      partners.forEach(
+          (partner, tags) -> {
+            if (tags.contains(tag)) {
+              result.add(partner);
+            }
+          });
+    }
+    return result;
+  }
+
+  /** The index answers tagged lookups symmetrically, exactly like {@link #correspondenceHasTag}. */
+  @Override
+  public boolean hasTaggedCorrespondenceLookup() {
+    return true;
+  }
+
+  @Override
+  public synchronized Optional<Set<EObject>> getAllObjectsInACorrespondence() {
+    Set<EObject> participants = Collections.newSetFromMap(new IdentityHashMap<>());
+    participants.addAll(correspondenceIndex().keySet());
+    return Optional.of(participants);
+  }
+
+  @Override
+  public synchronized Map<String, Set<EObject>> getCorrespondingObjectsByTag(EObject source) {
+    Map<String, Set<EObject>> byTag = new HashMap<>();
+    Map<EObject, Set<String>> partners = correspondenceIndex().get(source);
+    if (partners != null) {
+      partners.forEach(
+          (partner, tags) -> {
+            for (String tag : tags) {
+              byTag.computeIfAbsent(tag, k -> new LinkedHashSet<>()).add(partner);
+            }
+          });
+    }
+    return byTag;
+  }
+
+  /** Builds {@link #correspondenceIndex} if it is stale; see there. */
+  private Map<EObject, Map<EObject, Set<String>>> correspondenceIndex() {
+    if (correspondenceIndex != null) {
+      return correspondenceIndex;
+    }
+    trackExtensionChanges(); // containment changes (which change fragment URIs) invalidate it
+    Map<String, EObject> resolved = new HashMap<>();
+    Map<EObject, Map<EObject, Set<String>>> index = new IdentityHashMap<>();
+    correspondenceUriMap.forEach(
+        (sourceUri, targetUris) -> {
+          // like the URI-based lookup: a source is found under its current URI, a partner is
+          // whatever object its stored URI resolves to now
+          EObject source = resolveCorrespondent(sourceUri, resolved);
+          if (source == null || !sourceUri.equals(String.valueOf(EcoreUtil.getURI(source)))) {
+            return;
+          }
+          for (String targetUri : targetUris) {
+            EObject target = resolveCorrespondent(targetUri, resolved);
+            if (target != null) {
+              Set<String> tags = correspondenceTagMap.get(sourceUri + "|" + targetUri);
+              // both directions, so the relation is symmetric even for non-canonical hrefs
+              addCorrespondence(index, source, target, tags);
+              addCorrespondence(index, target, source, tags);
+            }
+          }
+        });
+    correspondenceIndex = index;
+    return index;
+  }
+
+  private static void addCorrespondence(
+      Map<EObject, Map<EObject, Set<String>>> index,
+      EObject from,
+      EObject to,
+      Set<String> tags) {
+    Set<String> entry =
+        index
+            .computeIfAbsent(from, k -> new LinkedHashMap<>())
+            .computeIfAbsent(to, k -> new HashSet<>());
+    if (tags == null || tags.isEmpty()) {
+      entry.add(null); // untagged
+    } else {
+      entry.addAll(tags);
+    }
+  }
+
+  /** The loaded object {@code uri} resolves to, or {@code null}. */
+  private EObject resolveCorrespondent(String uri, Map<String, EObject> resolved) {
+    if (resolved.containsKey(uri)) {
+      return resolved.get(uri);
+    }
+    EObject object;
+    try {
+      object = resourceSet.getEObject(URI.createURI(uri), false);
+    } catch (RuntimeException e) {
+      object = null; // unresolvable reference: skipped, as before
+    }
+    if (object != null && object.eIsProxy()) {
+      object = null;
+    }
+    resolved.put(uri, object);
+    return object;
+  }
+
+  /** Marks {@link #correspondenceIndex} stale. */
+  private synchronized void invalidateCorrespondenceIndex() {
+    correspondenceIndex = null;
   }
 
   private static DocumentBuilder newSecureDocumentBuilder() throws ParserConfigurationException {

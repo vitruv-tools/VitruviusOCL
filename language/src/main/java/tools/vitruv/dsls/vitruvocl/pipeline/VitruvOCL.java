@@ -373,10 +373,14 @@ public class VitruvOCL {
     }
 
     List<ConstraintResult> evaluated =
-        ConstraintListEvaluator.evaluate(
-            toEvaluate,
-            c -> compileAndEvaluate(c, wrapper, List.of(), transaction, transactionSupported),
-            threadPoolSize);
+        wrapper.batch(
+            view -> {
+              VitruvOCLCompiler.prefetchInstances(toEvaluate, view);
+              return ConstraintListEvaluator.evaluate(
+                  toEvaluate,
+                  c -> compileAndEvaluate(c, view, List.of(), transaction, transactionSupported),
+                  threadPoolSize);
+            });
 
     for (int i = 0; i < evaluated.size(); i++) {
       results.set(toEvaluateIndices.get(i), evaluated.get(i));

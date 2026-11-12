@@ -20,6 +20,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
@@ -362,7 +363,7 @@ final class IteratorOperationEvaluation {
       Boolean condition =
           bodyResult.isEmpty() ? null : bodyResult.getElements().get(0).tryGetBool();
       if (condition != null && condition) {
-        return new Value(List.of(elem), Type.optional(elemType));
+        return Value.singleton(elem, Type.optional(elemType));
       }
     }
     return Value.empty(Type.singleton(elemType));
@@ -576,6 +577,15 @@ final class IteratorOperationEvaluation {
     // streaming via elementIterator() and the previous getElements()-based materialization produce
     // identical results for a targeted shadowing/gap construction - this change fixes no
     // correctness bug (there wasn't one), it is a pure memory/streaming optimization.
+    VitruvOCLParser.IncludingOpContext including =
+        varSpec.iterVar.getText().equals(varSpec.accVar.getText())
+            ? null
+            : accumulatingIncluding(ctx.body, varSpec.accVar.getText());
+    if (including != null) {
+      return iterateIncluding(
+          receiver, including, accValue, iterScope, iterSymbol, iterVarType);
+    }
+
     Iterator<OCLElement> it = receiver.elementIterator();
     while (it.hasNext()) {
       OCLElement elem = it.next();
@@ -587,6 +597,112 @@ final class IteratorOperationEvaluation {
       accSymbol.setValue(bodyResult);
     }
     return accSymbol.getValue();
+  }
+
+  /**
+   * The {@code including} operation if {@code body} is exactly {@code acc.including(e)} and
+   * {@code e} does not mention {@code acc}; otherwise {@code null}. Such an iterate only appends to
+   * its accumulator, which {@link #iterateIncluding} does in linear instead of quadratic time.
+   */
+  private static VitruvOCLParser.IncludingOpContext accumulatingIncluding(
+      ParserRuleContext body, String accName) {
+    VitruvOCLParser.PrimaryWithNavContext primary = soleDescendant(body);
+    if (primary == null
+        || !primary.getText().equals(body.getText())
+        || primary.base == null
+        || !primary.base.getText().equals(accName)
+        || primary.navigationChainCS().size() != 1) {
+      return null;
+    }
+    VitruvOCLParser.IncludingOpContext including =
+        firstOfType(primary.navigationChainCS(0), VitruvOCLParser.IncludingOpContext.class);
+    if (including == null
+        || !primary.navigationChainCS(0).getText().equals("." + including.getText())
+        || mentions(including.arg, accName)) {
+      return null;
+    }
+    return including;
+  }
+
+  /** The outermost {@code PrimaryWithNav} node of {@code node}, following single-child chains. */
+  private static VitruvOCLParser.PrimaryWithNavContext soleDescendant(ParseTree node) {
+    ParseTree current = node;
+    while (current != null) {
+      if (current instanceof VitruvOCLParser.PrimaryWithNavContext primary) {
+        return primary;
+      }
+      current = current.getChildCount() == 1 ? current.getChild(0) : null;
+    }
+    return null;
+  }
+
+  private static <T extends ParseTree> T firstOfType(ParseTree node, Class<T> type) {
+    if (type.isInstance(node)) {
+      return type.cast(node);
+    }
+    for (int i = 0; i < node.getChildCount(); i++) {
+      T found = firstOfType(node.getChild(i), type);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /** Whether {@code node} contains a variable reference (or any token) named {@code name}. */
+  private static boolean mentions(ParseTree node, String name) {
+    if (node instanceof TerminalNode terminal) {
+      return terminal.getText().equals(name);
+    }
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (mentions(node.getChild(i), name)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Evaluates {@code iterate(x; acc = init | acc.including(e))} by appending each {@code e} to one
+   * growing list, deduplicated through a hash index for unique accumulator kinds: the same result
+   * as re-evaluating {@code acc.including(e)} (a copy of the whole accumulator) on every step.
+   */
+  private Value iterateIncluding(
+      Value receiver,
+      VitruvOCLParser.IncludingOpContext including,
+      Value accValue,
+      LocalScope iterScope,
+      VariableSymbol iterSymbol,
+      Type iterVarType) {
+    Type accType = accValue.getRuntimeType();
+    boolean unique = accType.isUnique();
+    List<OCLElement> elements = new ArrayList<>();
+    LazyOperations.HashedBuffer seen = LazyOperations.newSemanticBuffer();
+    for (OCLElement initial : accValue.getElements()) {
+      if (!unique) {
+        elements.add(initial);
+      } else if (!seen.contains(initial)) {
+        seen.add(initial);
+        elements.add(initial);
+      }
+    }
+    Iterator<OCLElement> it = receiver.elementIterator();
+    while (it.hasNext()) {
+      Value added =
+          evalInScopeMaterialized(
+              iterScope, iterSymbol, iterVarType, it.next(), () -> context.evaluate(including.arg));
+      if (added.isEmpty()) {
+        continue; // including(<empty>) leaves the accumulator unchanged
+      }
+      OCLElement element = added.getElements().get(0);
+      if (!unique) {
+        elements.add(element);
+      } else if (!seen.contains(element)) {
+        seen.add(element);
+        elements.add(element);
+      }
+    }
+    return Value.of(elements, accType);
   }
 
   /**
@@ -1020,7 +1136,7 @@ final class IteratorOperationEvaluation {
    * elem}, without reallocating the symbol or touching its scope's variable map again.
    */
   private static void rebindIterVar(VariableSymbol symbol, Type iterVarType, OCLElement elem) {
-    symbol.setValue(new Value(List.of(elem), iterVarType));
+    symbol.setValue(Value.singleton(elem, iterVarType));
   }
 
   /**

@@ -201,11 +201,12 @@ final class CollectionOperationEvaluation {
    * @return A singleton containing the first element, or empty
    */
   Value first(VitruvOCLParser.FirstOpContext ctx) {
-    Value receiver = context.receiver();
-    if (receiver.isEmpty()) {
+    // pulls one element: a lazy receiver (e.g. a select() chain) is not drained
+    java.util.Iterator<OCLElement> elements = context.receiver().elementIterator();
+    if (!elements.hasNext()) {
       return Value.empty(Type.optional(Type.ANY));
     }
-    return new Value(List.of(receiver.getElements().get(0)), Type.optional(Type.ANY));
+    return new Value(List.of(elements.next()), Type.optional(Type.ANY));
   }
 
   /**

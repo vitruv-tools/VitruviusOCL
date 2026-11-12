@@ -19,8 +19,10 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
@@ -45,16 +47,28 @@ final class ReverseIndex {
   private final Supplier<List<EObject>> roots;
   private final Map<EReference, Map<EObject, Map<EObject, Integer>>> index = new HashMap<>();
 
+  /** References known to be needed; see {@link #declare}. */
+  private final Set<EReference> declared = new LinkedHashSet<>();
+
   ReverseIndex(Supplier<List<EObject>> roots) {
     this.roots = roots;
+  }
+
+  /**
+   * Declares references that will be needed (e.g. all inverse steps of the session's relevance
+   * plans), so that the first lookup indexes all of them in one walk over the model instead of one
+   * walk per reference.
+   */
+  void declare(Collection<EReference> references) {
+    declared.addAll(references);
   }
 
   /** The holders {@code x} with {@code target ∈ x.reference}; builds the index on first use. */
   List<EObject> holders(EReference reference, EObject target) {
     Map<EObject, Map<EObject, Integer>> byTarget = index.get(reference);
     if (byTarget == null) {
-      byTarget = build(reference);
-      index.put(reference, byTarget);
+      buildMissing(reference);
+      byTarget = index.get(reference);
     }
     Map<EObject, Integer> holders = byTarget.get(target);
     return holders == null ? List.of() : new ArrayList<>(holders.keySet());
@@ -97,17 +111,30 @@ final class ReverseIndex {
     }
   }
 
-  private Map<EObject, Map<EObject, Integer>> build(EReference reference) {
-    Map<EObject, Map<EObject, Integer>> byTarget = new IdentityHashMap<>();
-    for (EObject holder : reachableObjects()) {
-      if (!reference.getEContainingClass().isSuperTypeOf(holder.eClass())) {
-        continue;
-      }
-      for (Object target : values(holder, reference)) {
-        add(byTarget, target, holder);
+  /** Indexes {@code reference} and every declared reference not indexed yet, in one walk. */
+  private void buildMissing(EReference reference) {
+    Set<EReference> missing = new LinkedHashSet<>();
+    missing.add(reference);
+    for (EReference declaredReference : declared) {
+      if (!index.containsKey(declaredReference)) {
+        missing.add(declaredReference);
       }
     }
-    return byTarget;
+    Map<EReference, Map<EObject, Map<EObject, Integer>>> built = new HashMap<>();
+    for (EReference r : missing) {
+      built.put(r, new IdentityHashMap<>());
+    }
+    for (EObject holder : reachableObjects()) {
+      for (EReference r : missing) {
+        if (r.getEContainingClass().isSuperTypeOf(holder.eClass())) {
+          Map<EObject, Map<EObject, Integer>> byTarget = built.get(r);
+          for (Object target : values(holder, r)) {
+            add(byTarget, target, holder);
+          }
+        }
+      }
+    }
+    index.putAll(built);
   }
 
   /** All objects reachable from the roots via containment and via (non-proxy) references. */

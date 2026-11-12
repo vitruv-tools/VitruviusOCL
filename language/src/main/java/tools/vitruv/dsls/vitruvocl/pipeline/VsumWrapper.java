@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EClass;
@@ -231,7 +232,7 @@ public class VsumWrapper implements MetamodelWrapperInterface {
    * <p>A wrapper of a single constraint check caches the result for the rest of the check, since
    * the models do not change during a check; a traversal happens only when a type not cached yet
    * is requested. A wrapper reading the live VSUM receives no notification of model changes here,
-   * so it traverses on every call — once for all requested types instead of once per type.
+   * so it traverses on every call (once for all requested types); a {@link #batch} view caches.
    *
    * @param types the metaclasses whose instances should be retrieved
    * @return an unmodifiable map with an entry for every requested type (and possibly more)
@@ -241,15 +242,30 @@ public class VsumWrapper implements MetamodelWrapperInterface {
     if (instanceCache == null) {
       return Collections.unmodifiableMap(obtainEngine(types).compute(getAllRootObjects()));
     }
-    synchronized (instanceCache) {
-      if (!instanceCache.keySet().containsAll(types)) {
+    return cachedInstances(instanceCache, types);
+  }
+
+  /**
+   * For the live VSUM: evaluates {@code work} against a view that caches the instances per type
+   * for this batch only, since the models do not change during it. Other callers keep reading the
+   * live models.
+   */
+  @Override
+  public <T> T batch(Function<MetamodelWrapperInterface, T> work) {
+    return work.apply(instanceCache != null ? this : new BatchCachingWrapper(this));
+  }
+
+  private Map<EClass, List<EObject>> cachedInstances(
+      Map<EClass, List<EObject>> cache, Collection<EClass> types) {
+    synchronized (cache) {
+      if (!cache.keySet().containsAll(types)) {
         obtainEngine(types)
             .compute(getAllRootObjects())
-            .forEach((type, instances) -> instanceCache.putIfAbsent(type, List.copyOf(instances)));
+            .forEach((type, instances) -> cache.putIfAbsent(type, List.copyOf(instances)));
       }
       Map<EClass, List<EObject>> result = new HashMap<>();
       for (EClass type : types) {
-        result.put(type, instanceCache.getOrDefault(type, Collections.emptyList()));
+        result.put(type, cache.getOrDefault(type, Collections.emptyList()));
       }
       return Collections.unmodifiableMap(result);
     }

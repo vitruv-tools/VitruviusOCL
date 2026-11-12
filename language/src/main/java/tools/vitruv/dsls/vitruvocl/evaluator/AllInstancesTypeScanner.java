@@ -33,7 +33,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  * <p>Knowing these types before evaluation lets the evaluator request all of them at once, so that
  * the wrapper can collect them in one model traversal instead of one per type.
  */
-final class AllInstancesTypeScanner {
+public final class AllInstancesTypeScanner {
 
   private AllInstancesTypeScanner() {}
 
@@ -44,7 +44,7 @@ final class AllInstancesTypeScanner {
    * @param nodeTypes the types the type checker computed for {@code tree}'s nodes
    * @return the requested EClasses in first-seen order; never {@code null}
    */
-  static Set<EClass> scan(ParseTree tree, ParseTreeProperty<Type> nodeTypes) {
+  public static Set<EClass> scan(ParseTree tree, ParseTreeProperty<Type> nodeTypes) {
     Set<EClass> types = new LinkedHashSet<>();
     Deque<ParseTree> pending = new ArrayDeque<>();
     pending.push(tree);

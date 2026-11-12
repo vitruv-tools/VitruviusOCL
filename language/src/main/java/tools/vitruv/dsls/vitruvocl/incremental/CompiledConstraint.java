@@ -73,6 +73,17 @@ final class CompiledConstraint {
   }
 
   /**
+   * The metaclasses whose instances evaluating this constraint may request; empty if it did not
+   * compile.
+   */
+  java.util.Set<org.eclipse.emf.ecore.EClass> requestedTypes() {
+    if (tree == null || nodeTypes == null) {
+      return java.util.Set.of();
+    }
+    return tools.vitruv.dsls.vitruvocl.evaluator.AllInstancesTypeScanner.scan(tree, nodeTypes);
+  }
+
+  /**
    * Same as {@link #compile(String, MetamodelWrapperInterface, FeatureIndex)} with a fresh index.
    */
   static CompiledConstraint compile(String text, MetamodelWrapperInterface wrapper) {

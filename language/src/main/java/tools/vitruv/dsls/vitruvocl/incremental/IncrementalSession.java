@@ -28,7 +28,9 @@ import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
+import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
+import tools.vitruv.dsls.vitruvocl.incremental.analysis.RelevancePlan;
 import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
@@ -186,6 +188,58 @@ public final class IncrementalSession implements AutoCloseable {
     }
   }
 
+  /**
+   * The references the relevance plans step backwards over that have neither containment nor an
+   * {@code eOpposite}, i.e. those inverted through the {@link ReverseIndex}.
+   */
+  private Set<org.eclipse.emf.ecore.EReference> reverseIndexedReferences() {
+    Set<org.eclipse.emf.ecore.EReference> references = new LinkedHashSet<>();
+    for (CompiledConstraint constraint : compiled.values()) {
+      ConstraintAnalysis analysis = constraint.analysis();
+      RelevancePlan plan = analysis == null ? null : analysis.relevancePlan();
+      if (plan == null) {
+        continue;
+      }
+      List<Origin> origins = new ArrayList<>();
+      plan.reads().forEach(read -> origins.add(read.origin()));
+      plan.correspondenceReads()
+          .forEach(
+              read -> {
+                origins.add(read.left());
+                origins.add(read.right());
+              });
+      for (Origin origin : origins) {
+        if (origin == null || origin.steps() == null) {
+          continue;
+        }
+        for (org.eclipse.emf.ecore.EReference step : origin.steps()) {
+          if (!step.isContainment() && step.getEOpposite() == null) {
+            references.add(step);
+          }
+        }
+      }
+    }
+    return references;
+  }
+
+  /**
+   * Requests the instances of the types of all constraints in one call, so that the initial full
+   * evaluation needs one traversal instead of one per newly requested type.
+   */
+  private void prefetchInstances(MetamodelWrapperInterface view) {
+    Set<org.eclipse.emf.ecore.EClass> types = new LinkedHashSet<>();
+    for (CompiledConstraint constraint : compiled.values()) {
+      types.addAll(constraint.requestedTypes());
+    }
+    if (types.size() > 1) {
+      try {
+        view.getAllInstances(types);
+      } catch (RuntimeException e) {
+        // only an optimization: the evaluation reports the failure where it matters
+      }
+    }
+  }
+
   /** Daemon worker, so that a session that is never closed cannot keep the JVM alive. */
   private static Thread workerThread(Runnable task) {
     Thread thread = new Thread(task, "vitruvocl-incremental-worker");
@@ -211,13 +265,20 @@ public final class IncrementalSession implements AutoCloseable {
     for (String constraint : distinctConstraints) {
       compiled.put(constraint, CompiledConstraint.compile(constraint, wrapper, features));
     }
+    reverseIndex.declare(reverseIndexedReferences());
     observingCorrespondences = observesCorrespondences();
     correspondenceSnapshot = observingCorrespondences ? captureCorrespondences() : null;
     evaluationWrapper = viewOf(correspondenceSnapshot);
-    MetamodelWrapperInterface view = evaluationWrapper;
     List<EvaluationOutcome> outcomes =
-        evaluateAll(
-            distinctConstraints, c -> compiled.get(c).evaluate(view, List.of(), false, null));
+        wrapper.batch(
+            batchView -> {
+              // the initial full evaluation reads through the batch's caching view
+              MetamodelWrapperInterface view = viewOf(correspondenceSnapshot, batchView);
+              prefetchInstances(view);
+              return evaluateAll(
+                  distinctConstraints,
+                  c -> compiled.get(c).evaluate(view, List.of(), false, null));
+            });
     for (int i = 0; i < distinctConstraints.size(); i++) {
       violations.replaceAll(distinctConstraints.get(i), outcomes.get(i));
       stats.evaluated(true, outcomes.get(i).evaluatedInstances());
@@ -342,13 +403,19 @@ public final class IncrementalSession implements AutoCloseable {
 
   /** The evaluation view for {@code snapshot}: answers correspondence queries from it. */
   private MetamodelWrapperInterface viewOf(CorrespondenceSnapshot snapshot) {
+    return viewOf(snapshot, wrapper);
+  }
+
+  /** {@link #viewOf(CorrespondenceSnapshot)} on top of {@code base} instead of the wrapper. */
+  private MetamodelWrapperInterface viewOf(
+      CorrespondenceSnapshot snapshot, MetamodelWrapperInterface base) {
     // The snapshot answers correspondenceHasTag as the two-way tagged lookup, which is only the
     // wrapper's own answer under that contract.
     return snapshot == null
             || !sharedCorrespondenceLookup
             || !wrapper.hasTaggedCorrespondenceLookup()
-        ? wrapper
-        : new SnapshotCorrespondenceWrapper(wrapper, snapshot);
+        ? base
+        : new SnapshotCorrespondenceWrapper(base, snapshot);
   }
 
   /**

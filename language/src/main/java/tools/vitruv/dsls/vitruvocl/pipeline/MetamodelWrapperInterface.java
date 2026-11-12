@@ -50,6 +50,19 @@ public interface MetamodelWrapperInterface {
   List<EObject> getAllInstances(EClass eClass);
 
   /**
+   * Runs {@code work}, during which the models are not changed (e.g. the evaluation of a list of
+   * constraints). {@code work} receives the wrapper to evaluate against: a wrapper may hand out a
+   * view that reuses results, such as the instances of a type, across the batch's requests. That
+   * view must only be used by the batch itself. The default passes this wrapper unchanged.
+   *
+   * @param work the evaluation to run, given the wrapper to use
+   * @return the result of {@code work}
+   */
+  default <T> T batch(java.util.function.Function<MetamodelWrapperInterface, T> work) {
+    return work.apply(this);
+  }
+
+  /**
    * Returns all instances of each of the given EClasses (subtype instances included), as needed by
    * one constraint evaluation.
    *

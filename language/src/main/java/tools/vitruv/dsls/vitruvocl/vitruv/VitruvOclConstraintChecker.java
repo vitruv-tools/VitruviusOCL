@@ -32,6 +32,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.DependencyAnalyzer;
 import tools.vitruv.dsls.vitruvocl.pipeline.FileError;
 import tools.vitruv.dsls.vitruvocl.pipeline.Violation;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.vitruv.OclInvariantParser.ParsedInvariant;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
@@ -321,6 +322,14 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
     // a fresh wrapper per check sees all metamodels registered up to now
     VsumWrapper wrapper = new VsumWrapper(context);
     Map<String, ConstraintDescriptor> current = constraints;
+    // one traversal for the instances of all checked constraints instead of one per new type
+    VitruvOCLCompiler.prefetchInstances(
+        constraintIds.stream()
+            .map(current::get)
+            .filter(java.util.Objects::nonNull)
+            .map(ConstraintDescriptor::source)
+            .toList(),
+        wrapper);
     List<ConstraintResult> results = new ArrayList<>();
     for (String id : constraintIds) {
       ConstraintDescriptor descriptor = current.get(id);

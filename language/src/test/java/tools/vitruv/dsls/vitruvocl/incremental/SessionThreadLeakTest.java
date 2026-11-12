@@ -31,6 +31,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 class SessionThreadLeakTest {
 
   /** {@code delegate}, except that collecting instances fails. */
+  @SuppressWarnings("unchecked")
   private static MetamodelWrapperInterface failingInstances(MetamodelWrapperInterface delegate) {
     return (MetamodelWrapperInterface)
         Proxy.newProxyInstance(
@@ -39,6 +40,10 @@ class SessionThreadLeakTest {
             (proxy, method, args) -> {
               if (method.getName().equals("getAllInstances")) {
                 throw new IllegalStateException("model access failed");
+              }
+              if (method.getName().equals("batch")) {
+                // evaluate against this failing proxy, not a view of the delegate
+                return ((java.util.function.Function<Object, Object>) args[0]).apply(proxy);
               }
               try {
                 return method.invoke(delegate, args);
