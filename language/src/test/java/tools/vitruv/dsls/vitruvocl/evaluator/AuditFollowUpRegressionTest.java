@@ -19,6 +19,8 @@ import java.util.List;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.ParameterizedTest;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
@@ -329,6 +331,73 @@ class AuditFollowUpRegressionTest extends DummyTestSpecification {
       long millis = (System.nanoTime() - start) / 1_000_000;
       assertSize(result, 20001);
       assertTrue(millis < 5_000, "took " + millis + " ms");
+    }
+  }
+
+  @Nested
+  class EmptyCollectionLiterals {
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "let s : Sequence(Integer) = Sequence{} in s",
+          "let s : Set(String) = Set{} in s",
+          "let s : Bag(Real) = Bag{} in s",
+          "let s : OrderedSet(Boolean) = OrderedSet{} in s"
+        })
+    void emptyLiteralConformsToAnyElementType(String expression) {
+      assertEquals(List.of(), check(expression).errors());
+      assertSize(compile(expression), 0);
+    }
+
+    @Test
+    void iterateWithAnEmptyInitialAccumulator() {
+      assertCollection(
+          compile(
+              "Sequence{3, 1}.iterate(x; acc : Sequence(Integer) = Sequence{} |"
+                  + " acc.including(x))"),
+          3, 1);
+    }
+
+    @Test
+    void variableTakesTheDeclaredElementType() {
+      assertEquals(
+          Type.INTEGER,
+          check("let s : Sequence(Integer) = Sequence{} in s").type().getElementType());
+    }
+
+    @Test
+    void elementsAddedToAnEmptyLiteralStillHaveToMatch() {
+      assertTypeError("let s : Sequence(Integer) = Sequence{}.append(\"a\") in s");
+      assertTypeError("let s : Sequence(Integer) = Sequence{}.including(\"a\") in s");
+    }
+
+    @Test
+    void untypedAccumulatorStartingEmptyIsNotAssumedToMatch() {
+      assertTypeError(
+          "let r : Sequence(Integer) = Sequence{\"a\"}.iterate(x; acc = Sequence{} |"
+              + " acc.including(x)) in r");
+    }
+
+    @Test
+    void emptyLiteralInsideABranchIsNotAccepted() {
+      assertTypeError(
+          "let s : Sequence(Integer) = if false then Sequence{} else Sequence{1, \"a\"} endif in s");
+    }
+
+    @Test
+    void collectionKindStillHasToMatch() {
+      assertTypeError("let s : Sequence(Integer) = Set{} in s");
+    }
+
+    @Test
+    void nonEmptyLiteralStillHasToMatchTheElementType() {
+      assertTypeError("let s : Sequence(Integer) = Sequence{\"a\"} in s");
+    }
+
+    @Test
+    void anyTypedCollectionStillDoesNotConform() {
+      assertTypeError("let s : Sequence(Integer) = Sequence{1, \"a\"} in s");
     }
   }
 }

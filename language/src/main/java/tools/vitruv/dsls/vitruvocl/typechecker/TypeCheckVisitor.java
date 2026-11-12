@@ -2261,6 +2261,31 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   }
 
   /**
+   * Whether {@code initializer} is an empty collection literal (e.g. {@code Sequence{}}) whose kind
+   * conforms to the collection type {@code declared}. Such a literal holds no element, so it is a
+   * valid initial value for every element type, although it is typed with element type {@code Any}.
+   * The variable takes the declared type, so no {@code Any} element type escapes.
+   *
+   * @param initializer the initializer expression
+   * @param initType the initializer's type
+   * @param declared the declared type of the variable
+   */
+  static boolean isEmptyLiteralOf(ParserRuleContext initializer, Type initType, Type declared) {
+    if (!declared.isCollection() || !initType.isCollection()) {
+      return false;
+    }
+    ParseTree node = initializer;
+    while (!(node instanceof VitruvOCLParser.CollectionLiteralExpCSContext)
+        && node.getChildCount() == 1) {
+      node = node.getChild(0);
+    }
+    return node instanceof VitruvOCLParser.CollectionLiteralExpCSContext literal
+        && literal.arguments == null
+        && literal.getText().equals(initializer.getText())
+        && initType.getMultiplicity().isConformantTo(declared.getMultiplicity());
+  }
+
+  /**
    * Type checks a single variable declaration.
    *
    * <p>Validates:
@@ -2298,7 +2323,8 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
       // use standard isConformantTo first, then singleton-unwrapping
       if (!initType.isConformantTo(explicitType)
-          && !Type.conformsWithUnwrapping(initType, explicitType)) {
+          && !Type.conformsWithUnwrapping(initType, explicitType)
+          && !isEmptyLiteralOf(ctx.varInit, initType, explicitType)) {
         reportError(ctx, "Type mismatch: got " + initType + ", expected " + explicitType);
         return Type.ERROR;
       }

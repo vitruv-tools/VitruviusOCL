@@ -584,7 +584,9 @@ final class IteratorOperationTyping {
       }
 
       // Init expression must conform to accumulator type
-      if (!initType.isConformantTo(accType) && !Type.conformsWithUnwrapping(initType, accType)) {
+      if (!initType.isConformantTo(accType)
+          && !Type.conformsWithUnwrapping(initType, accType)
+          && !TypeCheckVisitor.isEmptyLiteralOf(spec.accInit, initType, accType)) {
         context.error(
             spec,
             "iterate() accumulator init type "
