@@ -251,6 +251,49 @@ class VitruvOclConstraintCheckerTest {
   }
 
   @Test
+  @DisplayName("repeated checks compile each constraint only once")
+  void constraintsAreCompiledOnce() {
+    resource.getContents().add(shop.createItem("free sample", 0));
+    VitruvOclConstraintChecker checker = VitruvOclConstraintChecker.fromString(CONSTRAINTS);
+    List<String> ids = List.of(NON_NEGATIVE, AFFORDABLE, NOT_FREE);
+
+    List<ConstraintResult> first = checker.check(context(), ids);
+    long before = tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations();
+    List<ConstraintResult> second = checker.check(context(), ids);
+
+    assertEquals(
+        0,
+        tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations() - before,
+        "a second check must reuse the compiled constraints");
+    assertEquals(
+        first.stream().map(ConstraintResult::status).toList(),
+        second.stream().map(ConstraintResult::status).toList());
+  }
+
+  @Test
+  @DisplayName("a changed metamodel registry makes the next check compile again")
+  void newMetamodelInvalidatesCompiledConstraints() {
+    resource.getContents().add(shop.createItem("free sample", 0));
+    VitruvOclConstraintChecker checker = VitruvOclConstraintChecker.fromString(CONSTRAINTS);
+    List<String> ids = List.of(NON_NEGATIVE, AFFORDABLE, NOT_FREE);
+    checker.check(context(), ids);
+
+    org.eclipse.emf.ecore.EPackage extra =
+        org.eclipse.emf.ecore.EcoreFactory.eINSTANCE.createEPackage();
+    extra.setName("checkerCacheExtra");
+    extra.setNsURI("http://test/checker-cache-extra");
+    org.eclipse.emf.ecore.EPackage.Registry.INSTANCE.put(extra.getNsURI(), extra);
+    try {
+      long before = tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations();
+      checker.check(context(), ids);
+      assertEquals(
+          3, tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations() - before);
+    } finally {
+      org.eclipse.emf.ecore.EPackage.Registry.INSTANCE.remove(extra.getNsURI());
+    }
+  }
+
+  @Test
   @DisplayName("a failing evaluation only affects its own constraint")
   void evaluationFailureIsIsolated() {
     resource.getContents().add(shop.createBrokenItem(10));

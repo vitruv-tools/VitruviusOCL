@@ -95,6 +95,15 @@ public class Value implements Comparable<Value> {
    */
   private volatile Value normalized;
 
+  /**
+   * Semantic index for repeated {@link #includes} calls, built on the second call; read-only once
+   * published. Volatile: values may be shared by threads.
+   */
+  private volatile HashedBuffer includesIndex;
+
+  /** Number of {@link #includes} calls so far (a heuristic, so races are harmless). */
+  private int includesCalls;
+
   // ==================== Constructors ====================
 
   /** Creates a Value from a list of elements. This is the main constructor for OCL values. */
@@ -428,6 +437,18 @@ public class Value implements Comparable<Value> {
 
   /** Checks if this collection includes an element. Lazy: stops at the first match. */
   public boolean includes(OCLElement elem) {
+    HashedBuffer index = includesIndex;
+    if (index != null) {
+      return index.contains(elem);
+    }
+    if (includesCalls++ >= 1 && elements != null) {
+      // asked again and already fully computed: this value is reused (e.g. let-bound and queried
+      // per element), so index it once instead of scanning it on every call. A value that is not
+      // fully computed yet keeps its lazy scan, which stops at the first match.
+      index = LazyOperations.semanticIndex(elements.iterator());
+      includesIndex = index;
+      return index.contains(elem);
+    }
     Iterator<OCLElement> it = elementIterator();
     while (it.hasNext()) {
       if (OCLElement.semanticEquals(it.next(), elem)) {

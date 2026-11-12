@@ -14,6 +14,10 @@
 package tools.vitruv.dsls.vitruvocl.incremental;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +30,7 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
@@ -104,6 +109,12 @@ public final class IncrementalSession implements AutoCloseable {
    */
   private boolean forceFullEvaluation;
   private VsumWrapper attachedWrapper;
+
+  /** A rendered result and the outcome it was rendered from. */
+  private record Rendered(EvaluationOutcome outcome, ConstraintResult result) {}
+
+  /** The last rendered result per (distinct) constraint; see {@link #render(Set, Set)}. */
+  private final Map<String, Rendered> renderedResults = new HashMap<>();
 
   /**
    * Set by {@link #openAttached}: commits delivered before the initialization finished are covered
@@ -331,8 +342,14 @@ public final class IncrementalSession implements AutoCloseable {
       }
     }
 
+    // the selected constraints read the same post-state: one batch view shares the extensions
     List<EvaluationOutcome> outcomes =
-        evaluateAll(selected, c -> evaluateSelected(c, relevance.get(c), transaction));
+        wrapper.batch(
+            batchView -> {
+              MetamodelWrapperInterface view = viewOf(correspondenceSnapshot, batchView);
+              return evaluateAll(
+                  selected, c -> evaluateSelected(c, relevance.get(c), transaction, view));
+            });
     for (int i = 0; i < selected.size(); i++) {
       String constraint = selected.get(i);
       RelevantInstanceResolver.Relevance r = relevance.get(constraint);
@@ -358,8 +375,12 @@ public final class IncrementalSession implements AutoCloseable {
     if (config.verify()) {
       verify(transaction, true);
     }
-    forceFullEvaluation = false;
-    latest = new IncrementalResult(render(), stats.build());
+    BatchValidationResult rendered =
+        delta.hasUnknownChanges() || recovering
+            ? render()
+            : render(new HashSet<>(selected), touchedObjects(delta));
+    forceFullEvaluation = false; // only now: a failed render recovers with a full one
+    latest = new IncrementalResult(rendered, stats.build());
     return latest;
   }
 
@@ -471,8 +492,10 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   private EvaluationOutcome evaluateSelected(
-      String constraint, RelevantInstanceResolver.Relevance relevance, List<EChange<EObject>> tx) {
-    MetamodelWrapperInterface view = evaluationWrapper;
+      String constraint,
+      RelevantInstanceResolver.Relevance relevance,
+      List<EChange<EObject>> tx,
+      MetamodelWrapperInterface view) {
     if (relevance.classEvent()) {
       return compiled.get(constraint).evaluate(view, tx, true, null);
     }
@@ -561,18 +584,71 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   private BatchValidationResult render() {
+    renderedResults.clear();
+    return render(Set.of(), Collections.newSetFromMap(new IdentityHashMap<>()));
+  }
+
+  /**
+   * Renders the current results, reusing the previous result of every constraint whose outcome is
+   * the one it was rendered from, that was not re-evaluated ({@code reEvaluated}) and none of whose
+   * violations describes an object in {@code touched}: a result depends only on the outcome and on
+   * the current attributes and resource of the violating objects (labels and source files are read
+   * at render time). Not observed: a label attribute derived from other objects, and a model
+   * file renamed without a change event; such results stay as rendered until re-rendered.
+   */
+  private BatchValidationResult render(Set<String> reEvaluated, Set<EObject> touched) {
     List<ConstraintResult> results = new ArrayList<>(constraints.size());
     Set<String> seen = new LinkedHashSet<>();
     for (String constraint : constraints) {
       if (!seen.add(constraint)) {
         results.add(ConstraintEvaluations.duplicateResult(constraint));
-      } else {
-        results.add(
-            ConstraintEvaluations.render(
-                constraint, wrapper, List.of(), violations.currentOutcome(constraint)));
+        continue;
       }
+      EvaluationOutcome outcome = violations.currentOutcome(constraint);
+      Rendered cached = renderedResults.get(constraint);
+      if (cached == null
+          || cached.outcome() != outcome
+          || reEvaluated.contains(constraint)
+          || describesAny(outcome, touched)) {
+        cached =
+            new Rendered(
+                outcome, ConstraintEvaluations.render(constraint, wrapper, List.of(), outcome));
+        renderedResults.put(constraint, cached);
+      }
+      results.add(cached.result());
     }
     return new BatchValidationResult(results);
+  }
+
+  private static boolean describesAny(EvaluationOutcome outcome, Set<EObject> objects) {
+    if (objects.isEmpty()) {
+      return false;
+    }
+    for (EvaluationVisitor.ViolationRecord record : outcome.records()) {
+      if (record.instance() != null && objects.contains(record.instance())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Every object a transaction's events changed, added, removed or moved (identity set). */
+  private static Set<EObject> touchedObjects(TransactionDelta delta) {
+    Set<EObject> touched = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (ModelEvent event : delta.events()) {
+      addIfObject(event.object(), touched);
+      addIfObject(event.oldValue(), touched);
+      addIfObject(event.newValue(), touched);
+    }
+    touched.addAll(delta.structurallyInsertedObjects());
+    touched.addAll(delta.structurallyRemovedObjects());
+    return touched;
+  }
+
+  private static void addIfObject(Object value, Set<EObject> sink) {
+    if (value instanceof EObject object) {
+      sink.add(object);
+    }
   }
 
   /** Evaluates {@code selected} sequentially or on the session's pool; results in input order. */

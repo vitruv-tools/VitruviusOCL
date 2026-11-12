@@ -33,7 +33,6 @@ import org.eclipse.emf.ecore.EEnumLiteral;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import tools.vitruv.change.atomic.EChange;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLBaseVisitor;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
@@ -1598,20 +1597,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     // Process navigation chain. A property-nav step immediately followed by '@pre' is evaluated
     // specially (reading the transaction's pre-state instead of the live value); the '@pre' step
     // itself is then skipped since it was consumed by the property access before it.
-    List<VitruvOCLParser.NavigationChainCSContext> navChain = ctx.navigationChainCS();
-    for (int i = 0; i < navChain.size(); i++) {
-      VitruvOCLParser.NavigationChainCSContext nav = navChain.get(i);
-      if (nav.AT_PRE() != null) {
-        continue;
-      }
-      boolean nextIsAtPre = i + 1 < navChain.size() && navChain.get(i + 1).AT_PRE() != null;
-      if (nextIsAtPre
-          && nav.navigationTargetCS() instanceof VitruvOCLParser.PropertyNavContext propNav) {
-        currentValue = visitPropertyAccessWithReceiverPreState(propNav, currentValue);
-      } else {
-        currentValue = visitNavigationWithReceiver(nav, currentValue);
-      }
-    }
+    currentValue = navigate(ctx.navigationChainCS(), currentValue);
 
     return currentValue;
   }
@@ -1695,34 +1681,43 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * @param receiver The receiver value for the navigation
    * @return The result of the navigation
    */
+  /**
+   * Applies a navigation chain to {@code receiver}. A property step immediately followed by
+   * {@code @pre} reads the transaction's pre-state; the {@code @pre} step itself is consumed by it.
+   */
+  private Value navigate(List<VitruvOCLParser.NavigationChainCSContext> navChain, Value receiver) {
+    Value currentValue = receiver;
+    for (int i = 0; i < navChain.size(); i++) {
+      VitruvOCLParser.NavigationChainCSContext nav = navChain.get(i);
+      if (nav.AT_PRE() != null) {
+        continue;
+      }
+      boolean nextIsAtPre = i + 1 < navChain.size() && navChain.get(i + 1).AT_PRE() != null;
+      if (nextIsAtPre
+          && nav.navigationTargetCS() instanceof VitruvOCLParser.PropertyNavContext propNav) {
+        currentValue = visitPropertyAccessWithReceiverPreState(propNav, currentValue);
+      } else {
+        currentValue = visitNavigationWithReceiver(nav, currentValue);
+      }
+    }
+    return currentValue;
+  }
+
   private Value visitNavigationWithReceiver(
       VitruvOCLParser.NavigationChainCSContext ctx, Value receiver) {
 
+    // dispatch on the target's alternative directly (no visitor allocated per step and element)
     VitruvOCLParser.NavigationTargetCSContext target = ctx.navigationTargetCS();
-    // Use visitor pattern to dispatch based on navigation target type
-    return target.accept(
-        new VitruvOCLBaseVisitor<Value>() {
-          @Override
-          public Value visitPropertyNav(VitruvOCLParser.PropertyNavContext ctx) {
-            return visitPropertyAccessWithReceiver(ctx, receiver);
-          }
-
-          @Override
-          public Value visitOperationNav(VitruvOCLParser.OperationNavContext ctx) {
-            VitruvOCLParser.OperationCallContext opCtx = ctx.operationCall();
-            return visitOperationCallWithReceiver(opCtx, receiver);
-          }
-
-          @Override
-          public Value visitLifecycleNav(VitruvOCLParser.LifecycleNavContext ctx) {
-            return visitLifecyclePredicateWithReceiver(ctx.lifecyclePredicateCS(), receiver);
-          }
-
-          @Override
-          protected Value defaultResult() {
-            return Value.empty(Type.ANY);
-          }
-        });
+    if (target instanceof VitruvOCLParser.PropertyNavContext property) {
+      return visitPropertyAccessWithReceiver(property, receiver);
+    }
+    if (target instanceof VitruvOCLParser.OperationNavContext operation) {
+      return visitOperationCallWithReceiver(operation.operationCall(), receiver);
+    }
+    if (target instanceof VitruvOCLParser.LifecycleNavContext lifecycle) {
+      return visitLifecyclePredicateWithReceiver(lifecycle.lifecyclePredicateCS(), receiver);
+    }
+    throw new IllegalStateException("Unexpected navigation step: " + ctx.getText());
   }
 
   /**
@@ -2236,11 +2231,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.set(Type.ANY));
     }
 
-    Value currentValue = Value.of(List.of(), metaclassType);
-    for (VitruvOCLParser.NavigationChainCSContext nav : ctx.navigationChainCS()) {
-      currentValue = visitNavigationWithReceiver(nav, currentValue);
-    }
-    return currentValue;
+    return navigate(ctx.navigationChainCS(), Value.of(List.of(), metaclassType));
   }
 
   // ==================== Collection Literals ====================

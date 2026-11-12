@@ -310,6 +310,16 @@ public class VsumWrapper implements MetamodelWrapperInterface {
 
 
   /**
+   * The metamodel packages by name, exactly as this wrapper resolves type names (including which of
+   * several same-named packages wins). Two wrappers with equal maps type-check constraints alike.
+   *
+   * @return an unmodifiable snapshot
+   */
+  public Map<String, EPackage> metamodelsByName() {
+    return Collections.unmodifiableMap(new HashMap<>(metamodelRegistry)); // keys may be null
+  }
+
+  /**
    * Returns the names of all metamodels currently registered in this wrapper.
    *
    * @return unmodifiable set of metamodel names (EPackage names)

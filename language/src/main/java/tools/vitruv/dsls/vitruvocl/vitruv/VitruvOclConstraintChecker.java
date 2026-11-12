@@ -22,17 +22,22 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import org.eclipse.emf.ecore.EPackage;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.DependencyAnalyzer;
 import tools.vitruv.dsls.vitruvocl.pipeline.FileError;
 import tools.vitruv.dsls.vitruvocl.pipeline.Violation;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
+import tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.vitruv.OclInvariantParser.ParsedInvariant;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
@@ -80,6 +85,15 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    * concurrent edits are neither lost nor duplicated. Parsing and type checking stay outside.
    */
   private final Object editLock = new Object();
+
+  /** Guards {@link #prepared} and {@link #preparedAgainst}. */
+  private final Object preparedLock = new Object();
+
+  /** Compiled constraints by source; see {@link #preparedFor}. */
+  private final Map<String, PreparedConstraint> prepared = new HashMap<>();
+
+  /** The metamodels (as the wrapper resolves names) {@link #prepared} was compiled against. */
+  private Map<String, EPackage> preparedAgainst = Map.of();
 
   private VitruvOclConstraintChecker(List<ParsedInvariant> invariants) {
     Map<String, ConstraintDescriptor> initial = new LinkedHashMap<>();
@@ -322,28 +336,71 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
     // a fresh wrapper per check sees all metamodels registered up to now
     VsumWrapper wrapper = new VsumWrapper(context);
     Map<String, ConstraintDescriptor> current = constraints;
-    // one traversal for the instances of all checked constraints instead of one per new type
-    VitruvOCLCompiler.prefetchInstances(
-        constraintIds.stream()
-            .map(current::get)
-            .filter(java.util.Objects::nonNull)
-            .map(ConstraintDescriptor::source)
-            .toList(),
-        wrapper);
-    List<ConstraintResult> results = new ArrayList<>();
+    List<ConstraintDescriptor> checked = new ArrayList<>();
     for (String id : constraintIds) {
       ConstraintDescriptor descriptor = current.get(id);
       if (descriptor != null) {
-        results.add(evaluate(descriptor, wrapper));
+        checked.add(descriptor);
       }
+    }
+    Map<String, PreparedConstraint> compiled = preparedFor(checked, context, wrapper);
+    // one traversal for the instances of all checked constraints instead of one per new type
+    PreparedConstraint.prefetchInstances(
+        compiled.values().stream().filter(Objects::nonNull).toList(), wrapper);
+    List<ConstraintResult> results = new ArrayList<>();
+    for (ConstraintDescriptor descriptor : checked) {
+      results.add(evaluate(descriptor, compiled.get(descriptor.source()), wrapper));
     }
     return results;
   }
 
-  private static ConstraintResult evaluate(ConstraintDescriptor descriptor, VsumWrapper wrapper) {
+  /**
+   * The compiled form of every checked constraint, compiled once and reused across checks (a
+   * check would otherwise lex, parse and type-check every constraint again). The cache is dropped
+   * when the metamodels change, i.e. when the wrapper resolves some metamodel name to a different
+   * package than when the constraints were compiled; entries of constraints that no longer exist
+   * are dropped too. Not observed: a package changed in place (classes or features edited).
+   */
+  private Map<String, PreparedConstraint> preparedFor(
+      List<ConstraintDescriptor> checked, ConstraintCheckContext context, VsumWrapper wrapper) {
+    Map<String, EPackage> metamodels = wrapper.metamodelsByName();
+    Map<String, PreparedConstraint> result = new LinkedHashMap<>();
+    synchronized (preparedLock) {
+      if (!metamodels.equals(preparedAgainst)) {
+        prepared.clear();
+        preparedAgainst = metamodels;
+      }
+      Set<String> sources = new HashSet<>();
+      constraints.values().forEach(d -> sources.add(d.source()));
+      prepared.keySet().retainAll(sources);
+      for (ConstraintDescriptor descriptor : checked) {
+        String source = descriptor.source();
+        result.put(source, prepared.computeIfAbsent(source, s -> prepare(s, wrapper)));
+      }
+    }
+    return result;
+  }
+
+  private static PreparedConstraint prepare(String source, VsumWrapper wrapper) {
     try {
-      return toVitruvResult(
-          descriptor, VitruvOCL.evaluateConstraint(descriptor.source(), wrapper));
+      return PreparedConstraint.prepare(source, wrapper);
+    } catch (RuntimeException | StackOverflowError e) {
+      return null; // evaluated from scratch, which reports the failure for this constraint only
+    }
+  }
+
+  private static ConstraintResult evaluate(
+      ConstraintDescriptor descriptor, PreparedConstraint compiled, VsumWrapper wrapper) {
+    try {
+      tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult oclResult =
+          compiled == null
+              ? VitruvOCL.evaluateConstraint(descriptor.source(), wrapper)
+              : ConstraintEvaluations.render(
+                  descriptor.source(),
+                  wrapper,
+                  List.of(),
+                  compiled.evaluate(wrapper, List.of(), false, null));
+      return toVitruvResult(descriptor, oclResult);
     } catch (RuntimeException | StackOverflowError e) {
       String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
       return ConstraintResult.error(descriptor, List.of("Evaluation failed: " + reason));

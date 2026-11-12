@@ -61,8 +61,14 @@ class BatchTraversalTest {
         context edge::Item inv i: edge::Other.allInstances().notEmpty()
         """);
     long before = modelReads(live);
+    long preparationsBefore = PreparedConstraint.preparations();
 
     BatchValidationResult result = VitruvOCL.evaluateConstraints(constraints, 1);
+
+    assertEquals(
+        5,
+        PreparedConstraint.preparations() - preparationsBefore,
+        "each constraint is compiled once, for the prefetch and the evaluation together");
 
     assertEquals(5, result.getResults().size());
     assertTrue(result.getResults().stream().allMatch(ConstraintResult::isSuccess), "" + result);

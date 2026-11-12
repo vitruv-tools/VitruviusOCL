@@ -56,6 +56,15 @@ final class ConstraintListEvaluator {
       List<String> constraints,
       Function<String, ConstraintResult> perConstraintEvaluator,
       int threadPoolSize) {
+    return map(constraints, perConstraintEvaluator, threadPoolSize);
+  }
+
+  /**
+   * Applies {@code task} to every item, distributing the work across {@code threadPoolSize} worker
+   * threads; results in input order.
+   */
+  static <I, O> List<O> map(
+      List<I> constraints, Function<I, O> perConstraintEvaluator, int threadPoolSize) {
     if (threadPoolSize < 1) {
       throw new IllegalArgumentException(
           "threadPoolSize must be at least 1, was " + threadPoolSize);
@@ -66,14 +75,14 @@ final class ConstraintListEvaluator {
 
     ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
     try {
-      List<Future<ConstraintResult>> futures = new ArrayList<>(constraints.size());
-      for (String constraint : constraints) {
-        Callable<ConstraintResult> task = () -> perConstraintEvaluator.apply(constraint);
-        futures.add(executor.submit(task));
+      List<Future<O>> futures = new ArrayList<>(constraints.size());
+      for (I constraint : constraints) {
+        Callable<O> call = () -> perConstraintEvaluator.apply(constraint);
+        futures.add(executor.submit(call));
       }
 
-      List<ConstraintResult> results = new ArrayList<>(constraints.size());
-      for (Future<ConstraintResult> future : futures) {
+      List<O> results = new ArrayList<>(constraints.size());
+      for (Future<O> future : futures) {
         results.add(awaitResult(future));
       }
       return results;
@@ -82,7 +91,7 @@ final class ConstraintListEvaluator {
     }
   }
 
-  private static ConstraintResult awaitResult(Future<ConstraintResult> future) {
+  private static <O> O awaitResult(Future<O> future) {
     try {
       return future.get();
     } catch (InterruptedException e) {

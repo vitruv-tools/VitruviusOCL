@@ -15,15 +15,10 @@ package tools.vitruv.dsls.vitruvocl.incremental;
 
 import java.util.List;
 import java.util.function.Function;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.common.OclLexers;
-import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.PathAnalyzer;
@@ -32,10 +27,7 @@ import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSetAnalyzer;
 import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
-import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint;
 
 /**
  * A constraint text compiled once (parse, symbol table, type check) and evaluable many times
@@ -55,20 +47,17 @@ final class CompiledConstraint {
 
   private final String text;
   private final MetamodelWrapperInterface wrapper;
-  private final VitruvOCLParser.ContextDeclCSContext tree;
-  private final ParseTreeProperty<tools.vitruv.dsls.vitruvocl.typechecker.Type> nodeTypes;
+  private final PreparedConstraint prepared;
   private final ConstraintAnalysis analysis;
 
   private CompiledConstraint(
       String text,
       MetamodelWrapperInterface wrapper,
-      VitruvOCLParser.ContextDeclCSContext tree,
-      ParseTreeProperty<tools.vitruv.dsls.vitruvocl.typechecker.Type> nodeTypes,
+      PreparedConstraint prepared,
       ConstraintAnalysis analysis) {
     this.text = text;
     this.wrapper = wrapper;
-    this.tree = tree;
-    this.nodeTypes = nodeTypes;
+    this.prepared = prepared;
     this.analysis = analysis;
   }
 
@@ -77,10 +66,7 @@ final class CompiledConstraint {
    * compile.
    */
   java.util.Set<org.eclipse.emf.ecore.EClass> requestedTypes() {
-    if (tree == null || nodeTypes == null) {
-      return java.util.Set.of();
-    }
-    return tools.vitruv.dsls.vitruvocl.evaluator.AllInstancesTypeScanner.scan(tree, nodeTypes);
+    return prepared.requestedTypes();
   }
 
   /**
@@ -93,32 +79,16 @@ final class CompiledConstraint {
   /** Runs passes 1 and 2 once and analyses the result; never throws for invalid constraints. */
   static CompiledConstraint compile(
       String text, MetamodelWrapperInterface wrapper, FeatureIndex features) {
-    CommonTokenStream tokens =
-        new CommonTokenStream(OclLexers.create(CharStreams.fromString(text)));
-    VitruvOCLParser parser = new VitruvOCLParser(tokens);
-    parser.removeErrorListeners();
-    VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
-    if (parser.getNumberOfSyntaxErrors() > 0) {
-      return uncompilable(text, wrapper);
+    PreparedConstraint prepared = PreparedConstraint.prepare(text, wrapper);
+    if (!prepared.isCompiled()) {
+      return new CompiledConstraint(
+          text, wrapper, prepared, ConstraintAnalysis.forUncompilable());
     }
-
-    ErrorCollector errors = new ErrorCollector();
-    SymbolTableImpl symbolTable = new SymbolTableImpl(wrapper);
-    ScopeAnnotator scopes = new ScopeAnnotator();
-    new SymbolTableBuilder(symbolTable, wrapper, errors, scopes).visit(tree);
-    if (errors.hasErrors()) {
-      return uncompilable(text, wrapper);
-    }
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, errors, scopes);
-    typeChecker.setTokenStream(tokens);
-    typeChecker.visit(tree);
-    if (errors.hasErrors()) {
-      return uncompilable(text, wrapper);
-    }
-    ParseTreeProperty<tools.vitruv.dsls.vitruvocl.typechecker.Type> nodeTypes =
-        typeChecker.getNodeTypes();
     return new CompiledConstraint(
-        text, wrapper, tree, nodeTypes, analyse(tree, nodeTypes, features));
+        text,
+        wrapper,
+        prepared,
+        analyse(prepared.tree(), prepared.nodeTypes(), features));
   }
 
   private static ConstraintAnalysis analyse(
@@ -132,10 +102,6 @@ final class CompiledConstraint {
         PathAnalyzer.analyze(tree, nodeTypes, readSet));
   }
 
-  private static CompiledConstraint uncompilable(String text, MetamodelWrapperInterface wrapper) {
-    return new CompiledConstraint(text, wrapper, null, null, ConstraintAnalysis.forUncompilable());
-  }
-
   String text() {
     return text;
   }
@@ -147,12 +113,12 @@ final class CompiledConstraint {
   /** The static context class of a classifier context of this constraint, or {@code null}. */
   org.eclipse.emf.ecore.EClass contextClass(VitruvOCLParser.ClassifierContextCSContext ctx) {
     tools.vitruv.dsls.vitruvocl.typechecker.Type type =
-        nodeTypes == null ? null : nodeTypes.get(ctx);
+        prepared.isCompiled() ? prepared.nodeTypes().get(ctx) : null;
     return type == null ? null : type.getEClass();
   }
 
   boolean isCompiled() {
-    return tree != null;
+    return prepared.isCompiled();
   }
 
   /**
@@ -180,31 +146,6 @@ final class CompiledConstraint {
       List<EChange<EObject>> transaction,
       boolean transactionSupported,
       Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>> instanceOverride) {
-    if (!isCompiled()) {
-      return tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations.evaluateFresh(
-          text, view, transaction, transactionSupported);
-    }
-    ErrorCollector errors = new ErrorCollector();
-    SymbolTableImpl symbolTable = new SymbolTableImpl(view);
-    new SymbolTableBuilder(symbolTable, view, errors, new ScopeAnnotator()).visit(tree);
-    if (errors.hasErrors()) {
-      return EvaluationOutcome.failure(errors.getErrors());
-    }
-    EvaluationVisitor evaluator =
-        new EvaluationVisitor(
-            symbolTable, view, errors, nodeTypes, transaction, transactionSupported);
-    if (instanceOverride != null) {
-      evaluator.setContextInstanceOverride(instanceOverride);
-    }
-    evaluator.visit(tree);
-    if (errors.hasErrors()) {
-      return EvaluationOutcome.failure(errors.getErrors());
-    }
-    return new EvaluationOutcome(
-        false,
-        List.of(),
-        evaluator.getViolationRecords(),
-        evaluator.getSkippedConstraints(),
-        evaluator.getEvaluatedInstanceCount());
+    return prepared.evaluate(view, transaction, transactionSupported, instanceOverride);
   }
 }

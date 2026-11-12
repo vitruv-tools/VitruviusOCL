@@ -375,10 +375,19 @@ public class VitruvOCL {
     List<ConstraintResult> evaluated =
         wrapper.batch(
             view -> {
-              VitruvOCLCompiler.prefetchInstances(toEvaluate, view);
-              return ConstraintListEvaluator.evaluate(
-                  toEvaluate,
-                  c -> compileAndEvaluate(c, view, List.of(), transaction, transactionSupported),
+              // each constraint is compiled once: its types are prefetched, then it is evaluated
+              List<PreparedConstraint> prepared =
+                  ConstraintListEvaluator.map(
+                      toEvaluate, c -> PreparedConstraint.prepare(c, view), threadPoolSize);
+              PreparedConstraint.prefetchInstances(prepared, view);
+              return ConstraintListEvaluator.map(
+                  prepared,
+                  p ->
+                      ConstraintEvaluations.render(
+                          p.text(),
+                          view,
+                          List.of(),
+                          p.evaluate(view, transaction, transactionSupported, null)),
                   threadPoolSize);
             });
 

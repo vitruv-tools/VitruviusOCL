@@ -400,4 +400,28 @@ class AuditFollowUpRegressionTest extends DummyTestSpecification {
       assertTypeError("let s : Sequence(Integer) = Sequence{1, \"a\"} in s");
     }
   }
+
+  @Nested
+  class RepeatedIncludes {
+
+    @Test
+    void repeatedIncludesOnAReusedCollectionIsNotQuadratic() {
+      long start = System.nanoTime();
+      Value result =
+          compile(
+              "let s = Sequence{1..40000} in Sequence{1..40000}.forAll(x | s.includes(x))");
+      long millis = (System.nanoTime() - start) / 1_000_000;
+      assertSingleBool(result, true);
+      assertTrue(millis < 5_000, "took " + millis + " ms");
+    }
+
+    @Test
+    void includesStillComparesSemantically() {
+      assertSingleBool(
+          compile("let s = Sequence{1, 2.5, 3} in Sequence{1.0, 2.5, 3}.forAll(x | s.includes(x))"),
+          true);
+      assertSingleBool(
+          compile("let s = Set{1, 2, 3} in Sequence{1, 2, 4}.forAll(x | s.includes(x))"), false);
+    }
+  }
 }
