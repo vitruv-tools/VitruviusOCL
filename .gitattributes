@@ -1,0 +1,3 @@
+# ArchUnit writes its violation store with LF; keep it that way so a rewritten store
+# does not show up as a whole-file line-ending change on Windows checkouts.
+language/src/test/archunit_store/** text eol=lf

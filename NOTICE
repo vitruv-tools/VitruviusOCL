@@ -29,6 +29,11 @@ Copyright (c) AssertJ Authors
 License: Apache License 2.0
 https://assertj.github.io/doc/
 
+ArchUnit (v1.5.1)
+Copyright (c) TNG Technology Consulting GmbH
+License: Apache License 2.0
+https://www.archunit.org/
+
 Build Tools:
 - Apache Maven Surefire Plugin (v3.5.3) - Apache License 2.0
 - Build Helper Maven Plugin (v3.5.0) - MIT License
