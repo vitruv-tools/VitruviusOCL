@@ -25,7 +25,6 @@ import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
-import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
@@ -106,7 +105,7 @@ import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
  *
  * @see Type The type system implementation
  * @see TypeResolver Helper class for binary operation type resolution
- * @see EvaluationVisitor Phase 3 visitor that uses the type information
+ * @see "EvaluationVisitor: Pass 3 visitor that uses the type information"
  */
 public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 

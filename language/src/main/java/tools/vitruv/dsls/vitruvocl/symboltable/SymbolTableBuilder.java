@@ -23,7 +23,6 @@ import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.typechecker.Type;
-import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Phase 1 visitor that constructs the symbol table by collecting variable declarations and building
@@ -141,7 +140,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *
  * @author Max
  * @see SymbolTable The symbol table being populated
- * @see TypeCheckVisitor Pass 2 type checking visitor
+ * @see "TypeCheckVisitor: Pass 2 type checking visitor"
  * @see ScopeAnnotator Parse tree scope annotation utility
  * @see AbstractPhaseVisitor Base class with common error handling
  */

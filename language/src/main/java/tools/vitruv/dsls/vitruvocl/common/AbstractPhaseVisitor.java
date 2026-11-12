@@ -16,11 +16,9 @@ package tools.vitruv.dsls.vitruvocl.common;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLBaseVisitor;
-import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
-import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Abstract base class for visitor implementations used across compilation phases.
@@ -34,17 +32,16 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *   <li>Access to metamodel information via VSUM wrapper
  * </ul>
  *
- * <p>The generic type parameter {@code T} allows phase-specific return types: {@link
- * tools.vitruv.dsls.vitruvocl.typechecker.Type} for type checking and {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.Value} for evaluation.
+ * <p>The generic type parameter {@code T} allows phase-specific return types: {@code Type} for
+ * type checking and {@code Value} for evaluation.
  *
  * <p>Subclasses must implement {@link #handleUndefinedSymbol(String, ParserRuleContext)} to provide
- * phase-appropriate error handling for unresolved variables.
+ * phase-appropriate error handling for unresolved variables. The phase implementations are {@code
+ * TypeCheckVisitor} (Pass 2, type checking) and {@code EvaluationVisitor} (Pass 3, runtime
+ * evaluation).
  *
  * @param <T> Return type of visitor methods - {@code Type} for type checking phase, {@code Value}
  *     for evaluation phase
- * @see TypeCheckVisitor for Pass 2 implementation (type checking)
- * @see EvaluationVisitor for Pass 3 implementation (runtime evaluation)
  */
 public abstract class AbstractPhaseVisitor<T> extends VitruvOCLBaseVisitor<T> {
 

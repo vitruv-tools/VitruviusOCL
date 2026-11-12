@@ -283,9 +283,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /**
-   * Full constructor used by {@link tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler}, which
-   * itself distinguishes "no transaction constructor used" from "explicit, possibly-empty
-   * transaction" the same way (see {@code VitruvOCLCompiler}'s own two constructors).
+   * Full constructor used by {@code VitruvOCLCompiler}, which itself distinguishes "no transaction
+   * constructor used" from "explicit, possibly-empty transaction" the same way (see its own two
+   * constructors).
    *
    * @param transactionSupported see {@link #transactionSupported}
    */
