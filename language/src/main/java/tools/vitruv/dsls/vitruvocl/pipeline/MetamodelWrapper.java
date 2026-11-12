@@ -225,7 +225,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    *
    * @param ecorePaths all {@code .ecore} files found in the workspace
    */
-  public void registerWorkspaceEcoresForPlatformResolution(List<Path> ecorePaths) {
+  public synchronized void registerWorkspaceEcoresForPlatformResolution(List<Path> ecorePaths) {
     // filename.ecore -> file URI of the local copy
     Map<String, URI> byFilename = new HashMap<>();
     for (Path p : ecorePaths) {
@@ -409,7 +409,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param ecoreFile Path to .ecore metamodel file
    * @throws IOException If file cannot be read or is empty
    */
-  public void loadMetamodel(String packageName, Path ecoreFile) throws IOException {
+  public synchronized void loadMetamodel(String packageName, Path ecoreFile) throws IOException {
     EPackage ePackage = loadRootPackage(resourceSet, ecoreFile);
     // packageName may refer to a nested eSubpackage (e.g. "repository" inside pcm.ecore), so
     // don't blindly bind it to the root package here — registerPackageRecursively() resolves
@@ -423,10 +423,12 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param ecoreFile Path to .ecore metamodel file
    * @throws IOException If file cannot be read or is empty
    */
-  public void loadMetamodel(Path ecoreFile) throws IOException {
+  public synchronized void loadMetamodel(Path ecoreFile) throws IOException {
     EPackage ePackage = loadRootPackage(resourceSet, ecoreFile);
     String name = ePackage.getName();
-    metamodelRegistry.put(name, ePackage);
+    if (name != null) {
+      metamodelRegistry.put(name, ePackage);
+    }
     registerPackageRecursively(ePackage);
   }
 
@@ -506,7 +508,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param ecoreFile path to the modified {@code .ecore} file
    * @throws IOException if the file cannot be read or is empty after modification
    */
-  public void reloadMetamodel(Path ecoreFile) throws IOException {
+  public synchronized void reloadMetamodel(Path ecoreFile) throws IOException {
     ResourceSet probe = new ResourceSetImpl();
     probe
         .getResourceFactoryRegistry()
@@ -519,7 +521,9 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     unloadMetamodel(ecoreFile);
     probe.getResources().remove(freshResource);
     resourceSet.getResources().add(freshResource);
-    metamodelRegistry.put(fresh.getName(), fresh);
+    if (fresh.getName() != null) {
+      metamodelRegistry.put(fresh.getName(), fresh);
+    }
     registerPackageRecursively(fresh);
   }
 
@@ -532,7 +536,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    *
    * @param ecoreFile path to the {@code .ecore} file to remove
    */
-  public void unloadMetamodel(Path ecoreFile) {
+  public synchronized void unloadMetamodel(Path ecoreFile) {
     String targetUri = URI.createFileURI(ecoreFile.toAbsolutePath().toString()).toString();
 
     // Find the cached Resource in the ResourceSet by URI.
@@ -600,7 +604,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param xmiPath Absolute path to XMI model file
    * @throws IOException If file cannot be read
    */
-  public void loadModelInstance(Path xmiPath) throws IOException {
+  public synchronized void loadModelInstance(Path xmiPath) throws IOException {
     // Correspondence files are loaded via DOM to avoid EMF dynamic-EPackage type-validation issues.
     if (xmiPath.getFileName().toString().endsWith(".correspondence")) {
       loadCorrespondenceViaDOM(xmiPath);
@@ -642,7 +646,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param xmiFileName Filename relative to TEST_MODELS_PATH
    * @throws IOException If file cannot be read
    */
-  public void loadModelInstance(String xmiFileName) throws IOException {
+  public synchronized void loadModelInstance(String xmiFileName) throws IOException {
     loadModelInstance(testModelsPath.resolve(xmiFileName));
   }
 
@@ -653,7 +657,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return The EObject at that index, or null if out of bounds
    */
   @Override
-  public EObject getContextObjectByIndex(int index) {
+  public synchronized EObject getContextObjectByIndex(int index) {
     if (index >= 0 && index < contextObjects.size()) {
       return contextObjects.get(index);
     }
@@ -680,7 +684,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return Resolved EClass, or null if not found
    */
   @Override
-  public EClass resolveEClass(String metamodelName, String className) {
+  public synchronized EClass resolveEClass(String metamodelName, String className) {
     return MetamodelWrapperInterface.resolveEClassInRegistry(
         metamodelRegistry, metamodelName, className);
   }
@@ -719,7 +723,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return List of all direct and indirect instances (unmodifiable)
    */
   @Override
-  public List<EObject> getAllInstances(EClass eClass) {
+  public synchronized List<EObject> getAllInstances(EClass eClass) {
     return getAllInstances(List.of(eClass)).getOrDefault(eClass, Collections.emptyList());
   }
 
@@ -823,8 +827,8 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return Unmodifiable set of package names
    */
   @Override
-  public Set<String> getAvailableMetamodels() {
-    return Collections.unmodifiableSet(metamodelRegistry.keySet());
+  public synchronized Set<String> getAvailableMetamodels() {
+    return Set.copyOf(metamodelRegistry.keySet()); // a snapshot, see getContextObjects()
   }
 
   /**
@@ -835,7 +839,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return The filename (e.g., "spacecraft-atlas.spacemission"), or null if out of bounds
    */
   @Override
-  public String getInstanceNameByIndex(int index) {
+  public synchronized String getInstanceNameByIndex(int index) {
     if (index >= 0 && index < instanceFilenames.size()) {
       return instanceFilenames.get(index);
     }
@@ -846,13 +850,13 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * Returns the source filename for a specific EObject instance (by identity). More reliable than
    * index-based lookup.
    */
-  public String getSourceFileForInstance(EObject instance) {
+  public synchronized String getSourceFileForInstance(EObject instance) {
     return instanceSourceFile.get(instance);
   }
 
   /** Returns all registered context (root) objects in load order. */
-  public List<EObject> getContextObjects() {
-    return Collections.unmodifiableList(contextObjects);
+  public synchronized List<EObject> getContextObjects() {
+    return List.copyOf(contextObjects); // a snapshot: the list changes when models are loaded
   }
 
   /**
@@ -864,7 +868,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return List of all root EObjects from all loaded resources
    */
   @Override
-  public List<EObject> getAllRootObjects() {
+  public synchronized List<EObject> getAllRootObjects() {
     List<EObject> roots = new ArrayList<>();
 
     // Iterate through all resources in the resource set
@@ -886,13 +890,13 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @return the first matching {@link EClass}, or {@code null} if not found
    */
   @Override
-  public EClass resolveEClassByShortName(String shortName) {
+  public synchronized EClass resolveEClassByShortName(String shortName) {
     return MetamodelWrapperInterface.resolveEClassByShortNameInRegistry(
         metamodelRegistry, shortName);
   }
 
   @Override
-  public EEnum resolveEEnum(String enumName) {
+  public synchronized EEnum resolveEEnum(String enumName) {
     return MetamodelWrapperInterface.resolveEEnumInRegistry(metamodelRegistry, enumName);
   }
 
@@ -905,7 +909,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    * @param metamodelName the package name (e.g., {@code "JavaMM"})
    * @return the registered {@link EPackage}, or {@code null} if not found
    */
-  public EPackage getEPackage(String metamodelName) {
+  public synchronized EPackage getEPackage(String metamodelName) {
     return metamodelRegistry.get(metamodelName);
   }
 
@@ -1009,7 +1013,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
   }
 
   @Override
-  public Set<EObject> getCorrespondingObjects(EObject source) {
+  public synchronized Set<EObject> getCorrespondingObjects(EObject source) {
     // Resolve the source object's absolute URI (file URI + fragment)
     URI sourceUri = EcoreUtil.getURI(source);
     if (sourceUri == null) {
@@ -1038,7 +1042,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
   }
 
   @Override
-  public boolean correspondenceHasTag(EObject obj1, EObject obj2, String tag) {
+  public synchronized boolean correspondenceHasTag(EObject obj1, EObject obj2, String tag) {
     URI uri1 = EcoreUtil.getURI(obj1);
     URI uri2 = EcoreUtil.getURI(obj2);
     if (uri1 == null || uri2 == null) {

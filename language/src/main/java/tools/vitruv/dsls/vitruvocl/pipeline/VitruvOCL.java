@@ -569,14 +569,7 @@ public class VitruvOCL {
       throw new IllegalStateException(
           "attachIncrementalSession requires a VSUM registered via VitruvOCL.registerVSUM(vsum)");
     }
-    IncrementalSession session = IncrementalSession.open(constraints, wrapper, config);
-    try {
-      session.attachTo(wrapper, onResult, onFailure);
-      return session;
-    } catch (RuntimeException e) {
-      session.close();
-      throw e;
-    }
+    return IncrementalSession.openAttached(constraints, wrapper, config, onResult, onFailure);
   }
 
   // ---------------------------------------------------------------------------

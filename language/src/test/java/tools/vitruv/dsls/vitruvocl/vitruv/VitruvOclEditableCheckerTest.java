@@ -18,7 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -187,5 +194,40 @@ class VitruvOclEditableCheckerTest {
     withBuiltIn.delete(POSITIVE);
 
     assertTrue(withBuiltIn.getConstraints().isEmpty());
+  }
+
+  @Test
+  @DisplayName("concurrent edits are neither lost nor duplicated")
+  void concurrentCreates() throws Exception {
+    int count = 400;
+    ExecutorService pool = Executors.newFixedThreadPool(16);
+    CountDownLatch start = new CountDownLatch(1);
+    AtomicInteger duplicates = new AtomicInteger();
+    try {
+      List<Future<?>> futures = new ArrayList<>();
+      for (int i = 0; i < count; i++) {
+        String name = "c" + i;
+        futures.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  checker.create("context shop::Item inv " + name + ": self.price > 0");
+                  try {
+                    checker.create("context shop::Item inv " + name + ": self.price >= 0");
+                  } catch (DuplicateConstraintException expected) {
+                    duplicates.incrementAndGet();
+                  }
+                  return null;
+                }));
+      }
+      start.countDown();
+      for (Future<?> future : futures) {
+        future.get(60, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    assertEquals(count, checker.getConstraints().size(), "no created constraint may be lost");
+    assertEquals(count, duplicates.get(), "every second create must be rejected");
   }
 }

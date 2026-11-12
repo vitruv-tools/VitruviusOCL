@@ -35,6 +35,12 @@ interface OperationEvaluationContext {
   /** Returns the static type the type checker recorded for {@code ctx}, or {@code null}. */
   tools.vitruv.dsls.vitruvocl.typechecker.Type nodeType(ParserRuleContext ctx);
 
+  /**
+   * Whether evaluating {@code expression} may report a runtime error. Lazy operations must then be
+   * evaluated strictly, so that skipping elements does not hide errors eager evaluation reports.
+   */
+  boolean mayReportErrors(ParserRuleContext expression);
+
   /** Returns the symbol table (iterators bind their variables in fresh local scopes). */
   SymbolTable symbolTable();
 }

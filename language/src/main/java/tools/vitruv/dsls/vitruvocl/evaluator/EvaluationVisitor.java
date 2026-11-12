@@ -3361,6 +3361,11 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     }
 
     @Override
+    public boolean mayReportErrors(ParserRuleContext expression) {
+      return !cannotReportErrors(expression);
+    }
+
+    @Override
     public Type nodeType(ParserRuleContext ctx) {
       return nodeTypes.get(ctx);
     }

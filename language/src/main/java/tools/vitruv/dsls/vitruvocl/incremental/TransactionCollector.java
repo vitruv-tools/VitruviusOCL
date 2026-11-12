@@ -71,7 +71,7 @@ public final class TransactionCollector implements ChangePropagationListener {
       }
       return;
     }
-    if (onResult != null) {
+    if (onResult != null && result != null) { // null: nothing to report yet
       onResult.accept(result);
     }
   }

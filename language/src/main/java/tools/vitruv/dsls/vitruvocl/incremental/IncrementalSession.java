@@ -72,7 +72,7 @@ public final class IncrementalSession implements AutoCloseable {
   private final ExecutorService executor;
   private final ReverseIndex reverseIndex;
   private final RelevantInstanceResolver resolver;
-  private IncrementalResult latest;
+  private volatile IncrementalResult latest;
   private TransactionCollector attachedCollector;
 
   /**
@@ -102,6 +102,12 @@ public final class IncrementalSession implements AutoCloseable {
    */
   private boolean forceFullEvaluation;
   private VsumWrapper attachedWrapper;
+
+  /**
+   * Set by {@link #openAttached}: commits delivered before the initialization finished are covered
+   * by it and skipped.
+   */
+  private boolean coveredByInitialization;
 
   /**
    * Creates a session; call {@link #initialize()} before the first transaction.
@@ -148,6 +154,38 @@ public final class IncrementalSession implements AutoCloseable {
     }
   }
 
+  /**
+   * Opens a session and attaches it to {@code vsumWrapper}, so that every later commit is
+   * processed and reported to {@code onResult} (or {@code onFailure}).
+   *
+   * <p>The listener is registered <em>before</em> the initial evaluation, so no commit can slip in
+   * between the two: a commit delivered before the initialization started is covered by it (it
+   * reads the post-state), one delivered while it runs waits for it and is then processed.
+   *
+   * @return the initialised, attached session; close it to detach
+   */
+  public static IncrementalSession openAttached(
+      List<String> constraints,
+      VsumWrapper vsumWrapper,
+      IncrementalConfig config,
+      Consumer<IncrementalResult> onResult,
+      Consumer<RuntimeException> onFailure) {
+    IncrementalSession session = new IncrementalSession(constraints, vsumWrapper, config);
+    session.coveredByInitialization = true;
+    try {
+      session.attachTo(vsumWrapper, onResult, onFailure);
+      session.initialize();
+      return session;
+    } catch (RuntimeException | Error e) {
+      try {
+        session.close();
+      } catch (RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
+  }
+
   /** Daemon worker, so that a session that is never closed cannot keep the JVM alive. */
   private static Thread workerThread(Runnable task) {
     Thread thread = new Thread(task, "vitruvocl-incremental-worker");
@@ -166,7 +204,7 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /** Compiles all constraints and performs the initial full evaluation. */
-  public IncrementalResult initialize() {
+  public synchronized IncrementalResult initialize() {
     final IncrementalStats.Builder stats =
         new IncrementalStats.Builder().constraints(distinctConstraints.size());
     FeatureIndex features = FeatureIndex.forWrapper(wrapper);
@@ -201,7 +239,7 @@ public final class IncrementalSession implements AutoCloseable {
    * @throws IncrementalMismatchException in oracle mode, if the result differs from a full
    *     evaluation
    */
-  public IncrementalResult onTransaction(List<EChange<EObject>> changes) {
+  public synchronized IncrementalResult onTransaction(List<EChange<EObject>> changes) {
     if (latest == null) {
       throw new IllegalStateException("initialize() must be called before onTransaction()");
     }
@@ -401,14 +439,25 @@ public final class IncrementalSession implements AutoCloseable {
     if (attachedCollector != null) {
       throw new IllegalStateException("Session is already attached to a VSUM");
     }
-    attachedCollector = new TransactionCollector(this::onTransaction, onResult, onFailure);
+    attachedCollector = new TransactionCollector(this::onAttachedTransaction, onResult, onFailure);
     attachedWrapper = vsumWrapper;
     vsumWrapper.addTransactionListener(attachedCollector);
   }
 
+  /**
+   * Processes a commit delivered by the attached VSUM; {@code null} (nothing to report) if the
+   * session is not initialized yet, since the initialization then reads the commit's post-state.
+   */
+  private synchronized IncrementalResult onAttachedTransaction(List<EChange<EObject>> changes) {
+    if (latest == null && coveredByInitialization) {
+      return null;
+    }
+    return onTransaction(changes); // fails as before if attachTo was used without initialize()
+  }
+
   /** Removes the listener registered by {@link #attachTo}, if any, and stops worker threads. */
   @Override
-  public void close() {
+  public synchronized void close() { // waits for a transaction in progress
     if (attachedCollector != null) {
       attachedWrapper.removeTransactionListener(attachedCollector);
       attachedCollector = null;

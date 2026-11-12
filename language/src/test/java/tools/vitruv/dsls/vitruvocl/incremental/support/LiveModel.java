@@ -57,6 +57,7 @@ public final class LiveModel {
   private final List<Resource> modelResources;
   private final FakeCorrespondenceModel correspondences;
   private final VsumWrapper wrapper;
+  private final InternalVirtualModel vsum;
 
   private LiveModel(
       ResourceSet resourceSet,
@@ -70,6 +71,7 @@ public final class LiveModel {
     when(((ViewSource) vsum).getViewSourceModels())
         .thenAnswer(inv -> List.<Resource>copyOf(this.modelResources));
     when(vsum.getCorrespondenceModel()).thenReturn(correspondences);
+    this.vsum = vsum;
     this.wrapper = new VsumWrapper(vsum);
   }
 
@@ -156,6 +158,11 @@ public final class LiveModel {
       edit.run();
       return new ArrayList<>(recorder.endRecording().getEChanges());
     }
+  }
+
+  /** The mocked virtual model behind {@link #wrapper()} (e.g. to observe listener calls). */
+  public InternalVirtualModel vsum() {
+    return vsum;
   }
 
   /** The wrapper that evaluates constraints on this model. */

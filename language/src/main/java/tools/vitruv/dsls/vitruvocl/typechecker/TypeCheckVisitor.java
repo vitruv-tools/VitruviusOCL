@@ -2958,6 +2958,37 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   }
 
   /**
+   * Whether a value of {@code source} can be an instance of {@code target}. Casts between two
+   * metaclasses are always possible statically (EMF has multiple inheritance, and every class is an
+   * {@code EObject}), so only casts involving a primitive type are checked: their member types must
+   * be related by conformance in either direction, or one of them is untyped.
+   */
+  private static boolean isPossibleCast(Type source, Type target) {
+    Type from = memberType(source);
+    Type to = memberType(target);
+    if (from == Type.ERROR || to == Type.ERROR || from == Type.ANY || to == Type.ANY) {
+      return true;
+    }
+    if (from.isMetaclassType() && to.isMetaclassType()) {
+      return true;
+    }
+    return from.isConformantTo(to) || to.isConformantTo(from);
+  }
+
+  /** The member type of {@code type}: unwraps singleton, optional and collection types. */
+  private static Type memberType(Type type) {
+    Type member = type;
+    while (member.isSingleton() || member.isOptional() || member.isCollection()) {
+      Type element = member.getElementType();
+      if (element == member) {
+        break;
+      }
+      member = element;
+    }
+    return member;
+  }
+
+  /**
    * Visits an 'oclAsType' operation node in the AST.
    *
    * <p>Casts the receiver to the target type while preserving the multiplicity. The receiver's
@@ -2966,7 +2997,12 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    * <ul>
    *   <li>{@code ¡Shape! .oclAsType(Box)} → {@code ¡Box!}
    *   <li>{@code {Shape} .oclAsType(Box)} → {@code {Box}}
+   *   <li>{@code [Real] .oclAsType(Set(Integer))} → {@code [Integer]} (a collection target only
+   *       contributes its member type, as at runtime)
    * </ul>
+   *
+   * <p>A cast involving a primitive type whose member types are unrelated (neither conforms to the
+   * other) is an error; casts between metaclasses are checked at runtime.
    *
    * @param ctx the context of the 'oclAsType' operation node in the AST
    * @return the cast type with preserved multiplicity, or {@link Type#ERROR}
@@ -2981,6 +3017,16 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     Type targetType = visit(ctx.type);
     if (targetType == null && ctx.type != null) {
       targetType = resolveTypeExpression(ctx.type);
+    }
+
+    if (targetType != null && !isPossibleCast(receiverType, targetType)) {
+      reportError(ctx, "Cannot cast " + receiverType + " to unrelated type " + targetType);
+      nodeTypes.put(ctx, Type.ERROR);
+      return Type.ERROR;
+    }
+    if (targetType != null && targetType.isCollection() && !targetType.isSingleton()) {
+      // the evaluator casts the members and keeps the receiver's kind: only the member counts
+      targetType = memberType(targetType);
     }
 
     // preserve the receiver's multiplicity, replace only the

@@ -74,6 +74,12 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    */
   private volatile Map<String, ConstraintDescriptor> constraints;
 
+  /**
+   * Serializes the read-check-replace of {@link #constraints} in create/update/delete, so that
+   * concurrent edits are neither lost nor duplicated. Parsing and type checking stay outside.
+   */
+  private final Object editLock = new Object();
+
   private VitruvOclConstraintChecker(List<ParsedInvariant> invariants) {
     Map<String, ConstraintDescriptor> initial = new LinkedHashMap<>();
     Map<String, Integer> unnamedPerContext = new LinkedHashMap<>();
@@ -207,9 +213,14 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
       throw new DuplicateConstraintException(created.id());
     }
     typeCheck(source);
-    Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
-    changed.put(created.id(), created);
-    constraints = Collections.unmodifiableMap(changed);
+    synchronized (editLock) {
+      if (constraints.containsKey(created.id())) {
+        throw new DuplicateConstraintException(created.id()); // created concurrently
+      }
+      Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
+      changed.put(created.id(), created);
+      constraints = Collections.unmodifiableMap(changed);
+    }
     return created;
   }
 
@@ -237,20 +248,27 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
                       + " is updated; context type and invariant name cannot be changed")));
     }
     typeCheck(source);
-    Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
-    changed.put(id, updated);
-    constraints = Collections.unmodifiableMap(changed);
+    synchronized (editLock) {
+      if (!constraints.containsKey(id)) {
+        throw new UnknownConstraintException(id); // deleted concurrently
+      }
+      Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
+      changed.put(id, updated);
+      constraints = Collections.unmodifiableMap(changed);
+    }
     return updated;
   }
 
   @Override
   public void delete(String id) {
-    if (!constraints.containsKey(id)) {
-      throw new UnknownConstraintException(id);
+    synchronized (editLock) {
+      if (!constraints.containsKey(id)) {
+        throw new UnknownConstraintException(id);
+      }
+      Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
+      changed.remove(id);
+      constraints = Collections.unmodifiableMap(changed);
     }
-    Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
-    changed.remove(id);
-    constraints = Collections.unmodifiableMap(changed);
   }
 
   /** Parses a source that must contain exactly one named invariant. */

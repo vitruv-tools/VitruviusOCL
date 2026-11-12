@@ -706,7 +706,8 @@ final class IteratorOperationEvaluation {
                 .elementIterator();
     OCLElementSource mapped = LazyOperations.flatMap(receiver.asSource(), expand);
     Type resultType = context.nodeType(ctx);
-    return Value.lazy(mapped, resultType != null ? resultType : Type.set(Type.ANY));
+    return strictIfErrorProne(
+        Value.lazy(mapped, resultType != null ? resultType : Type.set(Type.ANY)), ctx.body);
   }
 
   /**
@@ -904,7 +905,7 @@ final class IteratorOperationEvaluation {
         elem ->
             !evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body));
     OCLElementSource filtered = LazyOperations.filter(receiver.asSource(), predicate);
-    return Value.lazy(filtered, receiver.getRuntimeType());
+    return strictIfErrorProne(Value.lazy(filtered, receiver.getRuntimeType()), ctx.body);
   }
 
   /**
@@ -967,7 +968,7 @@ final class IteratorOperationEvaluation {
         elem ->
             evalInScope(iterScope, iterSymbol, iterVarType, elem, () -> evalBooleanBody(ctx.body));
     OCLElementSource filtered = LazyOperations.filter(receiver.asSource(), predicate);
-    return Value.lazy(filtered, receiver.getRuntimeType());
+    return strictIfErrorProne(Value.lazy(filtered, receiver.getRuntimeType()), ctx.body);
   }
 
   /**
@@ -1029,5 +1030,17 @@ final class IteratorOperationEvaluation {
       VariableSymbol[] symbols, Type iterVarType, OCLElement elem1, OCLElement elem2) {
     rebindIterVar(symbols[0], iterVarType, elem1);
     rebindIterVar(symbols[1], iterVarType, elem2);
+  }
+
+  /**
+   * {@code lazyResult} (of select, reject or collect), fully evaluated now if {@code body} may
+   * report a runtime error: a consumer that stops early (e.g. {@code notEmpty()}) would otherwise
+   * skip elements whose body reports an error in eager evaluation.
+   */
+  private Value strictIfErrorProne(Value lazyResult, ParserRuleContext body) {
+    if (body != null && context.mayReportErrors(body)) {
+      lazyResult.getElements();
+    }
+    return lazyResult;
   }
 }

@@ -228,4 +228,57 @@ class AuditFollowUpRegressionTest extends DummyTestSpecification {
       assertTypeError("Set{1}.iterate(x; acc = acc | acc)");
     }
   }
+
+  @Nested
+  class OclAsTypeTyping {
+
+    @Test
+    void castBetweenUnrelatedTypesIsATypeError() {
+      assertTypeError("\"a\".oclAsType(Integer)");
+    }
+
+    @Test
+    void castToARelatedTypeTypeChecks() {
+      assertEquals(List.of(), check("1.oclAsType(Real)").errors());
+    }
+
+    @Test
+    void castToACollectionTypeKeepsTheReceiverKind() {
+      // the evaluator casts the members and keeps the receiver's collection kind
+      Type type = check("Sequence{1, 1}.oclAsType(Set(Real))").type();
+      assertEquals(Type.sequence(Type.DOUBLE).getCollectionKind(), type.getCollectionKind());
+    }
+
+    @Test
+    void castToACollectionTypeIsNotWrappedTwice() {
+      Type type = check("Set{2.5}.oclAsType(Set(Real))").type();
+      assertEquals(Type.DOUBLE, type.getElementType());
+    }
+  }
+
+  @Nested
+  class LazyFilterErrors {
+
+    @Test
+    void selectReportsAnErrorOfALaterElementLikeEagerEvaluation() {
+      org.junit.jupiter.api.Assertions.assertThrows(
+          AssertionError.class,
+          () -> compile("Sequence{\"a\", \"(\"}.select(p | \"a\".matches(p)).notEmpty()"),
+          "the invalid regular expression of the second element must be reported");
+    }
+
+    @Test
+    void collectReportsAnErrorOfALaterElementLikeEagerEvaluation() {
+      org.junit.jupiter.api.Assertions.assertThrows(
+          AssertionError.class,
+          () -> compile("Sequence{\"a\", \"(\"}.collect(p | \"a\".matches(p)).includes(true)"));
+    }
+
+    @Test
+    void rejectReportsAnErrorOfALaterElementLikeEagerEvaluation() {
+      org.junit.jupiter.api.Assertions.assertThrows(
+          AssertionError.class,
+          () -> compile("Sequence{\"b\", \"(\"}.reject(p | \"a\".matches(p)).notEmpty()"));
+    }
+  }
 }
