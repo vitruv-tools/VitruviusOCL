@@ -93,7 +93,7 @@ final class CompiledConstraint {
 
   private static ConstraintAnalysis analyse(
       VitruvOCLParser.ContextDeclCSContext tree,
-      ParseTreeProperty<tools.vitruv.dsls.vitruvocl.typechecker.Type> nodeTypes,
+      ParseTreeProperty<tools.vitruv.dsls.vitruvocl.types.Type> nodeTypes,
       FeatureIndex features) {
     ReadSet readSet = ReadSetAnalyzer.analyze(tree, nodeTypes, features);
     return new ConstraintAnalysis(
@@ -112,7 +112,7 @@ final class CompiledConstraint {
 
   /** The static context class of a classifier context of this constraint, or {@code null}. */
   org.eclipse.emf.ecore.EClass contextClass(VitruvOCLParser.ClassifierContextCSContext ctx) {
-    tools.vitruv.dsls.vitruvocl.typechecker.Type type =
+    tools.vitruv.dsls.vitruvocl.types.Type type =
         prepared.isCompiled() ? prepared.nodeTypes().get(ctx) : null;
     return type == null ? null : type.getEClass();
   }

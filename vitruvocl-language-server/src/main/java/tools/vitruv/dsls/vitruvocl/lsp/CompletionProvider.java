@@ -30,7 +30,7 @@ import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation.Family;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Builds context-sensitive completion lists for OCL# documents.

@@ -191,7 +191,7 @@ class CollectionLiteralTypeTest extends DummyTestSpecification {
     assertSingleDouble(
         new Value(
             java.util.List.of(r.getElements().get(0)),
-            tools.vitruv.dsls.vitruvocl.typechecker.Type.DOUBLE),
+            tools.vitruv.dsls.vitruvocl.types.Type.DOUBLE),
         3.0);
   }
 

@@ -1,4 +1,4 @@
-package tools.vitruv.dsls.vitruvocl.typechecker;
+package tools.vitruv.dsls.vitruvocl.types;
 
 import org.eclipse.emf.ecore.EClass;
 
@@ -18,7 +18,7 @@ import org.eclipse.emf.ecore.EClass;
  * <p>This is the base Type AST node produced during Pass 2 (Type Checking) of the compiler. Each
  * parsed expression node receives a Type annotation stored in the nodeTypes map.
  *
- * @see TypeCheckVisitor which produces Type annotations for parsed expressions
+ * @see "TypeCheckVisitor: produces Type annotations for parsed expressions"
  * @see Multiplicity for OCL multiplicity semantics
  * @see MetaclassType for metamodel integration
  */

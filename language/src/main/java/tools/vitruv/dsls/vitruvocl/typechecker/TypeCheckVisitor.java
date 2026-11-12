@@ -33,6 +33,9 @@ import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
+import tools.vitruv.dsls.vitruvocl.types.Multiplicity;
+import tools.vitruv.dsls.vitruvocl.types.Type;
+import tools.vitruv.dsls.vitruvocl.types.TypeResolver;
 
 /**
  * Phase 2 visitor that performs static type checking on OCL expressions.

@@ -30,8 +30,8 @@ import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Regression tests for the remaining medium findings of the November 2026 audit: order of lazy

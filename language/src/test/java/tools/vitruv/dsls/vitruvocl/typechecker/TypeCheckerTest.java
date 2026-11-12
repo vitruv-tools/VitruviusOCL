@@ -36,6 +36,7 @@ import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Comprehensive test suite for Type Checking phase (Pass 2) of VitruvOCL compiler.

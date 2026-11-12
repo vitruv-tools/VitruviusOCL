@@ -22,7 +22,7 @@ import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Phase 1 visitor that constructs the symbol table by collecting variable declarations and building

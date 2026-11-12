@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Runtime semantics of the String operations ({@code concat}, {@code substring}, {@code matches},

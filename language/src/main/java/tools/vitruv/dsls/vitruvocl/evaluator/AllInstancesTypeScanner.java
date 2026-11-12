@@ -22,7 +22,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EClass;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Static query analysis of the allInstances() computation strategy of Wei &amp; Kolovos (BigMDE

@@ -14,7 +14,7 @@
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Symbol representing a variable in the symbol table.

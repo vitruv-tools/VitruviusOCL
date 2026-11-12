@@ -15,6 +15,8 @@ package tools.vitruv.dsls.vitruvocl.typechecker;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.types.Type;
+import tools.vitruv.dsls.vitruvocl.types.TypeResolver;
 
 /**
  * Type rules of the collection operations: queries ({@code includes}, {@code size}, ...),

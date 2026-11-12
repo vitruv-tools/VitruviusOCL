@@ -34,9 +34,9 @@ import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Multiplicity;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Multiplicity;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Tests for {@code visitIncludingOp}'s cardinality-bound computation (the χ case system for {@code

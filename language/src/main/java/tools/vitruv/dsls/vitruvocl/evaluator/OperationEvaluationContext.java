@@ -33,7 +33,7 @@ interface OperationEvaluationContext {
   void error(ParserRuleContext ctx, String message);
 
   /** Returns the static type the type checker recorded for {@code ctx}, or {@code null}. */
-  tools.vitruv.dsls.vitruvocl.typechecker.Type nodeType(ParserRuleContext ctx);
+  tools.vitruv.dsls.vitruvocl.types.Type nodeType(ParserRuleContext ctx);
 
   /**
    * Whether evaluating {@code expression} may report a runtime error. Lazy operations must then be

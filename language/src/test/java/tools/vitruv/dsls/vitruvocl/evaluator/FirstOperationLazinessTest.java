@@ -22,7 +22,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /** {@code first()} pulls a single element from a lazy receiver instead of draining it. */
 class FirstOperationLazinessTest {

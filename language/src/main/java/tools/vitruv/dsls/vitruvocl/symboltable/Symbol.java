@@ -13,7 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Abstract base class for all symbols stored in the symbol table.

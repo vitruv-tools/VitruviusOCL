@@ -14,7 +14,7 @@ import java.util.List;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.lsp4j.Diagnostic;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Immutable snapshot of one full analysis cycle for a single document.

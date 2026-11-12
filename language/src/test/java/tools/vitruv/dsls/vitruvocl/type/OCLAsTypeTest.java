@@ -41,8 +41,8 @@ import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Comprehensive test suite for the {@code oclAsType} cast operation in VitruvOCL.

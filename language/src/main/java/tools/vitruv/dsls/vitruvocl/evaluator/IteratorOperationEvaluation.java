@@ -28,7 +28,7 @@ import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
 import tools.vitruv.dsls.vitruvocl.symboltable.LocalScope;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Runtime semantics of the iterator operations ({@code select}, {@code collect}, {@code forAll},

@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * A lazy {@link Value} follows call-by-need (Tisi et al., "Lazy Evaluation for OCL", 2015): no

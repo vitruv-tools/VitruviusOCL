@@ -15,6 +15,7 @@ package tools.vitruv.dsls.vitruvocl.typechecker;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Type rules of the String operations ({@code concat}, {@code substring}, {@code matches}, ...).

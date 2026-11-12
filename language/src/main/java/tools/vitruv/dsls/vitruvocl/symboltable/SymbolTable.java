@@ -13,7 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Interface for the symbol table of the OCL compiler.

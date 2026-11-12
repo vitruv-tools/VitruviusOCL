@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.typechecker;
+package tools.vitruv.dsls.vitruvocl.types;
 
 /**
  * Static helper methods for type resolution and type operations.

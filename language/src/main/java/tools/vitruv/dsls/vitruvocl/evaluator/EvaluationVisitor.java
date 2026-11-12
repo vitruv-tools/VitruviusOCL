@@ -44,7 +44,7 @@ import tools.vitruv.dsls.vitruvocl.symboltable.LocalScope;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Phase 3 visitor that evaluates OCL expressions and produces runtime values.
@@ -1232,7 +1232,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       if (leftElem instanceof OCLElement.FloatValue && rightElem instanceof OCLElement.FloatValue) {
         return Value.of(
             java.util.List.of(new OCLElement.FloatValue((float) result)),
-            tools.vitruv.dsls.vitruvocl.typechecker.Type.FLOAT);
+            tools.vitruv.dsls.vitruvocl.types.Type.FLOAT);
       }
       return Value.doubleValue(result);
     }
@@ -1285,7 +1285,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       if (leftElem instanceof OCLElement.FloatValue && rightElem instanceof OCLElement.FloatValue) {
         return Value.of(
             java.util.List.of(new OCLElement.FloatValue((float) result)),
-            tools.vitruv.dsls.vitruvocl.typechecker.Type.FLOAT);
+            tools.vitruv.dsls.vitruvocl.types.Type.FLOAT);
       }
       return Value.doubleValue(result);
     }

@@ -23,7 +23,7 @@ import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations.HashedBuffer;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * OCL Value - The unified value representation.

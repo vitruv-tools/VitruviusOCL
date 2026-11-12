@@ -18,7 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Runtime semantics of the collection operations: queries ({@code includes}, {@code size}, ...),

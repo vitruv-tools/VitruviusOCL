@@ -17,6 +17,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * What an operation-family type checker (e.g. {@link StringOperationTyping}) needs from {@link

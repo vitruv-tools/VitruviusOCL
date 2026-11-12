@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Tests {@link Value}'s lazy backing: materialize-on-demand {@link Value#getElements()}, the

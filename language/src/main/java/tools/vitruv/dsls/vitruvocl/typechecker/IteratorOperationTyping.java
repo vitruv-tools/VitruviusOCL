@@ -21,6 +21,8 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
+import tools.vitruv.dsls.vitruvocl.types.Type;
+import tools.vitruv.dsls.vitruvocl.types.TypeResolver;
 
 /**
  * Type rules of the iterator operations ({@code select}, {@code collect}, {@code forAll}, {@code

@@ -15,7 +15,7 @@ package tools.vitruv.dsls.vitruvocl.symboltable;
 
 import org.eclipse.emf.ecore.EClass;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Default implementation of the {@link SymbolTable} interface.

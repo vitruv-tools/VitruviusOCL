@@ -21,7 +21,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Contract tests for the "define once, rebind per element" pattern that {@code
