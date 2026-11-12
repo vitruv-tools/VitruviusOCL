@@ -222,8 +222,14 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private final boolean correspondenceFastPaths;
 
-  /** Result of {@link #cannotReportErrors} per constraint (parse-tree root). */
-  private final Map<ParseTree, Boolean> errorFreeConstraints = new IdentityHashMap<>();
+  /**
+   * Per constraint (parse-tree root): whether nothing outside an operand can carry an error into
+   * it; see {@link #cannotReportErrors}.
+   */
+  private final Map<ParseTree, Boolean> constraintCarriesNoErrors = new IdentityHashMap<>();
+
+  /** Result of {@link #isErrorFree} per parse-tree node. */
+  private final Map<ParseTree, Boolean> errorFreeNodes = new IdentityHashMap<>();
 
   /**
    * Value of each number and string literal node, computed once instead of re-parsing the literal
@@ -2723,20 +2729,69 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * at runtime, for invalid regular expressions in {@code matches()} and for unbound variables
    * (excluded by the type checker), and throws for integer
    * literals that do not fit an {@code int} and for {@code substring} bounds that are no integers.
-   * The check covers the <em>whole constraint</em>, not just {@code operand}, because lazily
-   * evaluated {@code let} values from outside can be forced inside it. It requires: no {@code
-   * append}/{@code iterate} (result types not trusted, as in the incremental analysis), no {@code
-   * matches}, no node
-   * typed {@code OclAny} or erroneous (an {@code OclAny} may hold a collection), every comparison
-   * operand of a non-collection type, and every integer literal within {@code int} range.
+   * The check covers {@code operand}, every {@code let} initializer of the constraint (a lazily
+   * evaluated {@code let} value from outside can be forced inside {@code operand}; lazy {@code
+   * select}/{@code reject}/{@code collect} results whose body could report an error are evaluated
+   * strictly where they occur, so they cannot carry an error inside), and the absence of {@code
+   * append}/{@code iterate} anywhere in the constraint (their result types are not trusted, as in
+   * the incremental analysis, so variables bound to their elements may be mistyped). Within these
+   * parts it requires: no {@code matches}, no node typed {@code OclAny} or erroneous (an {@code
+   * OclAny} may hold a collection), every comparison operand of a non-collection type, and every
+   * integer literal within {@code int} range.
    * Exceptions from the model access itself (the wrapper) are infrastructure failures and are not
    * considered.
    */
   private boolean cannotReportErrors(ParserRuleContext operand) {
-    return errorFreeConstraints.computeIfAbsent(root(operand), this::isErrorFree);
+    return isErrorFree(operand)
+        && constraintCarriesNoErrors.computeIfAbsent(
+            root(operand),
+            root -> !containsUntrustedTypes(root) && letInitializersErrorFree(root));
   }
 
+  /**
+   * Whether {@code node}'s subtree contains an {@code append} or {@code iterate}: their result
+   * types are not checked against the values they hold, so variables bound to their elements
+   * anywhere in the constraint may hold values of another type than their static one.
+   */
+  private static boolean containsUntrustedTypes(ParseTree node) {
+    if (node instanceof VitruvOCLParser.AppendOpContext
+        || node instanceof VitruvOCLParser.IterateOpContext) {
+      return true;
+    }
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (containsUntrustedTypes(node.getChild(i))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Whether every {@code let} initializer below {@code node} is error-free. */
+  private boolean letInitializersErrorFree(ParseTree node) {
+    if (node instanceof VitruvOCLParser.VariableDeclarationContext declaration
+        && declaration.varInit != null
+        && !isErrorFree(declaration.varInit)) {
+      return false;
+    }
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (!letInitializersErrorFree(node.getChild(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Whether no node of {@code node}'s subtree can report an error; memoized per node. */
   private boolean isErrorFree(ParseTree node) {
+    Boolean known = errorFreeNodes.get(node);
+    if (known == null) {
+      known = computeErrorFree(node);
+      errorFreeNodes.put(node, known);
+    }
+    return known;
+  }
+
+  private boolean computeErrorFree(ParseTree node) {
     if (node instanceof VitruvOCLParser.AppendOpContext
         || node instanceof VitruvOCLParser.IterateOpContext
         || node instanceof VitruvOCLParser.MatchesOpContext) {

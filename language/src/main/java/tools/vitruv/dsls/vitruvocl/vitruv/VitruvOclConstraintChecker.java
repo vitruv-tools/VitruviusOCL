@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -243,10 +244,14 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    * {@inheritDoc}
    *
    * <p>The source must contain exactly one named invariant with the same context type and name.
+   *
+   * @throws java.util.ConcurrentModificationException if the constraint was replaced (deleted and
+   *     created again) while the update was being checked
    */
   @Override
   public ConstraintDescriptor update(String id, String source) {
-    if (!constraints.containsKey(id)) {
+    ConstraintDescriptor before = constraints.get(id);
+    if (before == null) {
       throw new UnknownConstraintException(id);
     }
     ConstraintDescriptor updated = parseSingle(source);
@@ -263,15 +268,34 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
                       + " is updated; context type and invariant name cannot be changed")));
     }
     typeCheck(source);
+    replaceIfUnchanged(id, before, updated);
+    return updated;
+  }
+
+  /**
+   * Replaces the constraint {@code id} by {@code updated}, provided it is still {@code expected},
+   * the version the update started from. Parsing and type checking run without the lock, so the
+   * constraint may have been deleted, or deleted and created again, meanwhile; overwriting that
+   * newer version with the update's would silently lose it.
+   *
+   * @throws UnknownConstraintException if the constraint was deleted meanwhile
+   * @throws ConcurrentModificationException if it was replaced meanwhile
+   */
+  void replaceIfUnchanged(
+      String id, ConstraintDescriptor expected, ConstraintDescriptor updated) {
     synchronized (editLock) {
-      if (!constraints.containsKey(id)) {
+      ConstraintDescriptor current = constraints.get(id);
+      if (current == null) {
         throw new UnknownConstraintException(id); // deleted concurrently
+      }
+      if (current != expected) {
+        throw new ConcurrentModificationException(
+            "The constraint " + id + " was changed concurrently; the update was not applied");
       }
       Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
       changed.put(id, updated);
       constraints = Collections.unmodifiableMap(changed);
     }
-    return updated;
   }
 
   @Override

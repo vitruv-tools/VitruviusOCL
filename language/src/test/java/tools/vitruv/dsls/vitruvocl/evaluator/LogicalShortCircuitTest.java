@@ -14,10 +14,13 @@ package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
@@ -50,7 +53,7 @@ class LogicalShortCircuitTest {
             });
   }
 
-  @org.junit.jupiter.api.Test
+  @Test
   void undecidedLeftOperandEvaluatesTheRightOne() {
     AtomicInteger lookups = new AtomicInteger();
     VitruvOCLCompiler compiler = new VitruvOCLCompiler(counting(lookups), null);
@@ -58,7 +61,32 @@ class LogicalShortCircuitTest {
         "context edge::SubA inv: self.value > 0 and edge::Other.allInstances().exists(o | o ~"
             + " self)");
     assertFalse(compiler.hasErrors(), () -> "errors: " + compiler.getErrors().getErrors());
-    org.junit.jupiter.api.Assertions.assertTrue(lookups.get() > 0, "lookups are counted");
+    assertTrue(lookups.get() > 0, "lookups are counted");
+  }
+
+  @Test
+  void errorProneCodeElsewhereInTheConstraintDoesNotPreventSkipping() {
+    // matches() may report an invalid pattern, but it is not part of the skipped operand
+    AtomicInteger lookups = new AtomicInteger();
+    VitruvOCLCompiler compiler = new VitruvOCLCompiler(counting(lookups), null);
+    compiler.compile(
+        "context edge::SubA inv: (self.value < 0 and edge::Other.allInstances().exists(o | o ~"
+            + " self)) or self.name.matches(\"a.*\")");
+    assertFalse(compiler.hasErrors(), () -> "errors: " + compiler.getErrors().getErrors());
+    assertEquals(0, lookups.get(), "the right operand of 'and' must not be evaluated");
+  }
+
+  @Test
+  void errorProneLetValueStillPreventsSkipping() {
+    // the let value is evaluated lazily and may be forced inside the operand
+    AtomicInteger lookups = new AtomicInteger();
+    VitruvOCLCompiler compiler = new VitruvOCLCompiler(counting(lookups), null);
+    compiler.compile(
+        "context edge::SubA inv: let m = self.name.matches(\"a.*\") in self.value < 0 and"
+            + " (m or edge::Other.allInstances().exists(o | o ~ self))");
+    assertFalse(compiler.hasErrors(), () -> "errors: " + compiler.getErrors().getErrors());
+    assertTrue(
+        lookups.get() > 0, "an operand that may force an error-prone let value is evaluated");
   }
 
   @ParameterizedTest
@@ -73,7 +101,7 @@ class LogicalShortCircuitTest {
     VitruvOCLCompiler compiler = new VitruvOCLCompiler(counting(lookups), null);
     compiler.compile("context edge::SubA inv: " + body);
     assertFalse(compiler.hasErrors(), () -> "errors: " + compiler.getErrors().getErrors());
-    org.junit.jupiter.api.Assertions.assertNotNull(compiler.getLastEvaluator(), "evaluated");
+    assertNotNull(compiler.getLastEvaluator(), "evaluated");
     assertEquals(0, lookups.get(), "the right operand must not be evaluated");
   }
 }

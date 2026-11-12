@@ -262,6 +262,27 @@ class AuditFollowUpRegressionTest extends DummyTestSpecification {
   class LazyFilterErrors {
 
     @Test
+    void appendElsewhereStillPreventsSkippingAnOperand() {
+      // append is typed as its receiver, so i is statically Integer but 'a' at runtime
+      org.junit.jupiter.api.Assertions.assertThrows(
+          Throwable.class,
+          () ->
+              compile(
+                  "Sequence{1}.append(\"a\").exists(i | false and \"abc\".substring(i, i) =="
+                      + " \"a\")"));
+    }
+
+    @Test
+    void appendElsewhereStillForcesALazySelect() {
+      org.junit.jupiter.api.Assertions.assertThrows(
+          Throwable.class,
+          () ->
+              compile(
+                  "Sequence{1}.append(\"a\").select(i | \"abc\".substring(i, i) == \"a\")"
+                      + ".notEmpty()"));
+    }
+
+    @Test
     void selectReportsAnErrorOfALaterElementLikeEagerEvaluation() {
       org.junit.jupiter.api.Assertions.assertThrows(
           AssertionError.class,

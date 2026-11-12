@@ -34,7 +34,9 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import org.eclipse.emf.common.notify.Adapter;
 import org.eclipse.emf.common.notify.Notification;
+import org.eclipse.emf.common.notify.impl.AdapterImpl;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
@@ -154,9 +156,15 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
         @Override
         public void notifyChanged(Notification notification) {
           super.notifyChanged(notification);
-          if (!notification.isTouch() && affectsContainment(notification.getFeature())) {
+          if (notification.isTouch()) {
+            return;
+          }
+          if (affectsContainment(notification.getFeature())) {
             invalidateAllInstancesCache(false);
             invalidateCorrespondenceIndex(); // fragment URIs may have changed
+          } else if (notification.getFeature() instanceof EAttribute attribute
+              && attribute.isID()) {
+            invalidateCorrespondenceIndex(); // an ID is the URI fragment of its object
           }
         }
 
@@ -165,6 +173,67 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
           return false;
         }
       };
+
+  /**
+   * Drops the correspondence index when a resource changes what its URIs resolve to: another URI,
+   * other root objects, or a load/unload.
+   */
+  private final Adapter resourceTracker =
+      new AdapterImpl() {
+        @Override
+        public void notifyChanged(Notification notification) {
+          if (notification.isTouch() || !(notification.getNotifier() instanceof Resource)) {
+            return;
+          }
+          int feature = notification.getFeatureID(Resource.class);
+          if (feature == Resource.RESOURCE__URI
+              || feature == Resource.RESOURCE__CONTENTS
+              || feature == Resource.RESOURCE__IS_LOADED) {
+            invalidateCorrespondenceIndex();
+          }
+        }
+      };
+
+  /**
+   * Tracks every resource added to the resource set, also those loaded by resolving a proxy during
+   * evaluation: a correspondence whose partner was not loaded when the index was built must be
+   * found once it is. ID attributes inside such resources are tracked by {@link
+   * #extensionTracker} as well.
+   */
+  private final Adapter resourceSetTracker =
+      new AdapterImpl() {
+        @Override
+        public void notifyChanged(Notification notification) {
+          if (notification.getFeatureID(ResourceSet.class) != ResourceSet.RESOURCE_SET__RESOURCES
+              || notification.isTouch()) {
+            return;
+          }
+          invalidateCorrespondenceIndex();
+          for (Object added : addedValues(notification)) {
+            if (added instanceof Resource resource) {
+              track(resource);
+            }
+          }
+        }
+      };
+
+  private static List<?> addedValues(Notification notification) {
+    return switch (notification.getEventType()) {
+      case Notification.ADD -> List.of(notification.getNewValue());
+      case Notification.ADD_MANY -> (List<?>) notification.getNewValue();
+      default -> List.of();
+    };
+  }
+
+  /** Attaches the resource and content trackers to {@code resource} (once). */
+  private void track(Resource resource) {
+    if (!resource.eAdapters().contains(resourceTracker)) {
+      resource.eAdapters().add(resourceTracker);
+    }
+    if (!resource.eAdapters().contains(extensionTracker)) {
+      resource.eAdapters().add(extensionTracker);
+    }
+  }
 
   /**
    * Whether a change of {@code feature} can change which objects are contained: a containment
@@ -267,9 +336,33 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     }
   }
 
+  /**
+   * The wrapper's resource set. Resolving a cross-file proxy during evaluation (outside the
+   * wrapper's synchronized methods) loads the target resource into it, so its resource lookups and
+   * loads take the wrapper's lock: they must not race with loading or unloading models through the
+   * wrapper. Such a load therefore also blocks other threads using the wrapper while it reads the
+   * file.
+   */
+  private final class LockedResourceSet extends ResourceSetImpl {
+    @Override
+    public Resource getResource(URI uri, boolean loadOnDemand) {
+      synchronized (MetamodelWrapper.this) {
+        return super.getResource(uri, loadOnDemand);
+      }
+    }
+
+    @Override
+    public EObject getEObject(URI uri, boolean loadOnDemand) {
+      synchronized (MetamodelWrapper.this) {
+        return super.getEObject(uri, loadOnDemand);
+      }
+    }
+  }
+
   /** Creates metamodel wrapper with EMF resource factories configured. */
   public MetamodelWrapper() {
-    this.resourceSet = new ResourceSetImpl();
+    this.resourceSet = new LockedResourceSet();
+    resourceSet.eAdapters().add(resourceSetTracker);
     resourceSet
         .getResourceFactoryRegistry()
         .getExtensionToFactoryMap()
@@ -795,6 +888,10 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
     for (EObject root : contextObjects) {
       if (!root.eAdapters().contains(extensionTracker)) {
         root.eAdapters().add(extensionTracker);
+      }
+      Resource resource = root.eResource();
+      if (resource != null) {
+        track(resource);
       }
     }
   }

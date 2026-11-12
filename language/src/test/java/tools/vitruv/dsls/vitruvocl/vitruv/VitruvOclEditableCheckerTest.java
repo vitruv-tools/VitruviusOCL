@@ -230,4 +230,36 @@ class VitruvOclEditableCheckerTest {
     assertEquals(count, checker.getConstraints().size(), "no created constraint may be lost");
     assertEquals(count, duplicates.get(), "every second create must be rejected");
   }
+
+  @Test
+  @DisplayName("an update does not overwrite a constraint deleted and created again meanwhile")
+  void updateDoesNotOverwriteARecreatedConstraint() {
+    ConstraintDescriptor original =
+        checker.create("context shop::Item inv positive: self.price > 0");
+    ConstraintDescriptor update =
+        VitruvOclConstraintChecker.fromString("context shop::Item inv positive: self.price > 5")
+            .getConstraints()
+            .get(0);
+    // meanwhile (while the update type-checks): deleted and created again
+    checker.delete(POSITIVE);
+    ConstraintDescriptor recreated =
+        checker.create("context shop::Item inv positive: self.price >= 1");
+
+    assertThrows(
+        java.util.ConcurrentModificationException.class,
+        () -> checker.replaceIfUnchanged(POSITIVE, original, update));
+    assertEquals(List.of(recreated), checker.getConstraints());
+  }
+
+  @Test
+  @DisplayName("an update of a constraint deleted meanwhile fails as unknown")
+  void updateOfAConstraintDeletedMeanwhileFails() {
+    ConstraintDescriptor original =
+        checker.create("context shop::Item inv positive: self.price > 0");
+    checker.delete(POSITIVE);
+
+    assertThrows(
+        UnknownConstraintException.class,
+        () -> checker.replaceIfUnchanged(POSITIVE, original, original));
+  }
 }
