@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.Test;
  *       visibility only; not asserted on, since GC/JIT timing makes byte-level thresholds flaky.
  * </ol>
  */
+@Tag("slow")
 class SmartLoaderMemoryTradeoffTest {
 
   private static final Path METAMODELS = Path.of("src/test/resources/test-metamodels");

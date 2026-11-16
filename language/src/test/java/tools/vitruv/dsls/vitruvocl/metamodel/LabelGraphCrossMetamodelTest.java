@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -66,6 +67,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
  *
  * @see dsls.vitruvOCLInterface#evaluateConstraint(String, Path[], Path[])
  */
+@Tag("slow")
 class LabelGraphCrossMetamodelTest {
 
   // ==================== Metamodels ====================

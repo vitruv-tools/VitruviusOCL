@@ -234,6 +234,12 @@ artifacts have the group `tools.vitruv` and the prefix `tools.vitruv.vitruvocl`.
 ./mvnw clean test
 ```
 
+This skips the long-running tests tagged `slow` (e.g. the incremental oracle). To run them too:
+
+```bash
+./mvnw clean test -P all-tests
+```
+
 Coverage report: `language/target/site/jacoco/index.html`
 
 ---

@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v7
 
     - name: Setup Java and Maven cache
-      uses: actions/setup-java@v6.1.0
+      uses: actions/setup-java@v6.2.0
       with:
         distribution: 'temurin'
         java-version: '21'
@@ -30,8 +30,9 @@ jobs:
         cache: 'maven'
 
     - name: Verify build
+      # a release also runs the slow tests that the regular CI build skips
       run: >
-        ./mvnw clean verify
+        ./mvnw clean verify -P all-tests
         --batch-mode
         --update-snapshots
         --no-transfer-progress
@@ -47,7 +48,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
     - name: Setup Java and Maven cache
-      uses: actions/setup-java@v6.1.0
+      uses: actions/setup-java@v6.2.0
       with:
         distribution: 'temurin'
         java-version: '21'
