@@ -25,3 +25,7 @@ updates:
   commit-message:
     prefix: "NPM"
     include: "scope"
+  ignore:
+    # must stay in sync with engines.vscode in package.json (vsce rejects newer types)
+    - dependency-name: "@types/vscode"
+      update-types: ["version-update:semver-major", "version-update:semver-minor"]
