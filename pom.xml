@@ -13,7 +13,7 @@
 
     <!-- Project Information -->
     <artifactId>tools.vitruv.vitruvocl</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>4.0.2</version>
     <packaging>pom</packaging>
 
     <name>VitruviusOCL</name>
