@@ -14,6 +14,9 @@
     <artifactId>tools.vitruv.vitruvocl.language</artifactId>
     <packaging>jar</packaging>
 
+    <name>VitruviusOCL Language</name>
+    <description>Parser, type checker and evaluator for VitruviusOCL constraints across the models of a Vitruvius VSUM</description>
+
     <properties>
         <!-- Note: maven.compiler.source/target below are actually overridden by the inherited
              maven.compiler.release=21 from the grandparent pom (tools.vitruv:parent:4.0.0), which
