@@ -16,8 +16,8 @@ package tools.vitruv.dsls.vitruvocl.incremental.analysis;
 import java.util.Map;
 import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
-import tools.vitruv.dsls.vitruvocl.incremental.CorrespondenceDelta;
-import tools.vitruv.dsls.vitruvocl.incremental.TransactionDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 
 /**
  * The static, transaction-independent analysis of one constraint text, computed once and cached by

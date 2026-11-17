@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.incremental;
+package tools.vitruv.dsls.vitruvocl.incremental.delta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

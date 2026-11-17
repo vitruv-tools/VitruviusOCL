@@ -36,12 +36,16 @@ import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.RelevancePlan;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.EChangeClassifier;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.model.TransactionSource;
 import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
  * Stateful incremental evaluation of a fixed list of constraints against one model (VSUM or
@@ -108,7 +112,8 @@ public final class IncrementalSession implements AutoCloseable {
    * next transaction re-evaluate every constraint, so that no constraint keeps a stale outcome.
    */
   private boolean forceFullEvaluation;
-  private VsumWrapper attachedWrapper;
+
+  private TransactionSource attachedSource;
 
   /** A rendered result and the outcome it was rendered from. */
   private record Rendered(EvaluationOutcome outcome, ConstraintResult result) {}
@@ -168,8 +173,8 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /**
-   * Opens a session and attaches it to {@code vsumWrapper}, so that every later commit is
-   * processed and reported to {@code onResult} (or {@code onFailure}).
+   * Opens a session on {@code wrapper} and attaches it to the wrapper's transactions, so that every
+   * later commit is processed and reported to {@code onResult} (or {@code onFailure}).
    *
    * <p>The listener is registered <em>before</em> the initial evaluation, so no commit can slip in
    * between the two: a commit delivered before the initialization started is covered by it (it
@@ -177,16 +182,16 @@ public final class IncrementalSession implements AutoCloseable {
    *
    * @return the initialised, attached session; close it to detach
    */
-  public static IncrementalSession openAttached(
+  public static <W extends ModelAccess & TransactionSource> IncrementalSession openAttached(
       List<String> constraints,
-      VsumWrapper vsumWrapper,
+      W wrapper,
       IncrementalConfig config,
       Consumer<IncrementalResult> onResult,
       Consumer<RuntimeException> onFailure) {
-    IncrementalSession session = new IncrementalSession(constraints, vsumWrapper, config);
+    IncrementalSession session = new IncrementalSession(constraints, wrapper, config);
     session.coveredByInitialization = true;
     try {
-      session.attachTo(vsumWrapper, onResult, onFailure);
+      session.attachTo(wrapper, onResult, onFailure);
       session.initialize();
       return session;
     } catch (RuntimeException | Error e) {
@@ -515,26 +520,27 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /**
-   * Registers this session as change-propagation listener on {@code vsumWrapper}'s VSUM: after
-   * every {@code finishedChangePropagation} the transaction is processed and the result handed to
-   * {@code onResult}. Failures (including oracle mismatches) are handed to {@code onFailure}
-   * instead of being thrown into the propagation.
+   * Registers this session as change-propagation listener on {@code source}: after every {@code
+   * finishedChangePropagation} the transaction is processed and the result handed to {@code
+   * onResult}. Failures (including oracle mismatches) are handed to {@code onFailure} instead of
+   * being thrown into the propagation.
    */
   public void attachTo(
-      VsumWrapper vsumWrapper,
+      TransactionSource source,
       Consumer<IncrementalResult> onResult,
       Consumer<RuntimeException> onFailure) {
     if (attachedCollector != null) {
       throw new IllegalStateException("Session is already attached to a VSUM");
     }
     attachedCollector = new TransactionCollector(this::onAttachedTransaction, onResult, onFailure);
-    attachedWrapper = vsumWrapper;
-    vsumWrapper.addTransactionListener(attachedCollector);
+    attachedSource = source;
+    source.addTransactionListener(attachedCollector);
   }
 
   /**
-   * Processes a commit delivered by the attached VSUM; {@code null} (nothing to report) if the
-   * session is not initialized yet, since the initialization then reads the commit's post-state.
+   * Processes a commit delivered by the attached transaction source; {@code null} (nothing to
+   * report) if the session is not initialized yet, since the initialization then reads the commit's
+   * post-state.
    */
   private synchronized IncrementalResult onAttachedTransaction(List<EChange<EObject>> changes) {
     if (latest == null && coveredByInitialization) {
@@ -547,9 +553,9 @@ public final class IncrementalSession implements AutoCloseable {
   @Override
   public synchronized void close() { // waits for a transaction in progress
     if (attachedCollector != null) {
-      attachedWrapper.removeTransactionListener(attachedCollector);
+      attachedSource.removeTransactionListener(attachedCollector);
       attachedCollector = null;
-      attachedWrapper = null;
+      attachedSource = null;
     }
     if (executor != null) {
       executor.shutdown();

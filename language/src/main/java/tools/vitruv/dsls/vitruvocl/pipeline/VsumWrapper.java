@@ -38,6 +38,7 @@ import tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
 import tools.vitruv.dsls.vitruvocl.model.EcoreLookup;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.model.TransactionSource;
 import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.VirtualModel;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
@@ -59,7 +60,7 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  * @see ModelAccess
  * @see VirtualModel
  */
-public class VsumWrapper implements ModelAccess {
+public class VsumWrapper implements ModelAccess, TransactionSource {
 
   /** Provides the current model resources of the VSUM, read live on every access. */
   private final Supplier<Collection<Resource>> modelResources;
@@ -381,11 +382,13 @@ public class VsumWrapper implements ModelAccess {
    * @param listener receives one {@code finishedChangePropagation} callback per committed change
    * @throws IllegalStateException if this wrapper serves a single constraint check
    */
+  @Override
   public void addTransactionListener(ChangePropagationListener listener) {
     requireVsum().addChangePropagationListener(listener);
   }
 
   /** Removes a listener registered with {@link #addTransactionListener}. */
+  @Override
   public void removeTransactionListener(ChangePropagationListener listener) {
     requireVsum().removeChangePropagationListener(listener);
   }

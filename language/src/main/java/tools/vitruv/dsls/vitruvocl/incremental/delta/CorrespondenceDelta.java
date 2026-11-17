@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.incremental;
+package tools.vitruv.dsls.vitruvocl.incremental.delta;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -22,7 +22,7 @@ import java.util.Set;
 import org.eclipse.emf.ecore.EObject;
 
 /**
- * How the correspondence relation changed in one transaction, as observed by diffing two {@link
+ * How the correspondence relation changed in one transaction, as observed by diffing two {@code
  * CorrespondenceSnapshot}s (correspondence edits never appear in the EChange stream, see {@code
  * CorrespondenceVisibilityExperimentTest}).
  *
@@ -108,7 +108,8 @@ public final class CorrespondenceDelta {
     return UNKNOWN;
   }
 
-  static CorrespondenceDelta of(Set<Pair> added, Set<Pair> removed) {
+  /** A delta with known content: the correspondence pairs that were added and removed. */
+  public static CorrespondenceDelta of(Set<Pair> added, Set<Pair> removed) {
     return new CorrespondenceDelta(true, added, removed);
   }
 

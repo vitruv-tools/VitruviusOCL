@@ -27,6 +27,9 @@ import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.EChangeClassifier;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 
 /**
  * Inverse of non-containment references without {@code eOpposite} (level 3b): for an indexed

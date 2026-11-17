@@ -28,7 +28,8 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EcoreFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.incremental.CorrespondenceDelta.Pair;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta.Pair;
 import tools.vitruv.dsls.vitruvocl.incremental.support.FakeCorrespondenceModel;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 

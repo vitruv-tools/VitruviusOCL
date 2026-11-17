@@ -22,6 +22,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.EChangeClassifier;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 
 /** Maintenance of the {@link ReverseIndex} from transaction events. */

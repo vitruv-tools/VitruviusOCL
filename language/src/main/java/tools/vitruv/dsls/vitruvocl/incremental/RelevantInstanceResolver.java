@@ -27,6 +27,9 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.PseSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.RelevancePlan;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**

@@ -21,7 +21,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.eclipse.emf.ecore.EObject;
-import tools.vitruv.dsls.vitruvocl.incremental.CorrespondenceDelta.Pair;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta.Pair;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**

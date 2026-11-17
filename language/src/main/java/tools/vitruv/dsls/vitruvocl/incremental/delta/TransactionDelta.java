@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.incremental;
+package tools.vitruv.dsls.vitruvocl.incremental.delta;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -89,7 +89,7 @@ public final class TransactionDelta {
   }
 
   /** A copy of this delta that carries the observed change of the correspondence relation. */
-  TransactionDelta withCorrespondenceDelta(CorrespondenceDelta delta) {
+  public TransactionDelta withCorrespondenceDelta(CorrespondenceDelta delta) {
     return new TransactionDelta(
         changes,
         events,

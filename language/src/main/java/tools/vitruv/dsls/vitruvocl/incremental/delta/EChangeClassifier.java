@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.incremental;
+package tools.vitruv.dsls.vitruvocl.incremental.delta;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -126,7 +126,7 @@ public final class EChangeClassifier {
    * Maps one atomic change to an event; unknown change types map to {@link
    * ModelEvent.Kind#UNKNOWN}.
    */
-  static ModelEvent toEvent(EChange<EObject> change) {
+  public static ModelEvent toEvent(EChange<EObject> change) {
     if (change instanceof CreateEObject<EObject> create) {
       return existence(ModelEvent.Kind.CREATE, create.getAffectedElement());
     }
