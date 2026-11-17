@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.AbstractList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -184,6 +185,11 @@ class NavigationSelectNotEmptyStreamingTest {
 
   private ModelAccess wrapperFor(EObject instance) {
     return new ModelAccess() {
+      @Override
+      public Collection<EPackage> metamodelPackages() {
+        return List.of();
+      }
+
       @Override
       public EClass resolveEClass(String metamodelName, String className) {
         return "dummy".equals(metamodelName) && "Container".equals(className)

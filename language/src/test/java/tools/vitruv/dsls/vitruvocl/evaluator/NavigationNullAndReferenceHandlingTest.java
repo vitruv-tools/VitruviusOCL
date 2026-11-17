@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.antlr.v4.runtime.CharStreams;
@@ -146,6 +147,11 @@ class NavigationNullAndReferenceHandlingTest {
 
   private ModelAccess wrapperFor(EObject instance) {
     return new ModelAccess() {
+      @Override
+      public Collection<EPackage> metamodelPackages() {
+        return List.of();
+      }
+
       @Override
       public EClass resolveEClass(String metamodelName, String className) {
         if (!"dummy4".equals(metamodelName)) {

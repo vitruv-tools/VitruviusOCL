@@ -24,6 +24,7 @@ import java.util.function.Function;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 
 /**
  * Read access to the metamodels, model instances and correspondences that constraints are evaluated
@@ -97,6 +98,19 @@ public interface ModelAccess {
    * @return Set of metamodel names
    */
   Set<String> getAvailableMetamodels();
+
+  /**
+   * The metamodel packages this access knows, including those that are not registered in the global
+   * {@link EPackage.Registry} (for example metamodels loaded from files whose nsURI was taken over
+   * by another package). Sub-packages need not be listed separately.
+   *
+   * <p>A decorator must delegate this method; analyses that see only the decorator depend on it to
+   * find the metamodels of the wrapped access.
+   *
+   * @return an immutable snapshot of the packages, which may include globally registered ones;
+   *     empty if the access contributes none
+   */
+  Collection<EPackage> metamodelPackages();
 
   /**
    * Returns the source filename for an instance at the given index.

@@ -21,6 +21,7 @@ import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
@@ -108,6 +109,11 @@ final class SnapshotCorrespondenceWrapper implements ModelAccess {
   @Override
   public Set<String> getAvailableMetamodels() {
     return delegate.getAvailableMetamodels();
+  }
+
+  @Override
+  public Collection<EPackage> metamodelPackages() {
+    return delegate.metamodelPackages();
   }
 
   @Override

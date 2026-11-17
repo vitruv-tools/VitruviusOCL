@@ -945,6 +945,11 @@ public class MetamodelWrapper implements ModelAccess {
     return Set.copyOf(metamodelRegistry.keySet()); // a snapshot, see getContextObjects()
   }
 
+  @Override
+  public synchronized Collection<EPackage> metamodelPackages() {
+    return List.copyOf(metamodelRegistry.values());
+  }
+
   /**
    * Returns source filename for the context object at the given evaluation index. Index corresponds
    * to the i-th root EObject loaded (one per root per XMI file).

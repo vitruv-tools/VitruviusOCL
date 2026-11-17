@@ -16,11 +16,13 @@ package tools.vitruv.dsls.vitruvocl.incremental;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
@@ -63,6 +65,11 @@ class SessionRecoveryTest {
     @Override
     public Set<String> getAvailableMetamodels() {
       return delegate.getAvailableMetamodels();
+    }
+
+    @Override
+    public Collection<EPackage> metamodelPackages() {
+      return delegate.metamodelPackages();
     }
 
     @Override

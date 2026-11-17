@@ -330,6 +330,11 @@ public class VsumWrapper implements ModelAccess {
     return Collections.unmodifiableSet(metamodelRegistry.keySet());
   }
 
+  @Override
+  public Collection<EPackage> metamodelPackages() {
+    return List.copyOf(knownPackages);
+  }
+
   /**
    * Returns the source resource URI for the root object at the given index.
    *
