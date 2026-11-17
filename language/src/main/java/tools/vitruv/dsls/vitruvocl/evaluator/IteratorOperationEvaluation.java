@@ -23,8 +23,10 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.LocalScope;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
@@ -756,7 +758,7 @@ final class IteratorOperationEvaluation {
    * element.
    *
    * @param scope the iterator variable's scope; may be reused across multiple elements/traversals —
-   *     see {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations} for why this is safe
+   *     see {@link tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations} for why this is safe
    *     with lazy chains (each element's full evaluation, including any nested lazy sub-chains,
    *     completes before the next element is pulled)
    * @param iterSymbol the already-registered symbol to rebind (from {@link #defineIterVar})

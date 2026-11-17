@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import java.util.List;
 import org.eclipse.emf.ecore.EClass;

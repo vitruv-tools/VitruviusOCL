@@ -14,6 +14,7 @@
 package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import org.antlr.v4.runtime.ParserRuleContext;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 
 /**

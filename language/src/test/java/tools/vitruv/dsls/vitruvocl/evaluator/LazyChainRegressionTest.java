@@ -15,6 +15,8 @@ package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 
 /**
  * End-to-end regression tests through the full parse/type-check/evaluate pipeline, confirming that
@@ -24,7 +26,7 @@ import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
  * an evaluation strategy, never a semantic change).
  *
  * <p>Consumption-count proofs for the four laziness categories live in {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperationsTest} and {@link ValueLazyTest}, which
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperationsTest} and {@link ValueLazyTest}, which
  * operate directly on the lazy primitives where exact pull counts can be asserted; this class
  * instead exercises the real OCL syntax end-to-end to guard against regressions in how {@link
  * EvaluationVisitor} wires those primitives together.

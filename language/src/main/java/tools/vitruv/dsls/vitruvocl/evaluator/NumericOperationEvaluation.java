@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**

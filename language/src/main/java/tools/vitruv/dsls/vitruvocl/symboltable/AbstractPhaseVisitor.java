@@ -11,14 +11,14 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.common;
+package tools.vitruv.dsls.vitruvocl.symboltable;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLBaseVisitor;
+import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 
 /**
  * Abstract base class for visitor implementations used across compilation phases.

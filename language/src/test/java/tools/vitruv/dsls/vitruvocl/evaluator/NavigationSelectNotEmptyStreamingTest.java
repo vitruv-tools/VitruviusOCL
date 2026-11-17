@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -48,7 +49,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 /**
  * End-to-end consumption-count verification for {@code self.liste.select(x | x > 2).notEmpty()}
  * through the <em>real</em> parser/type-checker/evaluator pipeline - not the internal {@code
- * LazyOperations} layer directly (see {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy}'s tests
+ * LazyOperations} layer directly (see {@link tools.vitruv.dsls.vitruvocl.evaluator.value}'s tests
  * for that level).
  *
  * <h2>History (read before trusting the numbers)</h2>

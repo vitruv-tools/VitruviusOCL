@@ -19,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**

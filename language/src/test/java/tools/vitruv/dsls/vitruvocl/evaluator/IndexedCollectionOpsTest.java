@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**

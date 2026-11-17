@@ -21,7 +21,7 @@ import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**

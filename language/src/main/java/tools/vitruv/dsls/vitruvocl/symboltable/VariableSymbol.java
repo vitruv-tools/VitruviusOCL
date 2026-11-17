@@ -13,7 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**

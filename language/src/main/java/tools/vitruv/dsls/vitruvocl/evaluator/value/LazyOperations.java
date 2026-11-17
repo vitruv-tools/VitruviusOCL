@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,12 +23,11 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 
 /**
  * Composable, pull-based building blocks for lazy {@link OCLElementSource} chains.
  *
- * <p>See the {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy package documentation} for the
+ * <p>See the {@link tools.vitruv.dsls.vitruvocl.evaluator.value package documentation} for the
  * classification of which VitruvOCL collection operations map to which of these primitives.
  *
  * <p>None of these methods consume anything eagerly: they only build a new {@link

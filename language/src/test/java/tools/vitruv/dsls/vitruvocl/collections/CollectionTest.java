@@ -18,9 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
-import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 
 /**
  * Comprehensive test suite for collection operations and literals.
@@ -51,7 +50,7 @@ import tools.vitruv.dsls.vitruvocl.evaluator.Value;
  *
  * @see Value Runtime collection representation
  * @see OCLElement Collection element types
- * @see EvaluationVisitor Evaluates collection operations
+ * @see "EvaluationVisitor: evaluates collection operations"
  */
 class CollectionTest extends DummyTestSpecification {
 

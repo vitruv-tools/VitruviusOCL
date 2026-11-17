@@ -24,7 +24,7 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -36,7 +36,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  * Comprehensive test suite for String operations in VitruvOCL.
  *
  * @see Value Runtime value representation
- * @see tools.vitruv.dsls.vitruvocl.evaluator.OCLElement.StringValue String element wrapper
+ * @see tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement.StringValue String element wrapper
  * @see tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor Evaluates string operations
  * @see tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor Type checks string expressions
  */

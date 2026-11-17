@@ -1,64 +1,8 @@
-Cycle detected: common -> \
-                symboltable -> \
-                common\
-  1. Dependencies of common\
-    - Constructor <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector)> has parameter of type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (AbstractPhaseVisitor.java:0)\
-    - Field <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.symbolTable> has type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (AbstractPhaseVisitor.java:0)\
-    - Method <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.resolveSymbol(java.lang.String, org.antlr.v4.runtime.ParserRuleContext)> has return type <tools.vitruv.dsls.vitruvocl.symboltable.Symbol> in (AbstractPhaseVisitor.java:0)\
-    (1 further dependencies have been omitted...)\
-  2. Dependencies of symboltable\
-    - Class <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder> extends class <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor> in (SymbolTableBuilder.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator)> has parameter of type <tools.vitruv.dsls.vitruvocl.common.ErrorCollector> in (SymbolTableBuilder.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator)> calls constructor <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector)> in (SymbolTableBuilder.java:167)\
-    (14 further dependencies have been omitted...)
-Cycle detected: common -> \
-                symboltable -> \
-                evaluator -> \
-                common\
-  1. Dependencies of common\
-    - Constructor <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector)> has parameter of type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (AbstractPhaseVisitor.java:0)\
-    - Field <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.symbolTable> has type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (AbstractPhaseVisitor.java:0)\
-    - Method <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor.resolveSymbol(java.lang.String, org.antlr.v4.runtime.ParserRuleContext)> has return type <tools.vitruv.dsls.vitruvocl.symboltable.Symbol> in (AbstractPhaseVisitor.java:0)\
-    (1 further dependencies have been omitted...)\
-  2. Dependencies of symboltable\
-    - Field <tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol.value> has type <tools.vitruv.dsls.vitruvocl.evaluator.Value> in (VariableSymbol.java:0)\
-    - Method <tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol.getValue()> has return type <tools.vitruv.dsls.vitruvocl.evaluator.Value> in (VariableSymbol.java:0)\
-    - Method <tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol.setValue(tools.vitruv.dsls.vitruvocl.evaluator.Value)> has parameter of type <tools.vitruv.dsls.vitruvocl.evaluator.Value> in (VariableSymbol.java:0)\
-  3. Dependencies of evaluator\
-    - Class <tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor> extends class <tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor> in (EvaluationVisitor.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, org.antlr.v4.runtime.tree.ParseTreeProperty)> has parameter of type <tools.vitruv.dsls.vitruvocl.common.ErrorCollector> in (EvaluationVisitor.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, org.antlr.v4.runtime.tree.ParseTreeProperty, java.util.List)> has parameter of type <tools.vitruv.dsls.vitruvocl.common.ErrorCollector> in (EvaluationVisitor.java:0)\
-    (2 further dependencies have been omitted...)
-Cycle detected: evaluator -> \
-                evaluator.lazy -> \
-                evaluator\
-  1. Dependencies of evaluator\
-    - Class <tools.vitruv.dsls.vitruvocl.evaluator.Value$1> has generic interface <java.util.function.Supplier<tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations$HashedBuffer>> with type argument depending on <tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations$HashedBuffer> in (Value.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.evaluator.Value.<init>(tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource, tools.vitruv.dsls.vitruvocl.typechecker.Type)> has parameter of type <tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource> in (Value.java:0)\
-    - Field <tools.vitruv.dsls.vitruvocl.evaluator.Value$1.index> has type <tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations$HashedBuffer> in (Value.java:0)\
-    (49 further dependencies have been omitted...)\
-  2. Dependencies of evaluator.lazy\
-    - Class <tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations$ConcatIterator> has generic interface <java.util.Iterator<tools.vitruv.dsls.vitruvocl.evaluator.OCLElement>> with type argument depending on <tools.vitruv.dsls.vitruvocl.evaluator.OCLElement> in (LazyOperations.java:0)\
-    - Class <tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations$FilterIterator> has generic interface <java.util.Iterator<tools.vitruv.dsls.vitruvocl.evaluator.OCLElement>> with type argument depending on <tools.vitruv.dsls.vitruvocl.evaluator.OCLElement> in (LazyOperations.java:0)\
-    - Class <tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations$FlatMapIterator> has generic interface <java.util.Iterator<tools.vitruv.dsls.vitruvocl.evaluator.OCLElement>> with type argument depending on <tools.vitruv.dsls.vitruvocl.evaluator.OCLElement> in (LazyOperations.java:0)\
-    (52 further dependencies have been omitted...)
-Cycle detected: evaluator -> \
-                symboltable -> \
-                evaluator\
-  1. Dependencies of evaluator\
-    - Constructor <tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, org.antlr.v4.runtime.tree.ParseTreeProperty)> has parameter of type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (EvaluationVisitor.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, org.antlr.v4.runtime.tree.ParseTreeProperty, java.util.List)> has parameter of type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (EvaluationVisitor.java:0)\
-    - Constructor <tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor.<init>(tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.common.ErrorCollector, org.antlr.v4.runtime.tree.ParseTreeProperty, java.util.List, boolean)> has parameter of type <tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable> in (EvaluationVisitor.java:0)\
-    (110 further dependencies have been omitted...)\
-  2. Dependencies of symboltable\
-    - Field <tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol.value> has type <tools.vitruv.dsls.vitruvocl.evaluator.Value> in (VariableSymbol.java:0)\
-    - Method <tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol.getValue()> has return type <tools.vitruv.dsls.vitruvocl.evaluator.Value> in (VariableSymbol.java:0)\
-    - Method <tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol.setValue(tools.vitruv.dsls.vitruvocl.evaluator.Value)> has parameter of type <tools.vitruv.dsls.vitruvocl.evaluator.Value> in (VariableSymbol.java:0)
 Cycle detected: incremental -> \
                 incremental.analysis -> \
                 incremental\
   1. Dependencies of incremental\
-    - Constructor <tools.vitruv.dsls.vitruvocl.incremental.CompiledConstraint.<init>(java.lang.String, tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface, tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint, tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis)> has parameter of type <tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis> in (CompiledConstraint.java:0)\
+    - Constructor <tools.vitruv.dsls.vitruvocl.incremental.CompiledConstraint.<init>(java.lang.String, tools.vitruv.dsls.vitruvocl.model.ModelAccess, tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint, tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis)> has parameter of type <tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis> in (CompiledConstraint.java:0)\
     - Field <tools.vitruv.dsls.vitruvocl.incremental.CompiledConstraint.analysis> has type <tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis> in (CompiledConstraint.java:0)\
     - Method <tools.vitruv.dsls.vitruvocl.incremental.CompiledConstraint.analyse(tools.vitruv.dsls.vitruvocl.VitruvOCLParser$ContextDeclCSContext, org.antlr.v4.runtime.tree.ParseTreeProperty, tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex)> has parameter of type <tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex> in (CompiledConstraint.java:0)\
     (64 further dependencies have been omitted...)\
@@ -67,3 +11,16 @@ Cycle detected: incremental -> \
     - Method <tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis.decideByPolarity(tools.vitruv.dsls.vitruvocl.incremental.TransactionDelta, boolean, boolean)> has parameter of type <tools.vitruv.dsls.vitruvocl.incremental.TransactionDelta> in (ConstraintAnalysis.java:0)\
     - Method <tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis.decideByReadSet(tools.vitruv.dsls.vitruvocl.incremental.TransactionDelta)> has parameter of type <tools.vitruv.dsls.vitruvocl.incremental.TransactionDelta> in (ConstraintAnalysis.java:0)\
     (36 further dependencies have been omitted...)
+Cycle detected: incremental -> \
+                pipeline -> \
+                incremental\
+  1. Dependencies of incremental\
+    - Constructor <tools.vitruv.dsls.vitruvocl.incremental.CompiledConstraint.<init>(java.lang.String, tools.vitruv.dsls.vitruvocl.model.ModelAccess, tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint, tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis)> has parameter of type <tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint> in (CompiledConstraint.java:0)\
+    - Constructor <tools.vitruv.dsls.vitruvocl.incremental.IncrementalResult.<init>(tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult, tools.vitruv.dsls.vitruvocl.incremental.IncrementalStats)> has parameter of type <tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult> in (IncrementalResult.java:0)\
+    - Constructor <tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession$Rendered.<init>(tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome, tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult)> has parameter of type <tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult> in (IncrementalSession.java:0)\
+    (63 further dependencies have been omitted...)\
+  2. Dependencies of pipeline\
+    - Method <tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL.attachIncrementalSession(java.util.List, tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig, java.util.function.Consumer, java.util.function.Consumer)> has generic parameter type <java.util.function.Consumer<tools.vitruv.dsls.vitruvocl.incremental.IncrementalResult>> with type argument depending on <tools.vitruv.dsls.vitruvocl.incremental.IncrementalResult> in (VitruvOCL.java:0)\
+    - Method <tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL.attachIncrementalSession(java.util.List, tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig, java.util.function.Consumer, java.util.function.Consumer)> has parameter of type <tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig> in (VitruvOCL.java:0)\
+    - Method <tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL.attachIncrementalSession(java.util.List, tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig, java.util.function.Consumer, java.util.function.Consumer)> has return type <tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession> in (VitruvOCL.java:0)\
+    (12 further dependencies have been omitted...)

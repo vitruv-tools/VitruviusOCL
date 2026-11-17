@@ -24,7 +24,7 @@ import com.tngtech.archunit.library.freeze.FreezingArchRule;
 import java.net.URL;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
+import tools.vitruv.dsls.vitruvocl.symboltable.AbstractPhaseVisitor;
 
 /**
  * Package dependency rules for the {@code language} module.
@@ -34,16 +34,14 @@ import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
  * cycle, i.e. a new sequence of packages, fails the build; new class dependencies along an already
  * frozen cycle are tolerated (see {@link CyclePathViolationMatcher}).
  *
- * <p>Maintaining the store:
+ * <p>ArchUnit does not report every elementary cycle, and which ones it reports depends on the
+ * shape of the package graph. A cycle can therefore vanish from the report without being resolved
+ * and reappear after an unrelated change. The store is never updated by a normal run ({@code
+ * allowStoreUpdate=false}), so both cases fail the test instead of silently changing the baseline.
  *
- * <ul>
- *   <li>A cycle that disappears is removed from the store automatically. Commit the changed store
- *       together with the change that removed the cycle.
- *   <li>To accept a new cycle deliberately, run the test once with {@code
- *       -Darchunit.freeze.refreeze=true} and commit the resulting store.
- *   <li>CI can pass {@code -Darchunit.freeze.store.default.allowStoreUpdate=false} so that a store
- *       which should have shrunk but was not committed fails the build.
- * </ul>
+ * <p>Refreezing, after removing a cycle or when accepting one deliberately: run this test once with
+ * {@code -Darchunit.freeze.refreeze=true -Darchunit.freeze.store.default.allowStoreUpdate=true},
+ * check which cycles the store gained or lost, and commit it with the change.
  */
 class ArchitectureTest {
 

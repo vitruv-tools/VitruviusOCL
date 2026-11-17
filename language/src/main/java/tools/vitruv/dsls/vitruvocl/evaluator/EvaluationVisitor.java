@@ -33,12 +33,14 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
 import tools.vitruv.dsls.vitruvocl.evaluator.transaction.TransactionModel;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.symboltable.AbstractPhaseVisitor;
 import tools.vitruv.dsls.vitruvocl.symboltable.LocalScope;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -1966,9 +1968,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   /**
    * Lazily maps a raw {@code Iterator<?>} (a many-valued EMF feature's backing list iterator) to
-   * {@link OCLElement}s via {@link #wrapValue}, skipping {@code null} entries one at a time
-   * instead of pre-filtering the whole source. Mirrors {@code
-   * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations}'s {@code FilterIterator} lookahead
+   * {@link OCLElement}s via {@link #wrapValue}, skipping {@code null} entries one at a time instead
+   * of pre-filtering the whole source. Mirrors {@code
+   * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations}'s {@code FilterIterator} lookahead
    * pattern: {@code hasNext()} is answered from an already-computed pending element, so
    * constructing/advancing this iterator pulls at most one raw element ahead of what has actually
    * been yielded downstream.

@@ -11,11 +11,10 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import java.util.Iterator;
 import java.util.List;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 
 /**
  * A replayable, pull-based source of {@link OCLElement}s.

@@ -20,7 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 

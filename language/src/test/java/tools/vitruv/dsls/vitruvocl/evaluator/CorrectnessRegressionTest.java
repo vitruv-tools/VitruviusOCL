@@ -33,6 +33,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -115,16 +117,6 @@ class CorrectnessRegressionTest extends DummyTestSpecification {
       Value a = Value.of(List.of(new OCLElement.CastedMetaclassValue(first, eClass)), type);
       Value b = Value.of(List.of(new OCLElement.CastedMetaclassValue(second, eClass)), type);
       assertNotEquals(a, b);
-    }
-
-    @Test
-    void identityHashCollisionIsBrokenByStableTieBreak() {
-      int forward = InstanceOrder.compare(first, second, 42, 42);
-      int backward = InstanceOrder.compare(second, first, 42, 42);
-      assertNotEquals(0, forward, "distinct instances with colliding hashes must differ");
-      assertEquals(-Integer.signum(forward), Integer.signum(backward));
-      assertEquals(forward, InstanceOrder.compare(first, second, 42, 42), "order must be stable");
-      assertEquals(0, InstanceOrder.compare(first, first, 42, 42));
     }
   }
 

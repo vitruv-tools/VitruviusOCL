@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,11 +22,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 
 /**
  * Unit tests for {@link LazyOperations}, proving — via a pull-counting spy source — that each of
- * the four laziness categories from the {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy package
+ * the four laziness categories from the {@link tools.vitruv.dsls.vitruvocl.evaluator.value package
  * documentation} behaves as classified: category 1 never over-consumes, category 2 stops as soon as
  * the result is decided (worst case strict), category 3 grows its buffer only with confirmed
  * elements, and a chain feeding a structurally-strict (category 4) consumer is still drained from

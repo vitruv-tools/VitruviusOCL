@@ -17,7 +17,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
@@ -342,7 +344,7 @@ final class CollectionOperationEvaluation {
    *
    * <p>Category 3 (lazy, incremental buffer reconciliation): delegates to {@link
    * Value#intersection}, which pulls from both sides in alternation via {@link
-   * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#intersect} instead of fully
+   * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#intersect} instead of fully
    * materializing either side first. The result type is taken from the type-checker annotation on
    * the node if available, falling back to the receiver's runtime type. If the result type enforces
    * uniqueness (e.g. {@code Set}), duplicates are removed afterward (also lazily, see {@link

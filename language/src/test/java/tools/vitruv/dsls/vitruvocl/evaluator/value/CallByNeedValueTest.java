@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,8 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**

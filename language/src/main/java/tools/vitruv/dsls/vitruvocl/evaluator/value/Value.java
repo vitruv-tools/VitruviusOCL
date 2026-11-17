@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,9 +20,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations.HashedBuffer;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations.HashedBuffer;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
@@ -50,7 +48,7 @@ public class Value implements Comparable<Value> {
 
   /**
    * The lazy pull-based source backing this Value, or {@code null} if {@link #elements} was
-   * supplied eagerly. See the {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy package
+   * supplied eagerly. See the {@link tools.vitruv.dsls.vitruvocl.evaluator.value package
    * documentation} for the classification of which operations produce a lazy Value.
    *
    * <p>Released ({@code null}) once the source is exhausted and {@link #elements} is set, so that
@@ -379,7 +377,7 @@ public class Value implements Comparable<Value> {
    * Whether all elements are already known (an eager Value, or a lazy one that has been fully
    * traversed), so that {@link #size()} and {@link #getElements()} cost nothing.
    */
-  boolean isMaterialized() {
+  public boolean isMaterialized() {
     return elements != null;
   }
 

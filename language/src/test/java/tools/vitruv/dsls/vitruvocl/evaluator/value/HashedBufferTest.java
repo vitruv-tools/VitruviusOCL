@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,7 +25,6 @@ import org.eclipse.emf.ecore.EEnumLiteral;
 import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EcoreFactory;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 
 /**
  * The buffers of {@link LazyOperations#dedupe} and {@link LazyOperations#intersect} are hashed by

@@ -12,7 +12,9 @@
  *******************************************************************************/
 
 /**
- * Lazy, incremental evaluation infrastructure for the VitruvOCL collection operations.
+ * Runtime values of VitruvOCL ({@link tools.vitruv.dsls.vitruvocl.evaluator.value.Value}, {@link
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement}) and the lazy, incremental evaluation
+ * infrastructure for the collection operations.
  *
  * <h2>Scope</h2>
  *
@@ -40,8 +42,8 @@
  * concatenation, no duplicate check). These operations pass elements through without ever needing
  * to consume the full source themselves — how much is actually pulled is entirely up to the
  * outer, consuming expression. Implemented via {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#filter} and {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#flatMap}.
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#filter} and {@link
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#flatMap}.
  *
  * <h3>2. Lazy with early termination, worst case strict</h3>
  *
@@ -52,7 +54,7 @@
  * excludesAll} — no counter-example found) they must consume the entire source. {@code forAll} is
  * the special case: it short-circuits on the first {@code false}, but is structurally strict in
  * the success ({@code true}) case, since every element must be checked. These consumers pull via
- * {@link tools.vitruv.dsls.vitruvocl.evaluator.Value#elementIterator()} instead of {@code
+ * {@link tools.vitruv.dsls.vitruvocl.evaluator.value.Value#elementIterator()} instead of {@code
  * getElements()} so that an upstream lazy chain (category 1) can also stop early.
  *
  * <h3>3. Lazy with incremental buffer reconciliation instead of full traversal</h3>
@@ -61,13 +63,13 @@
  * and {@code intersection}. For the uniqueness check, each newly pulled element is tested against
  * a buffer of already-accepted (confirmed unique) elements; the buffer only grows with elements
  * that have actually been consumed and confirmed unique, never with the full source size. See
- * {@link tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#dedupe}. For {@code
+ * {@link tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#dedupe}. For {@code
  * intersection}, both input collections are pulled in alternation: each newly drawn element from
  * the "current" side is checked against the buffer of already-seen elements on the *other* side;
  * on a match it is emitted to the result, on a miss it is added to its own side's buffer and the
  * next pull switches to the other side. This allows early result elements without requiring
  * either input to be fully materialized up front. See {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#intersect}.
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#intersect}.
  *
  * <h3>4. Structurally strict, no meaningful lazy variant</h3>
  *
@@ -79,7 +81,7 @@
  * seeing every element. They are not converted to lazy producers. However, when their
  * <em>source</em> is itself a chain of lazy category-1/2/3 steps (e.g. {@code
  * select(...)->collect(...)->sum()}), they still benefit: the chain is drained exactly once via
- * {@link tools.vitruv.dsls.vitruvocl.evaluator.Value#getElements()} (which materializes an
+ * {@link tools.vitruv.dsls.vitruvocl.evaluator.value.Value#getElements()} (which materializes an
  * unmaterialized lazy {@code Value} by draining its {@code OCLElementSource} once and caching the
  * result), instead of each intermediate step allocating and copying its own fully materialized
  * {@code ArrayList}.
@@ -93,10 +95,9 @@
  * collection "stays lazy until the outer consumer actually asks for its elements", {@code
  * collectNested()}'s per-element body result is forced to fully materialize (via {@code
  * EvaluationVisitor#evalInScopeMaterialized}) <em>before</em> being wrapped in an {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.OCLElement.NestedCollection}, i.e. before it is stored for
- * later, possibly much later, consumption. This is intentional, not an accident: {@code
- * collectNested}'s per-element scope binding is a single, reused {@link
- * tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol} that gets rebound to the next element as
+ * OCLElement.NestedCollection}, i.e. before it is stored for later, possibly much later,
+ * consumption. This is intentional, not an accident: {@code collectNested}'s per-element scope
+ * binding is a single, reused {@code VariableSymbol} that gets rebound to the next element as
  * soon as the loop advances (see the rebind-not-reallocate design in {@code
  * EvaluationVisitor#defineIterVar}/{@code #rebindIterVar}). If the wrapped {@code Value} were left
  * lazy, consuming it later — e.g. via a subsequent {@code flatten()} call — would resolve its
@@ -119,7 +120,7 @@
  * still materialize the receiver into a plain {@code List} and run nested {@code for} loops. A
  * lazy Cartesian product would need its own dedicated iterator (pulling the outer element once per
  * inner exhaustion, symmetric to {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations}'s {@code FlatMapIterator}) and was
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations}'s {@code FlatMapIterator}) and was
  * judged lower value than the single-variable forms, which are both more common in practice and
  * were the forms the task's classification actually enumerated. The two-variable methods were
  * still touched during this work — for the scope-corruption fix described below, and to
@@ -131,7 +132,7 @@
  * EvaluationVisitor#visitPropertyAccessWithReceiver}) and the "no object" propagation for {@code
  * div}/{@code mod}/{@code at}/{@code reverse} are pre-existing, independent semantic fixes. The
  * lazy navigation implementation in this package preserves the former by using {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations#dedupe} inline instead of a
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#dedupe} inline instead of a
  * post-hoc {@code removeDuplicates()} call; it does not touch the latter at all.
  *
  * <h2>Symbol-table scope correctness under laziness</h2>
@@ -150,4 +151,4 @@
  * doesn't immediately drain it within the same element's evaluation). Regression tests for this
  * live in {@code LazyChainRegressionTest}.
  */
-package tools.vitruv.dsls.vitruvocl.evaluator.lazy;
+package tools.vitruv.dsls.vitruvocl.evaluator.value;
