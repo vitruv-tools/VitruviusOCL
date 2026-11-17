@@ -27,7 +27,6 @@ import java.util.function.Function;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnumLiteral;
 import org.eclipse.emf.ecore.EObject;
@@ -39,7 +38,7 @@ import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations;
 import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
 import tools.vitruv.dsls.vitruvocl.evaluator.transaction.TransactionModel;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.LocalScope;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -254,7 +253,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   public EvaluationVisitor(
       SymbolTable st,
-      MetamodelWrapperInterface specification,
+      ModelAccess specification,
       ErrorCollector errors,
       ParseTreeProperty<Type> nodeTypes) {
     this(st, specification, errors, nodeTypes, List.of(), false);
@@ -270,12 +269,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * @param specification The metamodel wrapper providing access to model instances
    * @param errors The error collector for reporting runtime errors
    * @param nodeTypes Pre-computed type information from the type checking phase
-   * @param transactionChanges the ordered list of atomic changes for this transaction (may be
-   *     empty — see {@link TransactionModel})
+   * @param transactionChanges the ordered list of atomic changes for this transaction (may be empty
+   *     — see {@link TransactionModel})
    */
   public EvaluationVisitor(
       SymbolTable st,
-      MetamodelWrapperInterface specification,
+      ModelAccess specification,
       ErrorCollector errors,
       ParseTreeProperty<Type> nodeTypes,
       List<EChange<EObject>> transactionChanges) {
@@ -291,7 +290,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   public EvaluationVisitor(
       SymbolTable st,
-      MetamodelWrapperInterface specification,
+      ModelAccess specification,
       ErrorCollector errors,
       ParseTreeProperty<Type> nodeTypes,
       List<EChange<EObject>> transactionChanges,

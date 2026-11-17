@@ -16,7 +16,7 @@ package tools.vitruv.dsls.vitruvocl.common;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLBaseVisitor;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 
@@ -52,7 +52,7 @@ public abstract class AbstractPhaseVisitor<T> extends VitruvOCLBaseVisitor<T> {
   protected final ErrorCollector errors;
 
   /** Interface to VSUM for metamodel and EObject access. */
-  protected final MetamodelWrapperInterface specification;
+  protected final ModelAccess specification;
 
   /**
    * Constructs a phase visitor with required compiler infrastructure.
@@ -62,7 +62,7 @@ public abstract class AbstractPhaseVisitor<T> extends VitruvOCLBaseVisitor<T> {
    * @param errors Error collector for this compilation phase
    */
   protected AbstractPhaseVisitor(
-      SymbolTable symbolTable, MetamodelWrapperInterface specification, ErrorCollector errors) {
+      SymbolTable symbolTable, ModelAccess specification, ErrorCollector errors) {
     this.symbolTable = symbolTable;
     this.specification = specification;
     this.errors = errors;

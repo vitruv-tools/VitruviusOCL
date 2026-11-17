@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
@@ -35,12 +35,12 @@ import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 class LogicalShortCircuitTest {
 
   /** The edge fixture's wrapper, counting every correspondence query. */
-  private static MetamodelWrapperInterface counting(AtomicInteger lookups) {
-    MetamodelWrapperInterface delegate = EdgeFixture.create().model().wrapper();
-    return (MetamodelWrapperInterface)
+  private static ModelAccess counting(AtomicInteger lookups) {
+    ModelAccess delegate = EdgeFixture.create().model().wrapper();
+    return (ModelAccess)
         Proxy.newProxyInstance(
-            MetamodelWrapperInterface.class.getClassLoader(),
-            new Class<?>[] {MetamodelWrapperInterface.class},
+            ModelAccess.class.getClassLoader(),
+            new Class<?>[] {ModelAccess.class},
             (proxy, method, args) -> {
               if (method.getName().toLowerCase().contains("correspond")) {
                 lookups.incrementAndGet();

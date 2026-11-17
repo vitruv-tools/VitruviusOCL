@@ -22,6 +22,7 @@ import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * The two halves of evaluating a single constraint text: {@link #evaluateFresh} (compile and
@@ -49,7 +50,7 @@ public final class ConstraintEvaluations {
    */
   public static EvaluationOutcome evaluateFresh(
       String constraint,
-      MetamodelWrapperInterface wrapper,
+      ModelAccess wrapper,
       List<EChange<EObject>> transaction,
       boolean transactionSupported) {
     // The transaction-less VitruvOCLCompiler constructor (not the 3-arg one with an empty list)
@@ -91,7 +92,7 @@ public final class ConstraintEvaluations {
    */
   public static ConstraintResult render(
       String constraint,
-      MetamodelWrapperInterface wrapper,
+      ModelAccess wrapper,
       List<Warning> loaderWarnings,
       EvaluationOutcome outcome) {
     if (outcome.failed()) {

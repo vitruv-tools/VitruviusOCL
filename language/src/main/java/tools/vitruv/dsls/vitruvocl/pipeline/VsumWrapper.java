@@ -36,6 +36,8 @@ import tools.vitruv.change.correspondence.Correspondence;
 import tools.vitruv.change.correspondence.view.CorrespondenceModelView;
 import tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
+import tools.vitruv.dsls.vitruvocl.model.EcoreLookup;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.VirtualModel;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
@@ -43,7 +45,7 @@ import tools.vitruv.framework.vsum.constraints.ConstraintChecker;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * VSUM-based implementation of the metamodel wrapper interface for VitruvOCL constraint evaluation.
+ * {@link ModelAccess} backed by a Vitruvius VSUM, for VitruvOCL constraint evaluation.
  *
  * <p>This wrapper provides access to metamodels, model instances, and the correspondence model
  * through the Vitruvius Virtual Single Underlying Model (VSUM). It discovers metamodels from the
@@ -54,10 +56,10 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  * {@link #getCorrespondingObjects(EObject, EClass)}, enabling evaluation of VitruvOCL's {@code ~}
  * (correspondence) operator for cross-metamodel consistency checking.
  *
- * @see MetamodelWrapperInterface
+ * @see ModelAccess
  * @see VirtualModel
  */
-public class VsumWrapper implements MetamodelWrapperInterface {
+public class VsumWrapper implements ModelAccess {
 
   /** Provides the current model resources of the VSUM, read live on every access. */
   private final Supplier<Collection<Resource>> modelResources;
@@ -197,8 +199,7 @@ public class VsumWrapper implements MetamodelWrapperInterface {
    */
   @Override
   public EClass resolveEClass(String metamodelName, String className) {
-    return MetamodelWrapperInterface.resolveEClassInRegistry(
-        metamodelRegistry, metamodelName, className);
+    return EcoreLookup.resolveEClassInRegistry(metamodelRegistry, metamodelName, className);
   }
 
   /**
@@ -246,12 +247,12 @@ public class VsumWrapper implements MetamodelWrapperInterface {
   }
 
   /**
-   * For the live VSUM: evaluates {@code work} against a view that caches the instances per type
-   * for this batch only, since the models do not change during it. Other callers keep reading the
-   * live models.
+   * For the live VSUM: evaluates {@code work} against a view that caches the instances per type for
+   * this batch only, since the models do not change during it. Other callers keep reading the live
+   * models.
    */
   @Override
-  public <T> T batch(Function<MetamodelWrapperInterface, T> work) {
+  public <T> T batch(Function<ModelAccess, T> work) {
     return work.apply(instanceCache != null ? this : new BatchCachingWrapper(this));
   }
 
@@ -479,13 +480,12 @@ public class VsumWrapper implements MetamodelWrapperInterface {
 
   @Override
   public EClass resolveEClassByShortName(String shortName) {
-    return MetamodelWrapperInterface.resolveEClassByShortNameInRegistry(
-        metamodelRegistry, shortName);
+    return EcoreLookup.resolveEClassByShortNameInRegistry(metamodelRegistry, shortName);
   }
 
   @Override
   public EEnum resolveEEnum(String enumName) {
-    return MetamodelWrapperInterface.resolveEEnumInRegistry(metamodelRegistry, enumName);
+    return EcoreLookup.resolveEEnumInRegistry(metamodelRegistry, enumName);
   }
 
   /**

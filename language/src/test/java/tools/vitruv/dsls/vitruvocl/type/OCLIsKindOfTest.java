@@ -34,9 +34,9 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -133,7 +133,7 @@ class OCLIsKindOfTest extends DummyTestSpecification {
   @Test
   void testTypeCheckReturnsBoolean() {
     ParseTree tree = parse("Set{5}.oclIsKindOf(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -154,7 +154,7 @@ class OCLIsKindOfTest extends DummyTestSpecification {
   @Test
   void testTypeCheckPreservesCollectionKind() {
     ParseTree tree = parse("Sequence{1, 2}.oclIsKindOf(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -259,23 +259,23 @@ class OCLIsKindOfTest extends DummyTestSpecification {
 
   static Stream<String> metamodelKindOfSatisfiedConstraints() {
     return Stream.of(
-        """
+"""
 context spaceMission::Spacecraft inv kindOfSpacecraft:
   spaceMission::Spacecraft.allInstances().oclIsKindOf(spaceMission::Spacecraft).select(b | b).size()
     == spaceMission::Spacecraft.allInstances().size()
-        """,
-        """
+""",
+"""
 context spaceMission::Spacecraft inv kindOfSatellite:
   spaceMission::Spacecraft.allInstances()
     .oclIsKindOf(satelliteSystem::Satellite).select(b | b).size()
     == 0
-        """,
-        """
+""",
+"""
 context satelliteSystem::Satellite inv kindOfSatellite:
   satelliteSystem::Satellite.allInstances()
     .oclIsKindOf(satelliteSystem::Satellite).select(b | b).size()
     == satelliteSystem::Satellite.allInstances().size()
-        """);
+""");
   }
 
   /** Tests oclIsKindOf used inside select iterator (uses extra instance file SPACECRAFT_ATLAS). */

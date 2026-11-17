@@ -13,7 +13,6 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EClassifier;
 import org.eclipse.emf.ecore.EPackage;
@@ -25,9 +24,9 @@ import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
@@ -200,10 +199,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    * @param scopeAnnotator The scope annotator containing scope annotations from Phase 1
    */
   public TypeCheckVisitor(
-      SymbolTable st,
-      MetamodelWrapperInterface wrapper,
-      ErrorCollector errors,
-      ScopeAnnotator scopeAnnotator) {
+      SymbolTable st, ModelAccess wrapper, ErrorCollector errors, ScopeAnnotator scopeAnnotator) {
     super(st, wrapper, errors);
     this.scopeAnnotator = scopeAnnotator;
   }

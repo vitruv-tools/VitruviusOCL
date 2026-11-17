@@ -30,6 +30,7 @@ import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalResult;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.framework.vsum.VirtualModel;
 
 /** Static facade for evaluating VitruvOCL constraints against a VSUM or standalone files. */
@@ -38,7 +39,7 @@ public class VitruvOCL {
   private VitruvOCL() {}
 
   private static VsumWrapper vsumWrapper = null;
-  private static MetamodelWrapperInterface directWrapper = null;
+  private static ModelAccess directWrapper = null;
 
   /**
    * Default worker-thread count for {@link ConstraintListEvaluator}-backed batch evaluation, used
@@ -66,14 +67,14 @@ public class VitruvOCL {
   }
 
   /**
-   * Registers a direct {@link MetamodelWrapperInterface} for constraint evaluation.
+   * Registers a direct {@link ModelAccess} for constraint evaluation.
    *
    * <p>Used by the language server when loading a VSUM directory directly via EMF without going
    * through {@link tools.vitruv.framework.vsum.VirtualModelBuilder}.
    *
    * @param wrapper the wrapper to register; must not be {@code null}
    */
-  public static synchronized void registerDirectWrapper(MetamodelWrapperInterface wrapper) {
+  public static synchronized void registerDirectWrapper(ModelAccess wrapper) {
     if (wrapper == null) {
       throw new IllegalArgumentException("Wrapper must not be null");
     }
@@ -130,8 +131,7 @@ public class VitruvOCL {
    * @param wrapper access to the metamodels and instances to evaluate against
    * @return the evaluation result
    */
-  public static ConstraintResult evaluateConstraint(
-      String constraint, MetamodelWrapperInterface wrapper) {
+  public static ConstraintResult evaluateConstraint(String constraint, ModelAccess wrapper) {
     return compileAndEvaluate(constraint, wrapper, List.of(), List.of(), false);
   }
 
@@ -327,20 +327,20 @@ public class VitruvOCL {
    *
    * @param constraints the OCL constraint expressions, in the order results should be returned
    * @param wrapper shared metamodel/instance access, reused (read-mostly) across all tasks
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be
-   *     at least 1
+   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be at
+   *     least 1
    * @return the batch evaluation result, in input order
    */
   private static BatchValidationResult evaluateConstraints(
-      List<String> constraints, MetamodelWrapperInterface wrapper, int threadPoolSize) {
+      List<String> constraints, ModelAccess wrapper, int threadPoolSize) {
     return evaluateConstraints(constraints, wrapper, threadPoolSize, List.of(), false);
   }
 
   /**
-   * Same as {@link #evaluateConstraints(List, MetamodelWrapperInterface, int)}, but with an
-   * explicit transaction shared by every constraint in {@code constraints} — the transaction is
-   * immutable and read-only, so sharing it read-only across the (possibly parallel) evaluation
-   * tasks below is as safe as sharing {@code wrapper} already is.
+   * Same as {@link #evaluateConstraints(List, ModelAccess, int)}, but with an explicit transaction
+   * shared by every constraint in {@code constraints} — the transaction is immutable and read-only,
+   * so sharing it read-only across the (possibly parallel) evaluation tasks below is as safe as
+   * sharing {@code wrapper} already is.
    *
    * @param transaction the ordered list of atomic changes between pre-state and the current
    *     post-state, evaluated by {@code @pre}/{@code OCLisNew}/{@code OCLisModified}/{@code
@@ -352,7 +352,7 @@ public class VitruvOCL {
    */
   private static BatchValidationResult evaluateConstraints(
       List<String> constraints,
-      MetamodelWrapperInterface wrapper,
+      ModelAccess wrapper,
       int threadPoolSize,
       List<EChange<EObject>> transaction,
       boolean transactionSupported) {
@@ -591,7 +591,7 @@ public class VitruvOCL {
 
   private static ConstraintResult compileAndEvaluate(
       String constraint,
-      MetamodelWrapperInterface wrapper,
+      ModelAccess wrapper,
       List<Warning> loaderWarnings,
       List<EChange<EObject>> transaction,
       boolean transactionSupported) {
@@ -605,7 +605,7 @@ public class VitruvOCL {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  private static synchronized MetamodelWrapperInterface getVsumWrapper() {
+  private static synchronized ModelAccess getVsumWrapper() {
     if (directWrapper != null) {
       return directWrapper;
     }

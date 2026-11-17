@@ -25,8 +25,8 @@ import tools.vitruv.dsls.vitruvocl.incremental.analysis.PathAnalyzer;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.PolarityAnalyzer;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSetAnalyzer;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint;
 
 /**
@@ -46,15 +46,12 @@ import tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint;
 final class CompiledConstraint {
 
   private final String text;
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
   private final PreparedConstraint prepared;
   private final ConstraintAnalysis analysis;
 
   private CompiledConstraint(
-      String text,
-      MetamodelWrapperInterface wrapper,
-      PreparedConstraint prepared,
-      ConstraintAnalysis analysis) {
+      String text, ModelAccess wrapper, PreparedConstraint prepared, ConstraintAnalysis analysis) {
     this.text = text;
     this.wrapper = wrapper;
     this.prepared = prepared;
@@ -69,16 +66,13 @@ final class CompiledConstraint {
     return prepared.requestedTypes();
   }
 
-  /**
-   * Same as {@link #compile(String, MetamodelWrapperInterface, FeatureIndex)} with a fresh index.
-   */
-  static CompiledConstraint compile(String text, MetamodelWrapperInterface wrapper) {
+  /** Same as {@link #compile(String, ModelAccess, FeatureIndex)} with a fresh index. */
+  static CompiledConstraint compile(String text, ModelAccess wrapper) {
     return compile(text, wrapper, FeatureIndex.forWrapper(wrapper));
   }
 
   /** Runs passes 1 and 2 once and analyses the result; never throws for invalid constraints. */
-  static CompiledConstraint compile(
-      String text, MetamodelWrapperInterface wrapper, FeatureIndex features) {
+  static CompiledConstraint compile(String text, ModelAccess wrapper, FeatureIndex features) {
     PreparedConstraint prepared = PreparedConstraint.prepare(text, wrapper);
     if (!prepared.isCompiled()) {
       return new CompiledConstraint(
@@ -142,7 +136,7 @@ final class CompiledConstraint {
    * from a snapshot).
    */
   EvaluationOutcome evaluate(
-      MetamodelWrapperInterface view,
+      ModelAccess view,
       List<EChange<EObject>> transaction,
       boolean transactionSupported,
       Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>> instanceOverride) {

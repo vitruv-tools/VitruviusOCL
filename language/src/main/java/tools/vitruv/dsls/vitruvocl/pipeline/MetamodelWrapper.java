@@ -60,6 +60,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
+import tools.vitruv.dsls.vitruvocl.model.EcoreLookup;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Manages metamodel and model instance loading for OCL constraint evaluation.
@@ -71,14 +73,14 @@ import tools.vitruv.dsls.vitruvocl.allinstances.cache.AllInstancesCallSite;
  *   <li>Loading XMI model instances
  *   <li>Resolving qualified names like {@code spacecraft::Spacecraft} to EClass
  *   <li>Querying all instances of a given EClass (including subtypes), via an {@link
- *       tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine} — see {@link
- *       #getAllInstances} for details
+ *       tools.vitruv.dsls.vitruvocl.allinstances.AllInstancesEngine} — see {@link #getAllInstances}
+ *       for details
  * </ul>
  *
- * <p>Implements {@link MetamodelWrapperInterface} for use across compilation phases, particularly
- * in the evaluation visitor where constraints access model elements.
+ * <p>Implements {@link ModelAccess} for use across compilation phases, particularly in the
+ * evaluation visitor where constraints access model elements.
  */
-public class MetamodelWrapper implements MetamodelWrapperInterface {
+public class MetamodelWrapper implements ModelAccess {
 
   private static final String FEAT_LEFT_EOBJECTS = "leftEObjects";
   private static final String FEAT_RIGHT_EOBJECTS = "rightEObjects";
@@ -794,8 +796,7 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    */
   @Override
   public synchronized EClass resolveEClass(String metamodelName, String className) {
-    return MetamodelWrapperInterface.resolveEClassInRegistry(
-        metamodelRegistry, metamodelName, className);
+    return EcoreLookup.resolveEClassInRegistry(metamodelRegistry, metamodelName, className);
   }
 
   /**
@@ -1004,13 +1005,12 @@ public class MetamodelWrapper implements MetamodelWrapperInterface {
    */
   @Override
   public synchronized EClass resolveEClassByShortName(String shortName) {
-    return MetamodelWrapperInterface.resolveEClassByShortNameInRegistry(
-        metamodelRegistry, shortName);
+    return EcoreLookup.resolveEClassByShortNameInRegistry(metamodelRegistry, shortName);
   }
 
   @Override
   public synchronized EEnum resolveEEnum(String enumName) {
-    return MetamodelWrapperInterface.resolveEEnumInRegistry(metamodelRegistry, enumName);
+    return EcoreLookup.resolveEEnumInRegistry(metamodelRegistry, enumName);
   }
 
   /**

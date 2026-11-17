@@ -21,18 +21,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Distributes evaluation of a constraint list across a configurable-size {@link ExecutorService}
  * thread pool, while preserving the caller-visible ordering of results.
  *
- * <p>Each constraint is handed to {@code perConstraintEvaluator} exactly once, on some pool
- * thread; {@code VitruvOCL}'s production callback creates a fresh {@link VitruvOCLCompiler} — and
- * therefore a fresh {@link tools.vitruv.dsls.vitruvocl.common.ErrorCollector} — per invocation, so
- * no compiler-level mutable state is ever shared between tasks. The one piece of state genuinely
- * shared across tasks is the {@link MetamodelWrapperInterface} passed into every compiler; see
- * {@link MetamodelWrapper#getAllInstances} and {@link VsumWrapper#getAllInstances} for how their
- * internal allInstances() cache stays correct under this concurrent access.
+ * <p>Each constraint is handed to {@code perConstraintEvaluator} exactly once, on some pool thread;
+ * {@code VitruvOCL}'s production callback creates a fresh {@link VitruvOCLCompiler} — and therefore
+ * a fresh {@link tools.vitruv.dsls.vitruvocl.common.ErrorCollector} — per invocation, so no
+ * compiler-level mutable state is ever shared between tasks. The one piece of state genuinely
+ * shared across tasks is the {@link ModelAccess} passed into every compiler; see {@link
+ * MetamodelWrapper#getAllInstances} and {@link VsumWrapper#getAllInstances} for how their internal
+ * allInstances() cache stays correct under this concurrent access.
  *
  * <p>Results are returned in the same order as the input {@code constraints} list regardless of
  * which worker thread finished first — callers submit by index and read back {@link Future#get()}

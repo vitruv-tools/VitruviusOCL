@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.pipeline;
+package tools.vitruv.dsls.vitruvocl.model;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -20,17 +20,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import org.eclipse.emf.ecore.EClass;
-import org.eclipse.emf.ecore.EClassifier;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
-import org.eclipse.emf.ecore.EPackage;
 
 /**
- * Constraint specification providing metamodel and instance access. Similar to Reactions'
- * ChangePropagationSpecification pattern.
+ * Read access to the metamodels, model instances and correspondences that constraints are evaluated
+ * against. This is the port between the language core (symbol table, type checker, evaluator,
+ * incremental analysis) and a concrete model source such as loaded files or a VSUM.
  */
-public interface MetamodelWrapperInterface {
+public interface ModelAccess {
 
   /**
    * Resolves an EClass by qualified name.
@@ -58,7 +58,7 @@ public interface MetamodelWrapperInterface {
    * @param work the evaluation to run, given the wrapper to use
    * @return the result of {@code work}
    */
-  default <T> T batch(java.util.function.Function<MetamodelWrapperInterface, T> work) {
+  default <T> T batch(Function<ModelAccess, T> work) {
     return work.apply(this);
   }
 
@@ -84,12 +84,12 @@ public interface MetamodelWrapperInterface {
   }
 
   /**
-   * * Resolves an EEnum by qualified name.
+   * Resolves an EEnum by qualified name.
    *
    * @param enumName The qualified name of the enum (e.g., "UML.VisibilityKind")
    * @return The resolved EEnum, or null if not found
    */
-  public EEnum resolveEEnum(String enumName);
+  EEnum resolveEEnum(String enumName);
 
   /**
    * Returns names of all available metamodels.
@@ -200,9 +200,9 @@ public interface MetamodelWrapperInterface {
   }
 
   /**
-   * Every object that currently takes part in a correspondence, if the implementation can
-   * enumerate them; used to observe correspondence changes, which no EChange reports. If this
-   * returns a value, {@link #getCorrespondingObjectsByTag} must be supported as well.
+   * Every object that currently takes part in a correspondence, if the implementation can enumerate
+   * them; used to observe correspondence changes, which no EChange reports. If this returns a
+   * value, {@link #getCorrespondingObjectsByTag} must be supported as well.
    *
    * <p>The incremental evaluator skips {@code ~} constraints when these two methods show no change,
    * so they must describe exactly the relation that {@link #getCorrespondingObjects}, {@link
@@ -225,72 +225,5 @@ public interface MetamodelWrapperInterface {
    */
   default Map<String, Set<EObject>> getCorrespondingObjectsByTag(EObject source) {
     throw new UnsupportedOperationException("correspondence enumeration is not supported");
-  }
-
-  /** Resolves a qualified name to its {@link EClass} using a name-keyed metamodel registry. */
-  static EClass resolveEClassInRegistry(
-      Map<String, EPackage> registry, String metamodelName, String className) {
-    EPackage ePackage = registry.get(metamodelName);
-    if (ePackage == null) {
-      return null;
-    }
-    EClassifier classifier = ePackage.getEClassifier(className);
-    return (classifier instanceof EClass ec) ? ec : null;
-  }
-
-  /** Resolves the first {@link EClass} matching an unqualified short name across a registry. */
-  static EClass resolveEClassByShortNameInRegistry(
-      Map<String, EPackage> registry, String shortName) {
-    for (EPackage ePackage : registry.values()) {
-      EClass found = resolveEClassByShortNameInPackage(ePackage, shortName);
-      if (found != null) {
-        return found;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Searches an {@link EPackage} and its direct subpackages for an {@link EClass} by short name.
-   */
-  static EClass resolveEClassByShortNameInPackage(EPackage ePackage, String shortName) {
-    EClassifier classifier = ePackage.getEClassifier(shortName);
-    if (classifier instanceof EClass eClass) {
-      return eClass;
-    }
-    for (EPackage subPkg : ePackage.getESubpackages()) {
-      EClassifier subClassifier = subPkg.getEClassifier(shortName);
-      if (subClassifier instanceof EClass eClass) {
-        return eClass;
-      }
-    }
-    return null;
-  }
-
-  /** Resolves the first {@link EEnum} matching a name across a registry and its subpackages. */
-  static EEnum resolveEEnumInRegistry(Map<String, EPackage> registry, String enumName) {
-    for (EPackage ePackage : registry.values()) {
-      EEnum found = resolveEEnumInPackage(ePackage, enumName);
-      if (found != null) {
-        return found;
-      }
-    }
-    return null;
-  }
-
-  /** Resolves an {@link EEnum} by name within an {@link EPackage} and its subpackages. */
-  static EEnum resolveEEnumInPackage(EPackage ePackage, String enumName) {
-    for (EClassifier classifier : ePackage.getEClassifiers()) {
-      if (classifier instanceof EEnum eEnum && eEnum.getName().equals(enumName)) {
-        return eEnum;
-      }
-    }
-    for (EPackage subPackage : ePackage.getESubpackages()) {
-      EEnum found = resolveEEnumInPackage(subPackage, enumName);
-      if (found != null) {
-        return found;
-      }
-    }
-    return null;
   }
 }

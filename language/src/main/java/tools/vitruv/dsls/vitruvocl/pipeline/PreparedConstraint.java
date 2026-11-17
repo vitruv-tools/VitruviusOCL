@@ -31,6 +31,7 @@ import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.OclLexers;
 import tools.vitruv.dsls.vitruvocl.evaluator.AllInstancesTypeScanner;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
@@ -66,7 +67,7 @@ public final class PreparedConstraint {
    * Parses and type-checks {@code text} against {@code wrapper}'s metamodels; never throws for an
    * invalid constraint.
    */
-  public static PreparedConstraint prepare(String text, MetamodelWrapperInterface wrapper) {
+  public static PreparedConstraint prepare(String text, ModelAccess wrapper) {
     PREPARATIONS.incrementAndGet();
     VitruvOCLLexer lexer = OclLexers.create(CharStreams.fromString(text));
     lexer.removeErrorListeners(); // a failed preparation is re-reported by evaluateFresh
@@ -101,11 +102,11 @@ public final class PreparedConstraint {
   /**
    * Requests the instances of every type the {@code constraints} may need in one call, so that a
    * single traversal serves all of them (Wei &amp; Kolovos' "one traversal serves all", across
-   * constraints) instead of one traversal per newly requested type. Only an optimization: a
-   * failure is ignored, each constraint's evaluation reports it.
+   * constraints) instead of one traversal per newly requested type. Only an optimization: a failure
+   * is ignored, each constraint's evaluation reports it.
    */
   public static void prefetchInstances(
-      Collection<PreparedConstraint> constraints, MetamodelWrapperInterface wrapper) {
+      Collection<PreparedConstraint> constraints, ModelAccess wrapper) {
     try {
       Set<EClass> types = new LinkedHashSet<>();
       for (PreparedConstraint constraint : constraints) {
@@ -157,7 +158,7 @@ public final class PreparedConstraint {
    *     the full extension ({@code null} = full extension)
    */
   public EvaluationOutcome evaluate(
-      MetamodelWrapperInterface view,
+      ModelAccess view,
       List<EChange<EObject>> transaction,
       boolean transactionSupported,
       Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>> instanceOverride) {

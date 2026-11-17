@@ -36,11 +36,11 @@ import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.RelevancePlan;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
@@ -72,7 +72,7 @@ public final class IncrementalSession implements AutoCloseable {
 
   private final List<String> constraints;
   private final List<String> distinctConstraints;
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
   private final IncrementalConfig config;
   private final Map<String, CompiledConstraint> compiled = new LinkedHashMap<>();
   private final ViolationSet violations = new ViolationSet();
@@ -97,10 +97,10 @@ public final class IncrementalSession implements AutoCloseable {
 
   /**
    * The wrapper the current transaction's evaluations use: a {@link SnapshotCorrespondenceWrapper}
-   * over the current snapshot if there is one, else the session's wrapper. Rebuilt
-   * whenever the snapshot is replaced.
+   * over the current snapshot if there is one, else the session's wrapper. Rebuilt whenever the
+   * snapshot is replaced.
    */
-  private MetamodelWrapperInterface evaluationWrapper;
+  private ModelAccess evaluationWrapper;
 
   /**
    * Set while a transaction is being processed and cleared only after it completed (including the
@@ -129,7 +129,7 @@ public final class IncrementalSession implements AutoCloseable {
    *     exactly as in a batch evaluation)
    */
   public IncrementalSession(
-      List<String> constraints, MetamodelWrapperInterface wrapper, IncrementalConfig config) {
+      List<String> constraints, ModelAccess wrapper, IncrementalConfig config) {
     if (constraints == null || wrapper == null || config == null) {
       throw new IllegalArgumentException("constraints, wrapper and config must not be null");
     }
@@ -152,7 +152,7 @@ public final class IncrementalSession implements AutoCloseable {
    * @return the initialised session; close it when done
    */
   public static IncrementalSession open(
-      List<String> constraints, MetamodelWrapperInterface wrapper, IncrementalConfig config) {
+      List<String> constraints, ModelAccess wrapper, IncrementalConfig config) {
     IncrementalSession session = new IncrementalSession(constraints, wrapper, config);
     try {
       session.initialize();
@@ -237,7 +237,7 @@ public final class IncrementalSession implements AutoCloseable {
    * Requests the instances of the types of all constraints in one call, so that the initial full
    * evaluation needs one traversal instead of one per newly requested type.
    */
-  private void prefetchInstances(MetamodelWrapperInterface view) {
+  private void prefetchInstances(ModelAccess view) {
     Set<org.eclipse.emf.ecore.EClass> types = new LinkedHashSet<>();
     for (CompiledConstraint constraint : compiled.values()) {
       types.addAll(constraint.requestedTypes());
@@ -284,11 +284,10 @@ public final class IncrementalSession implements AutoCloseable {
         wrapper.batch(
             batchView -> {
               // the initial full evaluation reads through the batch's caching view
-              MetamodelWrapperInterface view = viewOf(correspondenceSnapshot, batchView);
+              ModelAccess view = viewOf(correspondenceSnapshot, batchView);
               prefetchInstances(view);
               return evaluateAll(
-                  distinctConstraints,
-                  c -> compiled.get(c).evaluate(view, List.of(), false, null));
+                  distinctConstraints, c -> compiled.get(c).evaluate(view, List.of(), false, null));
             });
     for (int i = 0; i < distinctConstraints.size(); i++) {
       violations.replaceAll(distinctConstraints.get(i), outcomes.get(i));
@@ -346,7 +345,7 @@ public final class IncrementalSession implements AutoCloseable {
     List<EvaluationOutcome> outcomes =
         wrapper.batch(
             batchView -> {
-              MetamodelWrapperInterface view = viewOf(correspondenceSnapshot, batchView);
+              ModelAccess view = viewOf(correspondenceSnapshot, batchView);
               return evaluateAll(
                   selected, c -> evaluateSelected(c, relevance.get(c), transaction, view));
             });
@@ -423,13 +422,12 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /** The evaluation view for {@code snapshot}: answers correspondence queries from it. */
-  private MetamodelWrapperInterface viewOf(CorrespondenceSnapshot snapshot) {
+  private ModelAccess viewOf(CorrespondenceSnapshot snapshot) {
     return viewOf(snapshot, wrapper);
   }
 
   /** {@link #viewOf(CorrespondenceSnapshot)} on top of {@code base} instead of the wrapper. */
-  private MetamodelWrapperInterface viewOf(
-      CorrespondenceSnapshot snapshot, MetamodelWrapperInterface base) {
+  private ModelAccess viewOf(CorrespondenceSnapshot snapshot, ModelAccess base) {
     // The snapshot answers correspondenceHasTag as the two-way tagged lookup, which is only the
     // wrapper's own answer under that contract.
     return snapshot == null
@@ -495,7 +493,7 @@ public final class IncrementalSession implements AutoCloseable {
       String constraint,
       RelevantInstanceResolver.Relevance relevance,
       List<EChange<EObject>> tx,
-      MetamodelWrapperInterface view) {
+      ModelAccess view) {
     if (relevance.classEvent()) {
       return compiled.get(constraint).evaluate(view, tx, true, null);
     }

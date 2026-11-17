@@ -24,7 +24,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * If processing a transaction fails, its delta is lost; the next transaction must therefore
@@ -34,11 +34,11 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 class SessionRecoveryTest {
 
   /** Delegating wrapper whose instance access can be made to fail. */
-  private static final class FailingWrapper implements MetamodelWrapperInterface {
-    private final MetamodelWrapperInterface delegate;
+  private static final class FailingWrapper implements ModelAccess {
+    private final ModelAccess delegate;
     private boolean fail;
 
-    FailingWrapper(MetamodelWrapperInterface delegate) {
+    FailingWrapper(ModelAccess delegate) {
       this.delegate = delegate;
     }
 

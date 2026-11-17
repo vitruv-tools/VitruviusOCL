@@ -31,7 +31,7 @@ import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -401,7 +401,7 @@ class TypeCheckerTest extends DummyTestSpecification {
   private TypeCheckResult typeCheckWithErrors(String input, ErrorCollector errors) {
     ParseTree tree = parse(input);
 
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
 
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();

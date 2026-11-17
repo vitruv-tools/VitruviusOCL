@@ -27,6 +27,7 @@ import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.OclLexers;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
@@ -49,7 +50,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 public class VitruvOCLCompiler {
 
   /** Metamodel and instance access interface. */
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
 
   /** Optional OCL file path (for file-based compilation). */
   private final Path oclFile;
@@ -88,7 +89,7 @@ public class VitruvOCLCompiler {
    * @param wrapper Interface to metamodels and instances
    * @param oclFile Optional file path for file-based compilation
    */
-  public VitruvOCLCompiler(MetamodelWrapperInterface wrapper, Path oclFile) {
+  public VitruvOCLCompiler(ModelAccess wrapper, Path oclFile) {
     this.wrapper = wrapper;
     this.oclFile = oclFile;
     this.transaction = List.of();
@@ -105,8 +106,7 @@ public class VitruvOCLCompiler {
    *     post-state, evaluated by {@code @pre}/{@code OCLisNew}/{@code OCLisModified}/{@code
    *     OCLisDeleted} (may be empty)
    */
-  public VitruvOCLCompiler(
-      MetamodelWrapperInterface wrapper, Path oclFile, List<EChange<EObject>> transaction) {
+  public VitruvOCLCompiler(ModelAccess wrapper, Path oclFile, List<EChange<EObject>> transaction) {
     this.wrapper = wrapper;
     this.oclFile = oclFile;
     this.transaction = transaction == null ? List.of() : transaction;

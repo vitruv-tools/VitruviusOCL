@@ -25,24 +25,25 @@ import java.util.function.Function;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
- * A view of a wrapper for one {@link MetamodelWrapperInterface#batch batch}: it caches the
- * instances per type, since the models do not change during the batch, and delegates everything
- * else. Only the batch's own evaluation sees the cache; other callers of the underlying wrapper
- * are unaffected. Thread-safe, so the batch may evaluate constraints in parallel.
+ * A view of a wrapper for one {@link ModelAccess#batch batch}: it caches the instances per type,
+ * since the models do not change during the batch, and delegates everything else. Only the batch's
+ * own evaluation sees the cache; other callers of the underlying wrapper are unaffected.
+ * Thread-safe, so the batch may evaluate constraints in parallel.
  */
-final class BatchCachingWrapper implements MetamodelWrapperInterface {
+final class BatchCachingWrapper implements ModelAccess {
 
-  private final MetamodelWrapperInterface delegate;
+  private final ModelAccess delegate;
   private final Map<EClass, List<EObject>> instances = new HashMap<>();
 
-  BatchCachingWrapper(MetamodelWrapperInterface delegate) {
+  BatchCachingWrapper(ModelAccess delegate) {
     this.delegate = delegate;
   }
 
   @Override
-  public <T> T batch(Function<MetamodelWrapperInterface, T> work) {
+  public <T> T batch(Function<ModelAccess, T> work) {
     return work.apply(this); // nested: share this batch's cache
   }
 

@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -144,8 +144,8 @@ class NavigationNullAndReferenceHandlingTest {
     }
   }
 
-  private MetamodelWrapperInterface wrapperFor(EObject instance) {
-    return new MetamodelWrapperInterface() {
+  private ModelAccess wrapperFor(EObject instance) {
+    return new ModelAccess() {
       @Override
       public EClass resolveEClass(String metamodelName, String className) {
         if (!"dummy4".equals(metamodelName)) {
@@ -218,7 +218,7 @@ class NavigationNullAndReferenceHandlingTest {
     };
   }
 
-  private boolean evaluateInvariant(String constraint, MetamodelWrapperInterface wrapper) {
+  private boolean evaluateInvariant(String constraint, ModelAccess wrapper) {
     VitruvOCLLexer lexer = new VitruvOCLLexer(CharStreams.fromString(constraint));
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     VitruvOCLParser parser = new VitruvOCLParser(tokens);

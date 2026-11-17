@@ -21,7 +21,7 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.AbstractPhaseVisitor;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
@@ -160,10 +160,7 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
    * @param scopeAnnotator The scope annotator for attaching scope info to parse tree nodes
    */
   public SymbolTableBuilder(
-      SymbolTable st,
-      MetamodelWrapperInterface wrapper,
-      ErrorCollector errors,
-      ScopeAnnotator scopeAnnotator) {
+      SymbolTable st, ModelAccess wrapper, ErrorCollector errors, ScopeAnnotator scopeAnnotator) {
     super(st, wrapper, errors);
     this.scopeAnnotator = scopeAnnotator;
   }

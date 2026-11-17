@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * A session whose initial evaluation fails must not leave its worker threads running: they are
@@ -32,11 +32,11 @@ class SessionThreadLeakTest {
 
   /** {@code delegate}, except that collecting instances fails. */
   @SuppressWarnings("unchecked")
-  private static MetamodelWrapperInterface failingInstances(MetamodelWrapperInterface delegate) {
-    return (MetamodelWrapperInterface)
+  private static ModelAccess failingInstances(ModelAccess delegate) {
+    return (ModelAccess)
         Proxy.newProxyInstance(
-            MetamodelWrapperInterface.class.getClassLoader(),
-            new Class<?>[] {MetamodelWrapperInterface.class},
+            ModelAccess.class.getClassLoader(),
+            new Class<?>[] {ModelAccess.class},
             (proxy, method, args) -> {
               if (method.getName().equals("getAllInstances")) {
                 throw new IllegalStateException("model access failed");
@@ -61,7 +61,7 @@ class SessionThreadLeakTest {
 
   @Test
   void failedInitializationStopsTheWorkerThreads() throws InterruptedException {
-    MetamodelWrapperInterface wrapper = failingInstances(EdgeFixture.create().model().wrapper());
+    ModelAccess wrapper = failingInstances(EdgeFixture.create().model().wrapper());
     IncrementalConfig config =
         IncrementalConfig.of(IncrementalLevel.RELEVANT_INSTANCES).withThreads(2);
     Set<Thread> before = liveNonDaemonThreads();

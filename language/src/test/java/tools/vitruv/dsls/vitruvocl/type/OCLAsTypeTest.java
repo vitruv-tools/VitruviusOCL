@@ -33,9 +33,9 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -138,7 +138,7 @@ class OCLAsTypeTest extends DummyTestSpecification {
   @Test
   void testTypeCheckReturnsInteger() {
     ParseTree tree = parse("Set{5}.oclAsType(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -159,7 +159,7 @@ class OCLAsTypeTest extends DummyTestSpecification {
   @Test
   void testTypeCheckPreservesCollectionKind() {
     ParseTree tree = parse("Sequence{1, 2}.oclAsType(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -199,11 +199,11 @@ class OCLAsTypeTest extends DummyTestSpecification {
   @Test
   void testSpacecraftAsTypeSpacecraft() {
     String constraint =
-        """
+"""
 context spaceMission::Spacecraft inv asTypeSpacecraft:
   spaceMission::Spacecraft.allInstances().oclAsType(spaceMission::Spacecraft).size()
     == spaceMission::Spacecraft.allInstances().size()
-        """;
+""";
 
     ConstraintResult result =
         VitruvOCL.evaluateConstraint(
@@ -222,13 +222,13 @@ context spaceMission::Spacecraft inv asTypeSpacecraft:
   @Test
   void testSelectThenAsTypeInMetamodel() {
     String constraint =
-        """
+"""
 context spaceMission::Spacecraft inv selectThenAsType:
   spaceMission::Spacecraft.allInstances()
     .select(sc | sc.oclIsKindOf(spaceMission::Spacecraft))
     .oclAsType(spaceMission::Spacecraft)
     .size() > 0
-        """;
+""";
 
     ConstraintResult result =
         VitruvOCL.evaluateConstraint(

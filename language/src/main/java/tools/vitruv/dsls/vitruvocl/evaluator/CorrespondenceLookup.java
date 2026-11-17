@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import org.eclipse.emf.ecore.EObject;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Memoizing correspondence check for the {@code ~} operator in all its forms ({@code a ~ b} and
@@ -33,12 +33,12 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
  * object, so a correspondence {@code [a, x] ~ [b]} is found from {@code b} but not from {@code a}
  * ({@code CorrespondenceLookupSemanticsExperimentTest}). Tagged checks use memoized tagged lookups
  * if the wrapper declares them equivalent to {@code correspondenceHasTag} ({@link
- * MetamodelWrapperInterface#hasTaggedCorrespondenceLookup()}); otherwise they go to the wrapper
- * unchanged. A {@code null} lookup result counts as no correspondents.
+ * ModelAccess#hasTaggedCorrespondenceLookup()}); otherwise they go to the wrapper unchanged. A
+ * {@code null} lookup result counts as no correspondents.
  *
- * <p>With the participant filter, once a few lookups have been made the lookup also
- * fetches the set of all objects that take part in some correspondence (one scan, if the wrapper
- * can enumerate it); an object outside that set has no correspondent, so its checks need no lookup.
+ * <p>With the participant filter, once a few lookups have been made the lookup also fetches the set
+ * of all objects that take part in some correspondence (one scan, if the wrapper can enumerate it);
+ * an object outside that set has no correspondent, so its checks need no lookup.
  *
  * <p>One instance belongs to one {@link EvaluationVisitor} and is used by one thread. It assumes
  * the correspondence model does not change while the visitor runs, which holds because evaluation
@@ -49,7 +49,7 @@ final class CorrespondenceLookup {
   /** Lookups after which the participant set is fetched; it costs about one lookup itself. */
   static final int LOOKUPS_BEFORE_PARTICIPANT_FILTER = 4;
 
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
   private final boolean participantFilter;
   private int lookups;
   private boolean participantsFetched;
@@ -66,11 +66,11 @@ final class CorrespondenceLookup {
   /** Lazily read from the wrapper on first tagged check. */
   private Boolean taggedLookup;
 
-  CorrespondenceLookup(MetamodelWrapperInterface wrapper) {
+  CorrespondenceLookup(ModelAccess wrapper) {
     this(wrapper, true);
   }
 
-  CorrespondenceLookup(MetamodelWrapperInterface wrapper, boolean participantFilter) {
+  CorrespondenceLookup(ModelAccess wrapper, boolean participantFilter) {
     this.wrapper = wrapper;
     this.participantFilter = participantFilter;
   }

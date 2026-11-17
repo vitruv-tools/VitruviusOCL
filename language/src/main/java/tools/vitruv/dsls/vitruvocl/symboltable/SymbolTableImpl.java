@@ -14,7 +14,7 @@
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
 import org.eclipse.emf.ecore.EClass;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
@@ -43,7 +43,7 @@ public class SymbolTableImpl implements SymbolTable {
    *
    * <p>Used to resolve qualified metamodel types (e.g., {@code Metamodel::Class}).
    */
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
 
   /** The currently active scope. */
   private Scope currentScope;
@@ -55,7 +55,7 @@ public class SymbolTableImpl implements SymbolTable {
    *
    * @param wrapper the metamodel wrapper used to resolve metamodel types
    */
-  public SymbolTableImpl(MetamodelWrapperInterface wrapper) {
+  public SymbolTableImpl(ModelAccess wrapper) {
     this.globalScope = new GlobalScope();
     this.currentScope = globalScope;
     this.wrapper = wrapper;

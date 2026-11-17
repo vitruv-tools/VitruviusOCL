@@ -34,9 +34,9 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -136,7 +136,7 @@ class OCLIsTypeOfTest extends DummyTestSpecification {
   @Test
   void testTypeCheckReturnsBoolean() {
     ParseTree tree = parse("Set{5}.oclIsTypeOf(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -157,7 +157,7 @@ class OCLIsTypeOfTest extends DummyTestSpecification {
   @Test
   void testTypeCheckPreservesCollectionKind() {
     ParseTree tree = parse("Sequence{1, 2}.oclIsTypeOf(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -260,24 +260,24 @@ class OCLIsTypeOfTest extends DummyTestSpecification {
 
   static Stream<String> metamodelTypeOfSatisfiedConstraints() {
     return Stream.of(
-        """
+"""
 context spaceMission::Spacecraft inv typeOfSpacecraft:
   spaceMission::Spacecraft.allInstances().oclIsTypeOf(spaceMission::Spacecraft).forAll(b | b)
-        """,
-        """
+""",
+"""
 context satelliteSystem::Satellite inv typeOfSatellite:
   satelliteSystem::Satellite.allInstances().oclIsTypeOf(satelliteSystem::Satellite).forAll(b | b)
-        """);
+""");
   }
 
   /** Spacecraft is NOT exactly of type Satellite → constraint fails. */
   @Test
   void testSpacecraftIsNotTypeOfSatellite() {
     String constraint =
-        """
+"""
 context spaceMission::Spacecraft inv typeOfSatellite:
   spaceMission::Spacecraft.allInstances().oclIsTypeOf(satelliteSystem::Satellite).forAll(b | b)
-        """;
+""";
     ConstraintResult r =
         VitruvOCL.evaluateConstraint(
             constraint,

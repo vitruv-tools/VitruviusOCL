@@ -30,7 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.incremental.CorrespondenceDelta.Pair;
 import tools.vitruv.dsls.vitruvocl.incremental.support.FakeCorrespondenceModel;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Unit tests for {@link CorrespondenceSnapshot} and {@link CorrespondenceDelta}: the diff of two
@@ -40,7 +40,7 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 class CorrespondenceSnapshotTest {
 
   private FakeCorrespondenceModel model;
-  private MetamodelWrapperInterface wrapper;
+  private ModelAccess wrapper;
   private EObject a;
   private EObject b;
   private EObject c;
@@ -49,7 +49,7 @@ class CorrespondenceSnapshotTest {
   @BeforeEach
   void setUp() {
     model = new FakeCorrespondenceModel();
-    wrapper = mock(MetamodelWrapperInterface.class);
+    wrapper = mock(ModelAccess.class);
     when(wrapper.getAllObjectsInACorrespondence())
         .thenAnswer(inv -> Optional.of(model.getAllEObjectsInACorrespondence()));
     when(wrapper.getCorrespondingObjectsByTag(any(EObject.class)))
@@ -66,7 +66,7 @@ class CorrespondenceSnapshotTest {
 
   @Test
   void unsupportedWrapperYieldsNoSnapshot() {
-    MetamodelWrapperInterface plain = mock(MetamodelWrapperInterface.class);
+    ModelAccess plain = mock(ModelAccess.class);
     when(plain.getAllObjectsInACorrespondence()).thenReturn(Optional.empty());
 
     assertTrue(CorrespondenceSnapshot.capture(plain).isEmpty());
