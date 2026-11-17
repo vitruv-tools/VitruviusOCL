@@ -560,7 +560,7 @@ final class IteratorOperationEvaluation {
     VariableSymbol accSymbol =
         new VariableSymbol(varSpec.accVar.getText(), accValue.getRuntimeType(), iterScope, false);
     iterScope.defineVariable(accSymbol);
-    accSymbol.setValue(accValue);
+    context.environment().bind(accSymbol, accValue);
     VariableSymbol iterSymbol = defineIterVar(varSpec.iterVar.getText(), iterVarType, iterScope);
 
     // Streams the (possibly lazy) receiver via elementIterator() instead of forcing it into one
@@ -596,9 +596,9 @@ final class IteratorOperationEvaluation {
       Value bodyResult =
           evalInScopeMaterialized(
               iterScope, iterSymbol, iterVarType, elem, () -> context.evaluate(ctx.body));
-      accSymbol.setValue(bodyResult);
+      context.environment().bind(accSymbol, bodyResult);
     }
-    return accSymbol.getValue();
+    return context.environment().valueOf(accSymbol);
   }
 
   /**
@@ -711,9 +711,9 @@ final class IteratorOperationEvaluation {
    * Creates and registers a fresh iterator-variable symbol directly in {@code scope}'s own symbol
    * map (bypassing {@code context.symbolTable().defineVariable}, which would require {@code scope}
    * to already be the active current scope). Call this exactly once per iteration expression, then
-   * use {@link #rebindIterVar} to update the same symbol's value for each subsequent element —
-   * allocating a fresh {@link VariableSymbol} (and re-inserting it into the scope's map) per
-   * element is pure waste, since the identical name/scope/type is being re-registered every time.
+   * use {@link #rebindIterVar} to rebind the same symbol for each subsequent element — allocating a
+   * fresh {@link VariableSymbol} (and re-inserting it into the scope's map) per element is pure
+   * waste, since the identical name/scope/type is being re-registered every time.
    *
    * @param name the iterator variable's name
    * @param iterVarType the singleton type the variable is bound at
@@ -1137,14 +1137,14 @@ final class IteratorOperationEvaluation {
    * Rebinds an already-registered iterator-variable symbol (from {@link #defineIterVar}) to {@code
    * elem}, without reallocating the symbol or touching its scope's variable map again.
    */
-  private static void rebindIterVar(VariableSymbol symbol, Type iterVarType, OCLElement elem) {
-    symbol.setValue(Value.singleton(elem, iterVarType));
+  private void rebindIterVar(VariableSymbol symbol, Type iterVarType, OCLElement elem) {
+    context.environment().bind(symbol, Value.singleton(elem, iterVarType));
   }
 
   /**
    * Rebinds both iterator-variable symbols of a two-var iteration (from {@link #defineTwoVars}).
    */
-  private static void rebindTwoVars(
+  private void rebindTwoVars(
       VariableSymbol[] symbols, Type iterVarType, OCLElement elem1, OCLElement elem2) {
     rebindIterVar(symbols[0], iterVarType, elem1);
     rebindIterVar(symbols[1], iterVarType, elem2);

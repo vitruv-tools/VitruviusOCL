@@ -170,6 +170,9 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private Deque<Value> receiverStack = new ArrayDeque<>();
 
+  /** The values of the variables of this evaluation; the symbols themselves carry no values. */
+  private final Environment environment = new Environment();
+
   /** Runtime semantics of the String operations, see {@link StringOperationEvaluation}. */
   private final StringOperationEvaluation strings =
       new StringOperationEvaluation(new EvaluationContext());
@@ -429,6 +432,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     symbolTable.enterScope(instanceScope);
     VariableSymbol selfSymbol = bindContextVariables(ctx, contextType);
     exitScope(instanceScope);
+    // Bindings made while evaluating one instance are dropped once it is done (see Environment).
+    Environment.Mark contextBindings = environment.mark();
     Type selfType = Type.singleton(contextType);
     List<VitruvOCLParser.InvCSContext> invariants = ctx.invCS();
     List<VitruvOCLParser.PreCSContext> preconditions =
@@ -440,7 +445,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     for (EObject instance : instances) {
       evaluatedInstanceCount++;
       symbolTable.enterScope(instanceScope);
-      selfSymbol.setValue(Value.of(List.of(new OCLElement.MetaclassValue(instance)), selfType));
+      environment.bind(
+          selfSymbol, Value.of(List.of(new OCLElement.MetaclassValue(instance)), selfType));
 
       // Evaluate all invariants/preconditions/postconditions for this instance
       for (VitruvOCLParser.InvCSContext inv : invariants) {
@@ -463,6 +469,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       }
 
       exitScope(instanceScope);
+      environment.dropBindingsSince(contextBindings);
     }
 
     // pre/post require a transaction this evaluation run doesn't have — record once per context
@@ -509,11 +516,11 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         Value emptyValue = Value.empty(Type.ANY);
         VariableSymbol paramSymbol = symbolTable.resolveVariable(paramName);
         if (paramSymbol != null) {
-          paramSymbol.setValue(emptyValue);
+          environment.bind(paramSymbol, emptyValue);
         } else {
           VariableSymbol newParam =
               new VariableSymbol(paramName, Type.ANY, symbolTable.getCurrentScope(), false);
-          newParam.setValue(emptyValue);
+          environment.bind(newParam, emptyValue);
           symbolTable.defineVariable(newParam);
         }
       }
@@ -1097,7 +1104,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.ERROR);
     }
 
-    Value value = varSymbol.getValue();
+    Value value = environment.valueOf(varSymbol);
     if (value == null) {
       return Value.empty(Type.ANY);
     }
@@ -2455,7 +2462,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.ANY);
     }
 
-    Value selfValue = selfSymbol.getValue();
+    Value selfValue = environment.valueOf(selfSymbol);
 
     if (selfValue == null) {
       return Value.empty(Type.ANY);
@@ -2500,7 +2507,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     }
 
     VariableSymbol varSymbol = new VariableSymbol(varName, varType, declaringScope, false);
-    varSymbol.setValue(initValue);
+    environment.bind(varSymbol, initValue);
     declaringScope.defineVariable(varSymbol);
 
     return initValue;
@@ -3248,7 +3255,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     if (selfSymbol == null) {
       return Value.of(List.of(), receiver.getRuntimeType());
     }
-    Value selfValue = selfSymbol.getValue();
+    Value selfValue = environment.valueOf(selfSymbol);
     if (selfValue.isEmpty() || selfValue.size() != 1) {
       return Value.of(List.of(), receiver.getRuntimeType());
     }
@@ -3285,7 +3292,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     if (selfSymbol == null) {
       return Value.of(List.of(), receiver.getRuntimeType());
     }
-    Value selfValue = selfSymbol.getValue();
+    Value selfValue = environment.valueOf(selfSymbol);
     if (selfValue.isEmpty() || selfValue.size() != 1) {
       return Value.of(List.of(), receiver.getRuntimeType());
     }
@@ -3320,7 +3327,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     if (selfSymbol == null) {
       return Value.boolValue(false);
     }
-    Value selfValue = selfSymbol.getValue();
+    Value selfValue = environment.valueOf(selfSymbol);
     if (selfValue.isEmpty() || selfValue.size() != 1) {
       return Value.boolValue(false);
     }
@@ -3435,6 +3442,11 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     @Override
     public SymbolTable symbolTable() {
       return symbolTable;
+    }
+
+    @Override
+    public Environment environment() {
+      return environment;
     }
   }
 }

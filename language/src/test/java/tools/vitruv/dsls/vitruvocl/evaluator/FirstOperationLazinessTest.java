@@ -89,6 +89,11 @@ class FirstOperationLazinessTest {
       public SymbolTable symbolTable() {
         throw new UnsupportedOperationException();
       }
+
+      @Override
+      public Environment environment() {
+        throw new UnsupportedOperationException();
+      }
     };
   }
 }

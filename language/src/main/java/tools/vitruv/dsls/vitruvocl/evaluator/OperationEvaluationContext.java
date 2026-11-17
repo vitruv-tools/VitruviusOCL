@@ -44,4 +44,7 @@ interface OperationEvaluationContext {
 
   /** Returns the symbol table (iterators bind their variables in fresh local scopes). */
   SymbolTable symbolTable();
+
+  /** Returns the values of the variables (iterators bind their variables to the elements). */
+  Environment environment();
 }
