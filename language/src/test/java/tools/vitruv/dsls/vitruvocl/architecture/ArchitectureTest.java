@@ -66,7 +66,8 @@ class ArchitectureTest {
           new Layer("Compiler", "compiler"),
           new Layer("Incremental", "incremental.."),
           new Layer("Adapter", "adapter.."),
-          new Layer("Api", "pipeline", "cli", "vitruv"));
+          new Layer("Api", "api"),
+          new Layer("Top", "pipeline", "cli", "vitruv"));
 
   private static JavaClasses productionClasses;
 

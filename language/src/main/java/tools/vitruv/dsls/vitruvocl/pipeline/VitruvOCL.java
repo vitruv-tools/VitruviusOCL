@@ -14,35 +14,29 @@
 package tools.vitruv.dsls.vitruvocl.pipeline;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.SmartLoader;
 import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
-import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.compiler.ConstraintListEvaluator;
-import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalResult;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.result.Warning;
 import tools.vitruv.framework.vsum.VirtualModel;
 
-/** Static facade for evaluating VitruvOCL constraints against a VSUM or standalone files. */
+/**
+ * Static facade for evaluating VitruvOCL constraints against a registered VSUM or standalone files.
+ * Every method delegates to {@link VitruvOclEngine}, the instance API that replaces this facade;
+ * the registered VSUM or wrapper is the only state kept here.
+ */
 public class VitruvOCL {
 
   private VitruvOCL() {}
@@ -50,13 +44,7 @@ public class VitruvOCL {
   private static VsumWrapper vsumWrapper = null;
   private static ModelAccess directWrapper = null;
 
-  /**
-   * Default worker-thread count for {@link ConstraintListEvaluator}-backed batch evaluation, used
-   * whenever a caller does not pass an explicit thread pool size.
-   *
-   * <p>Every batch-evaluation entry point also accepts an explicit {@code threadPoolSize}
-   * parameter so callers can sweep thread counts for scaling benchmarks.
-   */
+  /** Worker threads for constraint lists when the caller does not pass a count. */
   private static final int DEFAULT_THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors();
 
   // ---------------------------------------------------------------------------
@@ -106,194 +94,81 @@ public class VitruvOCL {
   }
 
   // ---------------------------------------------------------------------------
-  // Evaluation (VSUM-aware and file-path-based; overloads kept together per checkstyle)
+  // Single constraints
+  // ---------------------------------------------------------------------------
+
+  /** Evaluates a constraint against the registered VSUM; see {@link VitruvOclEngine#evaluate}. */
+  public static ConstraintResult evaluateConstraint(String constraint) {
+    return registered().evaluate(constraint);
+  }
+
+  /** Evaluates a constraint with a transaction against the registered VSUM. */
+  public static ConstraintResult evaluateConstraint(
+      String constraint, List<EChange<EObject>> transaction) {
+    return registered().evaluate(constraint, transaction);
+  }
+
+  /** Evaluates a constraint against {@code wrapper}, independent of any registered VSUM. */
+  public static ConstraintResult evaluateConstraint(String constraint, ModelAccess wrapper) {
+    return VitruvOclEngine.forModel(wrapper).evaluate(constraint);
+  }
+
+  /** Evaluates a constraint against metamodels and instances loaded from files. */
+  public static ConstraintResult evaluateConstraint(
+      String constraint, Path[] ecoreFiles, Path[] xmiFiles) {
+    return VitruvOclEngine.forFiles(ecoreFiles, xmiFiles).evaluate(constraint);
+  }
+
+  /** Evaluates a constraint with a transaction against metamodels and instances from files. */
+  public static ConstraintResult evaluateConstraint(
+      String constraint, Path[] ecoreFiles, Path[] xmiFiles, List<EChange<EObject>> transaction) {
+    return VitruvOclEngine.forFiles(ecoreFiles, xmiFiles).evaluate(constraint, transaction);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Constraint lists and files
   // ---------------------------------------------------------------------------
 
   /**
-   * Evaluates a single constraint against the registered VSUM.
-   *
-   * @param constraint the OCL constraint expression
-   * @return the evaluation result
-   */
-  public static ConstraintResult evaluateConstraint(String constraint) {
-    return compileAndEvaluate(constraint, getVsumWrapper(), List.of(), List.of(), false);
-  }
-
-  /**
-   * Evaluates a single constraint against the registered VSUM, with an explicit transaction.
-   *
-   * @param constraint the OCL constraint expression
-   * @param transaction the ordered list of atomic changes between pre-state and the current
-   *     post-state, evaluated by {@code @pre}/{@code OCLisNew}/{@code OCLisModified}/{@code
-   *     OCLisDeleted} (may be empty)
-   * @return the evaluation result
-   */
-  public static ConstraintResult evaluateConstraint(
-      String constraint, List<EChange<EObject>> transaction) {
-    return compileAndEvaluate(constraint, getVsumWrapper(), List.of(), transaction, true);
-  }
-
-  /**
-   * Evaluates a single constraint against the given wrapper, independent of any registered VSUM.
-   *
-   * @param constraint the OCL constraint expression
-   * @param wrapper access to the metamodels and instances to evaluate against
-   * @return the evaluation result
-   */
-  public static ConstraintResult evaluateConstraint(String constraint, ModelAccess wrapper) {
-    return compileAndEvaluate(constraint, wrapper, List.of(), List.of(), false);
-  }
-
-  /**
-   * Evaluates a single constraint against metamodels and instances loaded from files.
-   *
-   * @param constraint the OCL constraint expression
-   * @param ecoreFiles metamodel files to load
-   * @param xmiFiles model instance files to load
-   * @return the evaluation result
-   */
-  public static ConstraintResult evaluateConstraint(
-      String constraint, Path[] ecoreFiles, Path[] xmiFiles) {
-    return evaluateConstraintFromFiles(constraint, ecoreFiles, xmiFiles, List.of(), false);
-  }
-
-  /**
-   * Evaluates a single constraint against metamodels and instances loaded from files, with an
-   * explicit transaction.
-   *
-   * @param constraint the OCL constraint expression
-   * @param ecoreFiles metamodel files to load
-   * @param xmiFiles model instance files to load
-   * @param transaction the ordered list of atomic changes between pre-state and the current
-   *     post-state, evaluated by {@code @pre}/{@code OCLisNew}/{@code OCLisModified}/{@code
-   *     OCLisDeleted} (may be empty)
-   * @return the evaluation result
-   */
-  public static ConstraintResult evaluateConstraint(
-      String constraint, Path[] ecoreFiles, Path[] xmiFiles, List<EChange<EObject>> transaction) {
-    return evaluateConstraintFromFiles(constraint, ecoreFiles, xmiFiles, transaction, true);
-  }
-
-  private static ConstraintResult evaluateConstraintFromFiles(
-      String constraint,
-      Path[] ecoreFiles,
-      Path[] xmiFiles,
-      List<EChange<EObject>> transaction,
-      boolean transactionSupported) {
-    SmartLoader.LoadResult loadResult =
-        SmartLoader.loadForConstraint(constraint, ecoreFiles, xmiFiles);
-    if (loadResult.hasErrors()) {
-      return new ConstraintResult(
-          constraint, false, List.of(), loadResult.fileErrors, loadResult.warnings);
-    }
-    return compileAndEvaluate(
-        constraint, loadResult.wrapper, loadResult.warnings, transaction, transactionSupported);
-  }
-
-  /**
-   * Evaluates all constraints in the given file against the registered VSUM.
-   *
-   * <p>If the constraints file cannot be read, a {@link BatchValidationResult} with a single error
-   * entry is returned instead of throwing an exception. This allows callers to handle
-   * file-not-found or I/O errors uniformly via the result object without checked exceptions.
-   *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @return the validation result; never {@code null}
+   * Evaluates all constraints in the given file against the registered VSUM. If the file cannot be
+   * read, the result holds a single error entry instead of an exception being thrown.
    */
   public static BatchValidationResult evaluateConstraints(Path constraintsFile) {
     return evaluateConstraints(constraintsFile, DEFAULT_THREAD_POOL_SIZE);
   }
 
-  /**
-   * Evaluates all constraints in the given file against the registered VSUM, distributing the
-   * evaluation across {@code threadPoolSize} worker threads.
-   *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be
-   *     at least 1
-   * @return the validation result; never {@code null}
-   */
+  /** Same as {@link #evaluateConstraints(Path)} with {@code threadPoolSize} worker threads. */
   public static BatchValidationResult evaluateConstraints(
       Path constraintsFile, int threadPoolSize) {
-    return evaluateConstraintsFromPath(constraintsFile, threadPoolSize, List.of(), false);
+    return evaluateRegistered(constraintsFile, threadPoolSize, null);
   }
 
   /**
-   * Evaluates all constraints in the given file against the registered VSUM, with an explicit
-   * transaction shared by every constraint in the file.
-   *
-   * <p>Unlike {@link #evaluateConstraints(Path)}, {@code pre}/{@code post} blocks are genuinely
-   * evaluated here (not skipped) — this is the entry point for callers that have a real
-   * transaction available, such as a Reaction-execution hook checking the constraints relevant to
-   * whichever Reactions just fired. See {@link #evaluateConstraint(String, List)} for the
-   * single-constraint equivalent and the meaning of {@code transaction}.
-   *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @param transaction the ordered list of atomic changes between pre-state and the current
-   *     post-state, evaluated by {@code @pre}/{@code OCLisNew}/{@code OCLisModified}/{@code
-   *     OCLisDeleted} (may be empty, but must not be {@code null} — pass {@link
-   *     #evaluateConstraints(Path)} instead if there genuinely is no transaction context)
-   * @return the validation result; never {@code null}
+   * Same as {@link #evaluateConstraints(Path)} with a transaction shared by every constraint;
+   * {@code pre}/{@code post} blocks are evaluated against it.
    */
   public static BatchValidationResult evaluateConstraints(
       Path constraintsFile, List<EChange<EObject>> transaction) {
-    return evaluateConstraintsFromPath(
-        constraintsFile, DEFAULT_THREAD_POOL_SIZE, transaction, true);
+    return evaluateRegistered(constraintsFile, DEFAULT_THREAD_POOL_SIZE, transaction);
   }
 
-  /**
-   * Evaluates multiple constraints against metamodels and instances loaded from files.
-   *
-   * @param constraints the OCL constraint expressions
-   * @param ecoreFiles metamodel files to load
-   * @param xmiFiles model instance files to load
-   * @return the batch evaluation result
-   */
+  /** Evaluates constraints against metamodels and instances loaded from files. */
   public static BatchValidationResult evaluateConstraints(
       List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles) {
     return evaluateConstraints(constraints, ecoreFiles, xmiFiles, DEFAULT_THREAD_POOL_SIZE);
   }
 
-  /**
-   * Evaluates multiple constraints against metamodels and instances loaded from files,
-   * distributing the evaluation across {@code threadPoolSize} worker threads.
-   *
-   * @param constraints the OCL constraint expressions
-   * @param ecoreFiles metamodel files to load
-   * @param xmiFiles model instance files to load
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be
-   *     at least 1
-   * @return the batch evaluation result
-   */
+  /** Same as {@link #evaluateConstraints(List, Path[], Path[])} with a thread count. */
   public static BatchValidationResult evaluateConstraints(
       List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles, int threadPoolSize) {
-    if (constraints.isEmpty()) {
-      return new BatchValidationResult(List.of());
-    }
-    // Union of every constraint's dependencies (not just the first), so constraints referencing
-    // different metamodel packages within the same batch all resolve correctly — see
-    // SmartLoader#loadForConstraints. This runs entirely before any parallel task is submitted.
-    SmartLoader.LoadResult loadResult =
-        SmartLoader.loadForConstraints(constraints, ecoreFiles, xmiFiles);
-    if (loadResult.hasErrors()) {
-      return new BatchValidationResult(
-          constraints.stream()
-              .map(
-                  c ->
-                      new ConstraintResult(
-                          c, false, List.of(), loadResult.fileErrors, loadResult.warnings))
-              .toList());
-    }
-    return evaluateConstraints(constraints, loadResult.wrapper, threadPoolSize);
+    return VitruvOclEngine.forFiles(ecoreFiles, xmiFiles)
+        .withThreadPoolSize(threadPoolSize)
+        .evaluateAll(constraints);
   }
 
   /**
-   * Evaluates constraints read from a file against metamodels and instances loaded from files.
+   * Evaluates the constraints of a file against metamodels and instances loaded from files.
    *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @param ecoreFiles metamodel files to load
-   * @param xmiFiles model instance files to load
-   * @return the batch evaluation result
    * @throws IOException if the constraints file cannot be read
    */
   public static BatchValidationResult evaluateConstraints(
@@ -302,186 +177,44 @@ public class VitruvOCL {
   }
 
   /**
-   * Evaluates constraints read from a file against metamodels and instances loaded from files,
-   * distributing the evaluation across {@code threadPoolSize} worker threads.
+   * Same as {@link #evaluateConstraints(Path, Path[], Path[])} with a thread count.
    *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @param ecoreFiles metamodel files to load
-   * @param xmiFiles model instance files to load
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be
-   *     at least 1
-   * @return the batch evaluation result
    * @throws IOException if the constraints file cannot be read
    */
   public static BatchValidationResult evaluateConstraints(
       Path constraintsFile, Path[] ecoreFiles, Path[] xmiFiles, int threadPoolSize)
       throws IOException {
-    List<String> constraints = parseConstraintsFile(constraintsFile);
-    return evaluateConstraints(constraints, ecoreFiles, xmiFiles, threadPoolSize);
+    return VitruvOclEngine.forFiles(ecoreFiles, xmiFiles)
+        .withThreadPoolSize(threadPoolSize)
+        .evaluateFile(constraintsFile);
   }
 
   /**
-   * Evaluates {@code constraints} against {@code wrapper}, distributing the work across {@code
-   * threadPoolSize} worker threads via {@link ConstraintListEvaluator}.
+   * Evaluates a project's constraints against its metamodel and instance directories ({@code
+   * model/src/main/{constraints.ocl,ecore,instances}}).
    *
-   * <p>Duplicate detection runs as a cheap, sequential pre-pass over the constraint strings
-   * themselves (no compilation involved) so that only the first occurrence of a given constraint
-   * text is ever submitted for (possibly parallel) compilation and evaluation; later duplicates are
-   * resolved directly to a {@link #duplicateResult}. This keeps duplicate-detection order-stable
-   * regardless of thread pool size, and avoids redundant work. Each submitted constraint is
-   * compiled and evaluated by {@link #compileAndEvaluate}, which creates its own {@link
-   * tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler} (and thus its own {@link
-   * tools.vitruv.dsls.vitruvocl.common.ErrorCollector}) per call — so no compiler-level state is
-   * shared between concurrently-running tasks. Results are returned in the same order as {@code
-   * constraints}, independent of completion order.
-   *
-   * @param constraints the OCL constraint expressions, in the order results should be returned
-   * @param wrapper shared metamodel/instance access, reused (read-mostly) across all tasks
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be at
-   *     least 1
-   * @return the batch evaluation result, in input order
-   */
-  private static BatchValidationResult evaluateConstraints(
-      List<String> constraints, ModelAccess wrapper, int threadPoolSize) {
-    return evaluateConstraints(constraints, wrapper, threadPoolSize, List.of(), false);
-  }
-
-  /**
-   * Same as {@link #evaluateConstraints(List, ModelAccess, int)}, but with an explicit transaction
-   * shared by every constraint in {@code constraints} — the transaction is immutable and read-only,
-   * so sharing it read-only across the (possibly parallel) evaluation tasks below is as safe as
-   * sharing {@code wrapper} already is.
-   *
-   * @param transaction the ordered list of atomic changes between pre-state and the current
-   *     post-state, evaluated by {@code @pre}/{@code OCLisNew}/{@code OCLisModified}/{@code
-   *     OCLisDeleted} (may be empty)
-   * @param transactionSupported whether {@code pre}/{@code post} blocks should be genuinely
-   *     evaluated against {@code transaction} ({@code true}) or skipped outright because this call
-   *     site has no transaction context at all ({@code false}) — see {@link
-   *     tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor}'s field of the same name
-   */
-  private static BatchValidationResult evaluateConstraints(
-      List<String> constraints,
-      ModelAccess wrapper,
-      int threadPoolSize,
-      List<EChange<EObject>> transaction,
-      boolean transactionSupported) {
-    int size = constraints.size();
-    List<ConstraintResult> results = new ArrayList<>(Collections.nCopies(size, null));
-    Set<String> seenConstraints = new HashSet<>();
-    List<String> toEvaluate = new ArrayList<>();
-    List<Integer> toEvaluateIndices = new ArrayList<>();
-
-    for (int i = 0; i < size; i++) {
-      String constraint = constraints.get(i);
-      if (!seenConstraints.add(constraint)) {
-        results.set(i, duplicateResult(constraint));
-      } else {
-        toEvaluate.add(constraint);
-        toEvaluateIndices.add(i);
-      }
-    }
-
-    List<ConstraintResult> evaluated =
-        wrapper.batch(
-            view -> {
-              // each constraint is compiled once: its types are prefetched, then it is evaluated
-              List<PreparedConstraint> prepared =
-                  ConstraintListEvaluator.map(
-                      toEvaluate, c -> PreparedConstraint.prepare(c, view), threadPoolSize);
-              PreparedConstraint.prefetchInstances(prepared, view);
-              return ConstraintListEvaluator.map(
-                  prepared,
-                  p ->
-                      ConstraintEvaluations.render(
-                          p.text(),
-                          view,
-                          List.of(),
-                          p.evaluate(view, transaction, transactionSupported, null)),
-                  threadPoolSize);
-            });
-
-    for (int i = 0; i < evaluated.size(); i++) {
-      results.set(toEvaluateIndices.get(i), evaluated.get(i));
-    }
-
-    return new BatchValidationResult(results);
-  }
-
-  private static BatchValidationResult evaluateConstraintsFromPath(
-      Path constraintsFile,
-      int threadPoolSize,
-      List<EChange<EObject>> transaction,
-      boolean transactionSupported) {
-    List<String> constraints;
-    try {
-      constraints = parseConstraintsFile(constraintsFile);
-    } catch (IOException e) {
-      return new BatchValidationResult(
-          List.of(
-              new ConstraintResult(
-                  constraintsFile.toString(),
-                  false,
-                  List.of(
-                      new CompileError(
-                          1,
-                          0,
-                          "Could not read constraints file: "
-                              + constraintsFile.getFileName()
-                              + " ("
-                              + e.getMessage()
-                              + ")",
-                          ErrorSeverity.ERROR,
-                          constraintsFile.toString())),
-                  List.of(),
-                  List.of())));
-    }
-    return evaluateConstraints(
-        constraints, getVsumWrapper(), threadPoolSize, transaction, transactionSupported);
-  }
-
-  /**
-   * Evaluates a project's constraints against its default metamodel and instance directories.
-   *
-   * @param projectDir project root; expects {@code model/src/main/{constraints.ocl,ecore,
-   *     instances}}
-   * @return the batch evaluation result
-   * @throws IOException if the constraints file cannot be read
+   * @throws IOException if the project or its constraints file cannot be read
    */
   public static BatchValidationResult evaluateProject(Path projectDir) throws IOException {
     return evaluateProject(projectDir, DEFAULT_THREAD_POOL_SIZE);
   }
 
   /**
-   * Evaluates a project's constraints against its default metamodel and instance directories,
-   * distributing the evaluation across {@code threadPoolSize} worker threads.
+   * Same as {@link #evaluateProject(Path)} with a thread count.
    *
-   * @param projectDir project root; expects {@code model/src/main/{constraints.ocl,ecore,
-   *     instances}}
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be
-   *     at least 1
-   * @return the batch evaluation result
-   * @throws IOException if the constraints file cannot be read
+   * @throws IOException if the project or its constraints file cannot be read
    */
   public static BatchValidationResult evaluateProject(Path projectDir, int threadPoolSize)
       throws IOException {
-    Path mainDir = projectDir.resolve("model/src/main");
-    Path constraintsFile = mainDir.resolve("constraints.ocl");
-    Path ecoreDir = mainDir.resolve("ecore");
-    Path instancesDir = mainDir.resolve("instances");
-    Path[] ecoreFiles = collectFiles(ecoreDir, ".ecore");
-    Path[] xmiFiles = collectAllFiles(instancesDir);
-    return evaluateConstraints(constraintsFile, ecoreFiles, xmiFiles, threadPoolSize);
+    return evaluateProject(
+        ConstraintFiles.projectConstraints(projectDir), projectDir, threadPoolSize);
   }
 
   /**
-   * Evaluates constraints from an explicit file against a project's default metamodel and instance
+   * Evaluates the constraints of an explicit file against a project's metamodel and instance
    * directories.
    *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @param resourcesDir project root; expects {@code model/src/main/{ecore,instances}}
-   * @return the batch evaluation result
-   * @throws IOException if the constraints file cannot be read
+   * @throws IOException if the project or the constraints file cannot be read
    */
   public static BatchValidationResult evaluateProject(Path constraintsFile, Path resourcesDir)
       throws IOException {
@@ -489,44 +222,25 @@ public class VitruvOCL {
   }
 
   /**
-   * Evaluates constraints from an explicit file against a project's default metamodel and instance
-   * directories, distributing the evaluation across {@code threadPoolSize} worker threads.
+   * Same as {@link #evaluateProject(Path, Path)} with a thread count.
    *
-   * @param constraintsFile path to the {@code .ocl} constraints file
-   * @param resourcesDir project root; expects {@code model/src/main/{ecore,instances}}
-   * @param threadPoolSize number of worker threads used to evaluate the constraint list; must be
-   *     at least 1
-   * @return the batch evaluation result
-   * @throws IOException if the constraints file cannot be read
+   * @throws IOException if the project or the constraints file cannot be read
    */
   public static BatchValidationResult evaluateProject(
       Path constraintsFile, Path resourcesDir, int threadPoolSize) throws IOException {
-    Path mainDir = resourcesDir.resolve("model/src/main");
-    Path ecoreDir = mainDir.resolve("ecore");
-    Path instancesDir = mainDir.resolve("instances");
-    Path[] ecoreFiles = collectFiles(ecoreDir, ".ecore");
-    Path[] xmiFiles = collectAllFiles(instancesDir);
-    return evaluateConstraints(constraintsFile, ecoreFiles, xmiFiles, threadPoolSize);
+    return VitruvOclEngine.forProject(resourcesDir)
+        .withThreadPoolSize(threadPoolSize)
+        .evaluateFile(constraintsFile);
   }
 
   // ---------------------------------------------------------------------------
-  // Incremental evaluation (opt-in; none of the methods above are affected)
+  // Incremental evaluation
   // ---------------------------------------------------------------------------
 
-  /**
-   * Opens and initialises an incremental evaluation session for {@code constraints} against the
-   * registered VSUM (or direct wrapper). The initial full evaluation is available via {@link
-   * IncrementalSession#latestResult()}; afterwards pass each transaction to {@link
-   * #evaluateConstraintsIncremental}, or use {@link #attachIncrementalSession} to have them
-   * delivered by the VSUM.
-   *
-   * @param constraints the constraint texts, in result order
-   * @param config level, oracle mode etc.; see {@link IncrementalConfig#fromSystemProperties()}
-   * @return the initialised session; close it when done
-   */
+  /** Opens an incremental session against the registered VSUM (or direct wrapper). */
   public static IncrementalSession openIncrementalSession(
       List<String> constraints, IncrementalConfig config) {
-    return IncrementalSession.open(constraints, getVsumWrapper(), config);
+    return registered().openIncrementalSession(constraints, config);
   }
 
   /**
@@ -537,12 +251,11 @@ public class VitruvOCL {
    */
   public static IncrementalSession openIncrementalSession(
       Path constraintsFile, IncrementalConfig config) throws IOException {
-    return openIncrementalSession(parseConstraintsFile(constraintsFile), config);
+    return openIncrementalSession(ConstraintFiles.read(constraintsFile), config);
   }
 
   /**
-   * Opens and initialises an incremental session over metamodels and instances loaded from files
-   * (the same loading as {@link #evaluateConstraints(Path, Path[], Path[])}).
+   * Opens an incremental session over metamodels and instances loaded from files.
    *
    * @throws IOException if the constraints file cannot be read
    * @throws IllegalStateException if the metamodel or instance files cannot be loaded
@@ -550,33 +263,21 @@ public class VitruvOCL {
   public static IncrementalSession openIncrementalSession(
       Path constraintsFile, Path[] ecoreFiles, Path[] xmiFiles, IncrementalConfig config)
       throws IOException {
-    List<String> constraints = parseConstraintsFile(constraintsFile);
-    SmartLoader.LoadResult loadResult =
-        SmartLoader.loadForConstraints(constraints, ecoreFiles, xmiFiles);
-    if (loadResult.hasErrors()) {
-      throw new IllegalStateException("Could not load model files: " + loadResult.fileErrors);
-    }
-    return IncrementalSession.open(constraints, loadResult.wrapper, config);
+    List<String> constraints = ConstraintFiles.read(constraintsFile);
+    return VitruvOclEngine.forFiles(ecoreFiles, xmiFiles)
+        .openIncrementalSession(constraints, config);
   }
 
-  /**
-   * Processes one transaction (already applied to the model) in {@code session} and returns all
-   * current violations.
-   *
-   * @param transaction the transaction's atomic changes in chronological order
-   */
+  /** Processes one transaction (already applied to the model) in {@code session}. */
   public static IncrementalResult evaluateConstraintsIncremental(
       IncrementalSession session, List<EChange<EObject>> transaction) {
     return session.onTransaction(transaction);
   }
 
   /**
-   * Opens an incremental session over the VSUM registered with {@link #registerVSUM} and
-   * registers it as change-propagation listener: every {@code commitChanges()} is evaluated as one
-   * transaction and its result handed to {@code onResult}. Closing the session removes the
-   * listener.
+   * Opens an incremental session over the VSUM registered with {@link #registerVSUM} that is
+   * notified of every commit.
    *
-   * @param onFailure receives exceptions (e.g. oracle mismatches) instead of the propagation
    * @throws IllegalStateException if no VSUM (as opposed to a direct wrapper) is registered
    */
   public static IncrementalSession attachIncrementalSession(
@@ -592,127 +293,63 @@ public class VitruvOCL {
       throw new IllegalStateException(
           "attachIncrementalSession requires a VSUM registered via VitruvOCL.registerVSUM(vsum)");
     }
-    return IncrementalSession.openAttached(constraints, wrapper, config, onResult, onFailure);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Shared compile + evaluate logic
-  // ---------------------------------------------------------------------------
-
-  private static ConstraintResult compileAndEvaluate(
-      String constraint,
-      ModelAccess wrapper,
-      List<Warning> loaderWarnings,
-      List<EChange<EObject>> transaction,
-      boolean transactionSupported) {
-    EvaluationOutcome outcome =
-        ConstraintEvaluations.evaluateFresh(
-            constraint, wrapper, transaction, transactionSupported);
-    return ConstraintEvaluations.render(constraint, wrapper, loaderWarnings, outcome);
+    return VitruvOclEngine.forModel(wrapper)
+        .attachIncrementalSession(constraints, config, onResult, onFailure);
   }
 
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
-  private static synchronized ModelAccess getVsumWrapper() {
+  /**
+   * Reads the constraints file first, so that an unreadable file yields an error result even
+   * without a registered VSUM, then evaluates against the registered VSUM.
+   *
+   * @param transaction the shared transaction, or {@code null} to skip {@code pre}/{@code post}
+   */
+  private static BatchValidationResult evaluateRegistered(
+      Path constraintsFile, int threadPoolSize, List<EChange<EObject>> transaction) {
+    List<String> constraints;
+    try {
+      constraints = ConstraintFiles.read(constraintsFile);
+    } catch (IOException e) {
+      return unreadableFile(constraintsFile, e);
+    }
+    VitruvOclEngine engine = registered().withThreadPoolSize(threadPoolSize);
+    return transaction == null
+        ? engine.evaluateAll(constraints)
+        : engine.evaluateAll(constraints, transaction);
+  }
+
+  private static BatchValidationResult unreadableFile(Path constraintsFile, IOException e) {
+    CompileError error =
+        new CompileError(
+            1,
+            0,
+            "Could not read constraints file: "
+                + constraintsFile.getFileName()
+                + " ("
+                + e.getMessage()
+                + ")",
+            ErrorSeverity.ERROR,
+            constraintsFile.toString());
+    return new BatchValidationResult(
+        List.of(
+            new ConstraintResult(
+                constraintsFile.toString(), false, List.of(error), List.of(), List.of())));
+  }
+
+  /** An engine over the registered direct wrapper, else the registered VSUM. */
+  private static synchronized VitruvOclEngine registered() {
     if (directWrapper != null) {
-      return directWrapper;
+      return VitruvOclEngine.forModel(directWrapper);
     }
     if (vsumWrapper != null) {
-      return vsumWrapper;
+      return VitruvOclEngine.forModel(vsumWrapper);
     }
     throw new IllegalStateException(
         "No VSUM registered. Call VitruvOCL.registerVSUM(vsum) or "
             + "VitruvOCL.registerDirectWrapper(wrapper) before evaluating constraints "
             + "without explicit file paths.");
-  }
-
-  private static ConstraintResult duplicateResult(String constraint) {
-    return ConstraintEvaluations.duplicateResult(constraint);
-  }
-
-  private static List<String> parseConstraintsFile(Path file) throws IOException {
-    String content = Files.readString(file);
-    List<String> constraints = new ArrayList<>();
-    String[] lines = content.split("\n");
-    StringBuilder cleaned = new StringBuilder();
-    for (String line : lines) {
-      String trimmed = line.trim();
-      // Skip comment lines and import declarations (e.g. "import model : '...'")
-      if (!trimmed.startsWith("--") && !trimmed.startsWith("import ") && !trimmed.isEmpty()) {
-        cleaned.append(line).append("\n");
-      }
-    }
-    String[] parts = cleaned.toString().split("(?=context\\s)");
-    for (String part : parts) {
-      String trimmed = part.trim();
-      if (!trimmed.isEmpty() && trimmed.startsWith("context")) {
-        constraints.addAll(splitContextBlockByConstraintKeyword(trimmed));
-      }
-    }
-    return constraints;
-  }
-
-  /**
-   * Splits a single {@code context ...} block further on {@code inv}/{@code pre}/{@code post}
-   * boundaries, so that a shared context header followed by several constraint blocks is
-   * evaluated as independent units rather than as one indivisible block. Each resulting segment
-   * is re-prefixed with the original context header.
-   *
-   * <p>The negative lookbehind {@code (?<!@)} keeps this from matching {@code pre} inside the
-   * {@code @pre} postfix operator (e.g. {@code self.mass@pre}) — without it, a body using
-   * {@code @pre} gets split mid-token, splintering {@code self.mass@} and {@code pre == 999} into
-   * two broken fragments.
-   */
-  private static List<String> splitContextBlockByConstraintKeyword(String contextBlock) {
-    java.util.regex.Matcher headerMatcher =
-        java.util.regex.Pattern.compile("(?<!@)\\b(?:inv|pre|post)\\b").matcher(contextBlock);
-    if (!headerMatcher.find()) {
-      return List.of(contextBlock);
-    }
-    String header = contextBlock.substring(0, headerMatcher.start()).trim();
-
-    String[] segments = contextBlock.split("(?<!@)(?=\\b(?:inv|pre|post)\\b)");
-    List<String> result = new ArrayList<>();
-    for (String segment : segments) {
-      String trimmed = segment.trim();
-      if (trimmed.isEmpty() || trimmed.startsWith("context")) {
-        continue;
-      }
-      result.add(header + "\n" + trimmed);
-    }
-    return result.isEmpty() ? List.of(contextBlock) : result;
-  }
-
-  private static Path[] collectFiles(Path directory, String... extensions) throws IOException {
-    if (!Files.exists(directory) || !Files.isDirectory(directory)) {
-      return new Path[0];
-    }
-    try (Stream<Path> stream = Files.walk(directory)) {
-      return stream
-          .filter(Files::isRegularFile)
-          .filter(
-              p -> {
-                String name = p.getFileName().toString().toLowerCase();
-                for (String ext : extensions) {
-                  if (name.endsWith(ext)) {
-                    return true;
-                  }
-                }
-                return false;
-              })
-          .toList()
-          .toArray(new Path[0]);
-    }
-  }
-
-  private static Path[] collectAllFiles(Path directory) throws IOException {
-    if (!Files.exists(directory) || !Files.isDirectory(directory)) {
-      return new Path[0];
-    }
-    try (Stream<Path> stream = Files.walk(directory)) {
-      return stream.filter(Files::isRegularFile).toList().toArray(new Path[0]);
-    }
   }
 }
