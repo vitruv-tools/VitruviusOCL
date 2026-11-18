@@ -13,46 +13,67 @@
 
 package tools.vitruv.dsls.vitruvocl.architecture;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.library.freeze.FreezingArchRule;
+import com.tngtech.archunit.library.Architectures.LayeredArchitecture;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.symboltable.AbstractPhaseVisitor;
 
 /**
- * Package dependency rules for the {@code language} module.
+ * Package dependency rules for the {@code language} module: every class belongs to a layer, the
+ * layers depend only downwards, and there are no package cycles.
  *
- * <p>The package cycles that exist today are frozen: they are recorded in the violation store
- * ({@code src/test/archunit_store}, configured in {@code archunit.properties}). Only a new package
- * cycle, i.e. a new sequence of packages, fails the build; new class dependencies along an already
- * frozen cycle are tolerated (see {@link CyclePathViolationMatcher}).
+ * <p>The layer rule fixes the intended direction of every dependency between layers, so an upward
+ * edge fails on its own and does not have to close a cycle first. Cycles between packages of the
+ * same layer (e.g. within {@code evaluator..} or {@code incremental..}) are left to the cycle rule.
+ * ArchUnit's cycle report does not list every elementary cycle of a package graph, which is why the
+ * rules are not reduced to the cycle rule alone.
  *
- * <p>ArchUnit does not report every elementary cycle, and which ones it reports depends on the
- * shape of the package graph. A cycle can therefore vanish from the report without being resolved
- * and reappear after an unrelated change. The store is never updated by a normal run ({@code
- * allowStoreUpdate=false}), so both cases fail the test instead of silently changing the baseline.
- *
- * <p>Refreezing, after removing a cycle or when accepting one deliberately: run this test once with
- * {@code -Darchunit.freeze.refreeze=true -Darchunit.freeze.store.default.allowStoreUpdate=true},
- * check which cycles the store gained or lost, and commit it with the change.
+ * <p>The layers follow the target picture of the architecture plan as far as its packages exist;
+ * the facade and the integrations still share the top layer.
  */
 class ArchitectureTest {
 
   private static final String ROOT_PACKAGE = "tools.vitruv.dsls.vitruvocl";
 
+  /**
+   * A layer and its packages, relative to the root package ({@code ..} includes subpackages, the
+   * empty string is the root package itself).
+   */
+  private record Layer(String name, String... packages) {}
+
+  /** The layers from bottom to top; a layer may only be used by the layers above it. */
+  private static final List<Layer> LAYERS =
+      List.of(
+          new Layer("Parser", ""), // ANTLR-generated lexer and parser in the root package
+          new Layer("Common", "common"),
+          new Layer("Model", "model"),
+          new Layer("Types", "types"),
+          new Layer("SymbolTable", "symboltable"),
+          new Layer("TypeChecker", "typechecker", "operations"),
+          new Layer("Evaluator", "evaluator.."),
+          new Layer("Result", "result"),
+          new Layer("Compiler", "compiler"),
+          new Layer("Incremental", "incremental.."),
+          new Layer("Adapter", "adapter.."),
+          new Layer("Api", "pipeline", "cli", "vitruv"));
+
   private static JavaClasses productionClasses;
 
   /**
-   * Imports only this module's production classes. Importing by package would also pick up
-   * {@code vitruvocl-allinstances}, which shares the root package and, depending on how the build
-   * is invoked, would be read from its {@code target/classes} or from a jar in the local repository.
+   * Imports only this module's production classes. Importing by package would also pick up {@code
+   * vitruvocl-allinstances}, which shares the root package and, depending on how the build is
+   * invoked, would be read from its {@code target/classes} or from a jar in the local repository.
    */
   @BeforeAll
   static void importClasses() {
@@ -69,15 +90,72 @@ class ArchitectureTest {
   }
 
   @Test
-  void packagesHaveNoNewCycles() {
-    ArchRule noCycles =
-        slices()
-            .matching(ROOT_PACKAGE + ".(**)")
-            .namingSlices("$1")
-            .should()
-            .beFreeOfCycles()
-            .as("packages below " + ROOT_PACKAGE + " should be free of cycles");
+  void packagesAreFreeOfCycles() {
+    slices()
+        .matching(ROOT_PACKAGE + ".(**)")
+        .namingSlices("$1")
+        .should()
+        .beFreeOfCycles()
+        .as("packages below " + ROOT_PACKAGE + " should be free of cycles")
+        .check(productionClasses);
+  }
 
-    FreezingArchRule.freeze(noCycles).check(productionClasses);
+  @Test
+  void layersDependOnlyDownwards() {
+    LayeredArchitecture architecture = layeredArchitecture().consideringOnlyDependenciesInLayers();
+    for (Layer layer : LAYERS) {
+      architecture = architecture.layer(layer.name()).definedBy(qualified(layer.packages()));
+    }
+    for (int i = 0; i < LAYERS.size() - 1; i++) {
+      architecture =
+          architecture.whereLayer(LAYERS.get(i).name()).mayOnlyBeAccessedByLayers(namesAbove(i));
+    }
+    architecture
+        .whereLayer(LAYERS.get(LAYERS.size() - 1).name())
+        .mayNotBeAccessedByAnyLayer()
+        .check(productionClasses);
+  }
+
+  /** Without this, a new package would escape the layer rule, which ignores unlisted packages. */
+  @Test
+  void everyClassBelongsToALayer() {
+    String[] allowed =
+        LAYERS.stream()
+            .flatMap(layer -> Arrays.stream(qualified(layer.packages())))
+            .toArray(String[]::new);
+
+    classes()
+        .should()
+        .resideInAnyPackage(allowed)
+        .as("every class belongs to a layer of " + ROOT_PACKAGE)
+        .check(productionClasses);
+  }
+
+  /**
+   * A layer that lists several packages stays non-empty when one of them disappears, so the layer
+   * rule would not notice a renamed or removed package; this test does.
+   */
+  @Test
+  void everyListedPackageExists() {
+    List<String> missing =
+        LAYERS.stream()
+            .flatMap(layer -> Arrays.stream(qualified(layer.packages())))
+            .map(pkg -> pkg.endsWith("..") ? pkg.substring(0, pkg.length() - 2) : pkg)
+            .filter(pkg -> !productionClasses.containPackage(pkg))
+            .toList();
+
+    assertThat(missing).isEmpty();
+  }
+
+  private static String[] qualified(String... packages) {
+    return Arrays.stream(packages)
+        .map(p -> p.isEmpty() ? ROOT_PACKAGE : ROOT_PACKAGE + "." + p)
+        .toArray(String[]::new);
+  }
+
+  private static String[] namesAbove(int index) {
+    return LAYERS.subList(index + 1, LAYERS.size()).stream()
+        .map(Layer::name)
+        .toArray(String[]::new);
   }
 }
