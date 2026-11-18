@@ -19,10 +19,8 @@ import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.EcorePackage;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
@@ -278,19 +276,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       suggestion = null;
     }
 
-    org.antlr.v4.runtime.Token tok = ctx.getStart();
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            suggestion));
+    reportError(ctx.getStart(), message, suggestion);
   }
 
   // ==================== Context Declaration ====================
@@ -729,17 +715,10 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     if (ctx.expCS().size() > 1) {
       for (int i = 1; i < ctx.expCS().size(); i++) {
         org.antlr.v4.runtime.Token bad = ctx.expCS().get(i).getStart();
-        errors.add(
-            new CompileError(
-                bad.getLine(),
-                bad.getCharPositionInLine(),
-                bad.getLine(),
-                bad.getCharPositionInLine() + bad.getText().length(),
-                "Missing logical operator before this expression — did you mean 'and', 'or', or"
-                    + " 'implies'?",
-                ErrorSeverity.ERROR,
-                PHASE_TAG,
-                null));
+        reportError(
+            bad,
+            "Missing logical operator before this expression — did you mean 'and', 'or', or"
+                + " 'implies'?");
       }
       return Type.ERROR;
     }
@@ -797,16 +776,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
         e != null
             ? e.getCharPositionInLine() + e.getText().length()
             : s.getCharPositionInLine() + s.getText().length();
-    errors.add(
-        new CompileError(
-            s.getLine(),
-            s.getCharPositionInLine(),
-            endLine,
-            endCol,
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportSpanError(s, endLine, endCol, message);
   }
 
   /**
@@ -832,20 +802,9 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       side = "right-hand operand is";
     }
 
-    errors.add(
-        new CompileError(
-            op.getLine(),
-            op.getCharPositionInLine(),
-            op.getLine(),
-            op.getCharPositionInLine() + op.getText().length(),
-            "Missing or invalid operand for '"
-                + op.getText()
-                + "' — "
-                + side
-                + " missing or invalid",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportError(
+        op,
+        "Missing or invalid operand for '" + op.getText() + "' — " + side + " missing or invalid");
     return false;
   }
 
@@ -955,18 +914,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       default -> "";
     };
 
-    org.antlr.v4.runtime.Token tok = ctx.op;
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            "Invalid operator `" + op + "`" + hint,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportError(ctx.op, "Invalid operator `" + op + "`" + hint);
 
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
@@ -990,17 +938,12 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
         }
       }
     }
-    errors.add(
-        new CompileError(
-            eq.getLine(),
-            eq.getCharPositionInLine(),
-            eq.getLine(),
-            eq.getCharPositionInLine() + 1,
-            "Use '==' for equality comparison, not '='",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            "=="));
+    reportSpanError(
+        eq,
+        eq.getLine(),
+        eq.getCharPositionInLine() + 1,
+        "Use '==' for equality comparison, not '='",
+        "==");
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
   }
@@ -1009,17 +952,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   public Type visitMultiEqualsOp(VitruvOCLParser.MultiEqualsOpContext ctx) {
     visit(ctx.left);
     visit(ctx.right);
-    errors.add(
-        new CompileError(
-            ctx.op.getLine(),
-            ctx.op.getCharPositionInLine(),
-            ctx.op.getLine(),
-            ctx.op.getCharPositionInLine() + ctx.op.getText().length(),
-            "Invalid operator '" + ctx.op.getText() + "' — did you mean '=='?",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            "=="));
+    reportError(ctx.op, "Invalid operator '" + ctx.op.getText() + "' — did you mean '=='?", "==");
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
   }
@@ -1377,16 +1310,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
     if (!leftType.isConformantTo(Type.BOOLEAN)) {
       org.antlr.v4.runtime.Token ls = ctx.left.getStart();
-      errors.add(
-          new CompileError(
-              ls.getLine(),
-              ls.getCharPositionInLine(),
-              ls.getLine(),
-              ls.getCharPositionInLine() + ls.getText().length(),
-              "Left operand of 'implies' must be Boolean, got " + leftType,
-              ErrorSeverity.ERROR,
-              PHASE_TAG,
-              null));
+      reportError(ls, "Left operand of 'implies' must be Boolean, got " + leftType);
     }
 
     if (!rightType.isConformantTo(Type.BOOLEAN)) {
@@ -1396,31 +1320,17 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       if (badCallSpan.length > 0) {
         org.antlr.v4.runtime.Token opTok = tokens.get(badCallSpan[0]);
         org.antlr.v4.runtime.Token endTok = tokens.get(badCallSpan[1]);
-        errors.add(
-            new CompileError(
-                opTok.getLine(),
-                opTok.getCharPositionInLine(),
-                endTok.getLine(),
-                endTok.getCharPositionInLine() + endTok.getText().length(),
-                "'"
-                    + opTok.getText()
-                    + "(~, ...)' has invalid arguments — check for syntax errors inside the"
-                    + " parentheses",
-                ErrorSeverity.ERROR,
-                PHASE_TAG,
-                null));
+        reportSpanError(
+            opTok,
+            endTok.getLine(),
+            endTok.getCharPositionInLine() + endTok.getText().length(),
+            "'"
+                + opTok.getText()
+                + "(~, ...)' has invalid arguments — check for syntax errors inside the"
+                + " parentheses");
       } else {
         org.antlr.v4.runtime.Token rs = ctx.right.getStart();
-        errors.add(
-            new CompileError(
-                rs.getLine(),
-                rs.getCharPositionInLine(),
-                rs.getLine(),
-                rs.getCharPositionInLine() + rs.getText().length(),
-                "Right operand of 'implies' must be Boolean, got " + rightType,
-                ErrorSeverity.ERROR,
-                PHASE_TAG,
-                null));
+        reportError(rs, "Right operand of 'implies' must be Boolean, got " + rightType);
       }
     }
 
@@ -2776,16 +2686,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
         stop != null
             ? stop.getCharPositionInLine() + stop.getText().length()
             : start.getCharPositionInLine() + ctx.getText().length();
-    errors.add(
-        new CompileError(
-            start.getLine(),
-            start.getCharPositionInLine(),
-            endLine,
-            endCol,
-            "'" + opName + "' requires '| <body>' after the iterator variable(s)",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportSpanError(
+        start,
+        endLine,
+        endCol,
+        "'" + opName + "' requires '| <body>' after the iterator variable(s)");
     return Type.ERROR;
   }
 
@@ -2803,16 +2708,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
         stop != null
             ? stop.getCharPositionInLine() + stop.getText().length()
             : start.getCharPositionInLine() + ctx.getText().length();
-    errors.add(
-        new CompileError(
-            start.getLine(),
-            start.getCharPositionInLine(),
-            endLine,
-            endCol,
-            "'" + opName + "' takes no arguments",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportSpanError(start, endLine, endCol, "'" + opName + "' takes no arguments");
     return Type.ERROR;
   }
 
@@ -2836,17 +2732,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       suggestion = name + "(...)";
       message = "'" + name + "' is an operation that requires arguments — use '" + suggestion + "'";
     }
-    errors.add(
-        new CompileError(
-            op.getLine(),
-            op.getCharPositionInLine(),
-            op.getLine(),
-            op.getCharPositionInLine() + op.getText().length(),
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            suggestion));
+    reportError(op, message, suggestion);
     return Type.ERROR;
   }
 
@@ -3354,18 +3240,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
           stop != null
               ? stop.getCharPositionInLine() + stop.getText().length()
               : start.getCharPositionInLine() + callCtx.getText().length();
-      errors.add(
-          new CompileError(
-              start.getLine(),
-              start.getCharPositionInLine(),
-              endLine,
-              endCol,
-              "'"
-                  + opName
-                  + "(~, ...)' has invalid arguments — check for extra or misplaced commas",
-              ErrorSeverity.ERROR,
-              PHASE_TAG,
-              null));
+      reportSpanError(
+          start,
+          endLine,
+          endCol,
+          "'" + opName + "(~, ...)' has invalid arguments — check for extra or misplaced commas");
     }
     return true;
   }
@@ -3417,17 +3296,10 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     if (!isExprStart) {
       return false;
     }
-    errors.add(
-        new CompileError(
-            next.getLine(),
-            next.getCharPositionInLine(),
-            next.getLine(),
-            next.getCharPositionInLine() + next.getText().length(),
-            "Missing logical operator before this expression — did you mean 'and', 'or', or"
-                + " 'implies'?",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportError(
+        next,
+        "Missing logical operator before this expression — did you mean 'and', 'or', or"
+            + " 'implies'?");
     return true;
   }
 
@@ -3460,16 +3332,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     if (!COMPARISON_OPS.contains(opTok.getText())) {
       return false;
     }
-    errors.add(
-        new CompileError(
-            opTok.getLine(),
-            opTok.getCharPositionInLine(),
-            opTok.getLine(),
-            opTok.getCharPositionInLine() + opTok.getText().length(),
-            "Missing right-hand operand for '" + opTok.getText() + "'",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportError(opTok, "Missing right-hand operand for '" + opTok.getText() + "'");
     return true;
   }
 
@@ -4037,16 +3900,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
           (stop != null
               ? stop.getCharPositionInLine() + stop.getText().length()
               : start.getCharPositionInLine() + start.getText().length());
-      errors.add(
-          new CompileError(
-              start.getLine(),
-              start.getCharPositionInLine(),
-              (stop != null ? stop.getLine() : start.getLine()),
-              endCol,
-              "Type filter must be a metaclass (e.g. persons::Person), got: " + baseType,
-              ErrorSeverity.ERROR,
-              PHASE_TAG,
-              null));
+      reportSpanError(
+          start,
+          stop != null ? stop.getLine() : start.getLine(),
+          endCol,
+          "Type filter must be a metaclass (e.g. persons::Person), got: " + baseType);
       return Type.ERROR;
     }
 
@@ -4091,19 +3949,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
             ? "Unknown filter option '" + typed + ERR_DID_YOU_MEAN + best + "'?"
             : "Unknown filter option '" + typed + "' — valid options are 'Tag' and 'Type'";
 
-    org.antlr.v4.runtime.Token tok = ctx.badKey;
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            best));
+    reportError(ctx.badKey, message, best);
 
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
@@ -4112,19 +3958,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   @Override
   public Type visitInvalidFilterArg(VitruvOCLParser.InvalidFilterArgContext ctx) {
     org.antlr.v4.runtime.Token tok = ctx.badArg;
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            "Invalid filter argument '"
-                + tok.getText()
-                + "' — expected 'Type = <type>' or 'Tag = <string>'",
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null));
+    reportError(
+        tok,
+        "Invalid filter argument '"
+            + tok.getText()
+            + "' — expected 'Type = <type>' or 'Tag = <string>'");
     return Type.ERROR;
   }
 
@@ -4140,16 +3978,11 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
           (stop != null
               ? stop.getCharPositionInLine() + stop.getText().length()
               : start.getCharPositionInLine() + start.getText().length());
-      errors.add(
-          new CompileError(
-              start.getLine(),
-              start.getCharPositionInLine(),
-              (stop != null ? stop.getLine() : start.getLine()),
-              endCol,
-              "Tag filter value must be String, got " + bare,
-              ErrorSeverity.ERROR,
-              PHASE_TAG,
-              null));
+      reportSpanError(
+          start,
+          stop != null ? stop.getLine() : start.getLine(),
+          endCol,
+          "Tag filter value must be String, got " + bare);
     }
     nodeTypes.put(ctx, Type.ANY);
     return Type.ANY;
@@ -4286,19 +4119,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
                 + ERR_OP_DOES_NOT_EXIST
                 + " (valid correspondence ops: select, reject, exists)";
 
-    org.antlr.v4.runtime.Token tok = ctx.opName;
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            best));
+    reportError(ctx.opName, message, best);
 
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
@@ -4342,19 +4163,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       suggestion = best; // still offer a Quick Fix to the closest keyword op
     }
 
-    org.antlr.v4.runtime.Token tok = ctx.op;
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            suggestion));
+    reportError(ctx.op, message, suggestion);
 
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
@@ -4389,19 +4198,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       suggestion = null;
     }
 
-    org.antlr.v4.runtime.Token tok = ctx.opName;
-    int endCol = tok.getCharPositionInLine() + tok.getText().length();
-    errors.add(
-        new CompileError(
-            tok.getLine(),
-            tok.getCharPositionInLine(),
-            tok.getLine(),
-            endCol,
-            message,
-            ErrorSeverity.ERROR,
-            PHASE_TAG,
-            null,
-            suggestion));
+    reportError(ctx.opName, message, suggestion);
 
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;

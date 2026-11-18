@@ -1,0 +1,126 @@
+# Characterization snapshot of the type checker's error-recovery diagnostics (RecoveryDiagnosticsTest).
+# Each case: "### <name>", the invariant body (appended to "context family::Member inv:" plus a new line
+# and two spaces), then one "=> " line per diagnostic:
+# <line>:<column>-<endLine>:<endColumn> <severity> <source> code=<errorCode> fix=<suggestion> | <message>
+# Lines starting with "# " are comments; empty lines are ignored.
+
+### undefinedVariableWithSuggestion
+selff.firstName == "Homer"
+=> 2:2-2:7 ERROR type-checker code=null fix=self | Undefined variable 'selff' — did you mean 'self'?
+
+### undefinedVariable
+foo == 1
+=> 2:2-2:5 ERROR type-checker code=null fix=null | Undefined variable: foo
+
+### missingLogicalOperatorBetweenSpecExpressions
+self.firstName == "a" self.firstName == "b"
+=> 2:24-2:28 ERROR type-checker code=null fix=null | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### missingLogicalOperatorBeforeLiteral
+self.firstName == "a" "b" == "c"
+=> 2:24-2:27 ERROR type-checker code=null fix=null | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### missingLogicalOperatorBeforeNot
+true not false
+=> 2:7-2:10 ERROR type-checker code=null fix=null | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### equalityOnCollections
+persons::Person.allInstances() == persons::Person.allInstances()
+=> 2:2-2:66 ERROR type-checker code=null fix=null | Equality requires single values, not collections: <persons::Person> and <persons::Person>
+
+### invalidOperandInParentheses
+(self.firstName == ) and true
+=> 2:18-2:20 ERROR type-checker code=null fix=null | Missing or invalid operand for '==' — right-hand operand is missing or invalid
+
+### invalidOperatorSequenceNotEquals
+1 <> 2
+=> 2:4-2:6 ERROR type-checker code=null fix=null | Invalid operator `<>` — did you mean `!=`? (OCL standard `<>` is not supported)
+
+### invalidOperatorSequence
+1 ** 2
+=> 2:4-2:6 ERROR type-checker code=null fix=null | Invalid operator `**`
+
+### invalidOperatorSequencePlusMinus
+1 +- 2
+=> 2:4-2:6 ERROR type-checker code=null fix=null | Invalid operator `+-` — use `+` or `-` as separate operators
+
+### singleEquals
+self.firstName = "Homer"
+=> 2:17-2:18 ERROR type-checker code=null fix=== | Use '==' for equality comparison, not '='
+
+### tripleEquals
+self.firstName === "Homer"
+=> 2:17-2:20 ERROR type-checker code=null fix=== | Invalid operator '===' — did you mean '=='?
+
+### impliesLeftNotBoolean
+1 implies true
+=> 2:2-2:3 ERROR type-checker code=null fix=null | Left operand of 'implies' must be Boolean, got Integer
+
+### impliesRightNotBoolean
+true implies 1
+=> 2:15-2:16 ERROR type-checker code=null fix=null | Right operand of 'implies' must be Boolean, got Integer
+
+### correspondenceFilterParseErrorAfterImplies
+self.firstName == "Homer" implies
+    persons::Person.allInstances().reject(~, , , Tag = "x").isEmpty()
+=> 3:35-3:59 ERROR type-checker code=null fix=null | 'reject(~, ...)' has invalid arguments — check for extra or misplaced commas
+
+### correspondenceFilterParseError
+persons::Person.allInstances().select(~, , Tag = "x").notEmpty()
+=> 2:33-2:55 ERROR type-checker code=null fix=null | 'select(~, ...)' has invalid arguments — check for extra or misplaced commas
+
+### iteratorWithoutBody
+persons::Person.allInstances().select(x).notEmpty()
+=> 2:33-2:42 ERROR type-checker code=null fix=null | 'select' requires '| <body>' after the iterator variable(s)
+
+### noArgumentOperationWithArguments
+persons::Person.allInstances().size(1) > 0
+=> 2:33-2:40 ERROR type-checker code=null fix=null | 'size' takes no arguments
+
+### operationWithoutParentheses
+persons::Person.allInstances().size > 0
+=> 2:33-2:37 ERROR type-checker code=null fix=size() | 'size' is an operation — add parentheses: 'size()'
+
+### operationWithArgumentsWithoutParentheses
+5.div > 1
+=> 2:4-2:7 ERROR type-checker code=null fix=div(...) | 'div' is an operation that requires arguments — use 'div(...)'
+
+### missingRightOperandBeforeParenthesis
+self.firstName == )
+=> 2:17-2:19 ERROR type-checker code=null fix=null | Missing right-hand operand for '=='
+
+### missingRightOperandAtEnd
+self.firstName <
+=> 2:17-2:18 ERROR type-checker code=null fix=null | Missing right-hand operand for '<'
+
+### typeFilterNotMetaclass
+persons::Person.allInstances().select(~, Type = "momma").notEmpty()
+=> 2:43-2:57 ERROR type-checker code=null fix=null | Type filter must be a metaclass (e.g. persons::Person), got: String
+
+### unknownFilterOption
+persons::Person.allInstances().select(~, Tags = "x").notEmpty()
+=> 2:43-2:47 ERROR type-checker code=null fix=Tag | Unknown filter option 'Tags' — did you mean 'Tag'?
+
+### invalidFilterArgument
+persons::Person.allInstances().select(~, Husband).notEmpty()
+=> 2:43-2:50 ERROR type-checker code=null fix=null | Invalid filter argument 'Husband' — expected 'Type = <type>' or 'Tag = <string>'
+
+### tagFilterNotString
+persons::Person.allInstances().select(~, Tag = 3).notEmpty()
+=> 2:43-2:50 ERROR type-checker code=null fix=null | Tag filter value must be String, got Integer
+
+### unknownCorrespondenceOperation
+persons::Person.allInstances().selct(~).notEmpty()
+=> 2:33-2:38 ERROR type-checker code=null fix=select | Unknown operation 'selct' — did you mean 'select'?
+
+### unknownBinaryOperatorWithSuggestion
+true andd false
+=> 2:7-2:11 ERROR type-checker code=null fix=and | Unknown operator 'andd' — did you mean 'and'?
+
+### unknownBinaryOperator
+1 foo 2
+=> 2:4-2:7 ERROR type-checker code=null fix=or | Unknown operator 'foo' — this operator does not exist
+
+### unknownOperation
+persons::Person.allInstances().sizee() > 0
+=> 2:33-2:38 ERROR type-checker code=null fix=size | Unknown operation 'sizee' — did you mean 'size'?

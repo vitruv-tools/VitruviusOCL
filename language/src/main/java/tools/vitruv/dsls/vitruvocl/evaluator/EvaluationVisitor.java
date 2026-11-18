@@ -168,7 +168,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    *   <li>Push [2,3] → visit size → pop → result 2
    * </ol>
    */
-  private Deque<Value> receiverStack = new ArrayDeque<>();
+  private final Deque<Value> receiverStack = new ArrayDeque<>();
 
   /** The values of the variables of this evaluation; the symbols themselves carry no values. */
   private final Environment environment = new Environment();

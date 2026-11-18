@@ -16,6 +16,7 @@ package tools.vitruv.dsls.vitruvocl.symboltable;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLBaseVisitor;
+import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
@@ -120,13 +121,66 @@ public abstract class AbstractPhaseVisitor<T> extends VitruvOCLBaseVisitor<T> {
   }
 
   /**
-   * Records an error at the given token's position.
+   * Records an error that covers exactly the text of the given token.
    *
-   * @param token Token providing the error location
+   * @param token Token whose text is the error range
    * @param message Human-readable error message
    */
   protected void reportError(Token token, String message) {
-    errors.add(token, message, ErrorSeverity.ERROR, phaseTag());
+    reportError(token, message, null);
+  }
+
+  /**
+   * Records an error that covers exactly the text of the given token and offers a quick fix.
+   *
+   * @param token Token whose text is the error range
+   * @param message Human-readable error message
+   * @param suggestion Replacement text for a quick fix, or {@code null} for none
+   */
+  protected void reportError(Token token, String message, String suggestion) {
+    reportSpanError(
+        token,
+        token.getLine(),
+        token.getCharPositionInLine() + token.getText().length(),
+        message,
+        suggestion);
+  }
+
+  /**
+   * Records an error that starts at the given token and ends at an explicit position.
+   *
+   * @param start Token whose start position is the start of the error range
+   * @param endLine Line where the error range ends
+   * @param endColumn Column (exclusive) where the error range ends
+   * @param message Human-readable error message
+   */
+  protected void reportSpanError(Token start, int endLine, int endColumn, String message) {
+    reportSpanError(start, endLine, endColumn, message, null);
+  }
+
+  /**
+   * Records an error that starts at the given token, ends at an explicit position and offers a
+   * quick fix.
+   *
+   * @param start Token whose start position is the start of the error range
+   * @param endLine Line where the error range ends
+   * @param endColumn Column (exclusive) where the error range ends
+   * @param message Human-readable error message
+   * @param suggestion Replacement text for a quick fix, or {@code null} for none
+   */
+  protected void reportSpanError(
+      Token start, int endLine, int endColumn, String message, String suggestion) {
+    errors.add(
+        new CompileError(
+            start.getLine(),
+            start.getCharPositionInLine(),
+            endLine,
+            endColumn,
+            message,
+            ErrorSeverity.ERROR,
+            phaseTag(),
+            null,
+            suggestion));
   }
 
   /**
