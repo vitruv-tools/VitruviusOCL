@@ -25,7 +25,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Function;
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnumLiteral;
@@ -74,10 +73,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   private static final String PHASE_TAG = "evaluator";
 
-  /** Matches {@code {self.attr}} placeholders in {@code @message} templates. */
-  private static final java.util.regex.Pattern SELF_ATTRIBUTE_PLACEHOLDER =
-      java.util.regex.Pattern.compile("\\{self\\.([a-zA-Z_]\\w*)\\}");
-
   // ==================== Instance Fields ====================
 
   /**
@@ -89,15 +84,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private final ParseTreeProperty<Type> nodeTypes;
 
   /**
-   * EObject instances that violated a constraint, in evaluation order.
-   *
-   * <p>Populated during {@link #visitClassifierContextCS}: one entry per instance where the
-   * invariant evaluated to false. Used by callers to produce precise violation messages.
-   */
-  private final List<EObject> violatingInstances = new ArrayList<>();
-
-  /**
-   * Violation records produced during evaluation, one per violated invariant instance.
+   * Violation records produced during evaluation, one per violated constraint (inv, pre or post)
+   * and instance.
    *
    * @param severity The @severity value (never null; defaults to "WARNING").
    * @param customMessage The interpolated @message template, or {@code null} when no @message
@@ -105,8 +93,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * @param instance The EObject that violated the constraint.
    */
   public record ViolationRecord(String severity, String customMessage, EObject instance) {}
-
-  private final List<ViolationRecord> violationRecords = new ArrayList<>();
 
   /**
    * One {@code pre}/{@code post} block that was not evaluated because this {@link
@@ -120,7 +106,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   public record SkippedConstraint(String kind, String blockName, String contextName) {}
 
-  private final List<SkippedConstraint> skippedConstraints = new ArrayList<>();
+  /** Violations and skipped blocks recorded during this evaluation run. */
+  private final ConstraintResultRecorder resultRecorder = new ConstraintResultRecorder();
 
   /**
    * Number of context instances {@link #visitClassifierContextCS} evaluated its inv/pre/post blocks
@@ -226,14 +213,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    */
   private final boolean correspondenceFastPaths;
 
-  /**
-   * Per constraint (parse-tree root): whether nothing outside an operand can carry an error into
-   * it; see {@link #cannotReportErrors}.
-   */
-  private final Map<ParseTree, Boolean> constraintCarriesNoErrors = new IdentityHashMap<>();
-
-  /** Result of {@link #isErrorFree} per parse-tree node. */
-  private final Map<ParseTree, Boolean> errorFreeNodes = new IdentityHashMap<>();
+  /** Decides which logical operands can be skipped without hiding a runtime error. */
+  private final ErrorFreeAnalysis errorFreeAnalysis;
 
   /**
    * Value of each number and string literal node, computed once instead of re-parsing the literal
@@ -302,6 +283,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       boolean transactionSupported) {
     super(st, specification, errors);
     this.nodeTypes = nodeTypes;
+    this.errorFreeAnalysis = new ErrorFreeAnalysis(nodeTypes);
     this.transaction = new TransactionModel(transactionChanges);
     this.transactionSupported = transactionSupported;
     this.correspondenceFastPaths = !Boolean.getBoolean(PROP_NO_CORRESPONDENCE_FAST_PATHS);
@@ -455,33 +437,26 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
         // but this keeps the loop correct regardless of what a future invariant body might touch.
         symbolTable.enterScope(instanceScope);
         Value invResult = visit(inv);
-        recordConstraintResult(invResult, allResults, instance, inv.annotationCS());
+        resultRecorder.record(invResult, allResults, instance, inv.annotationCS());
       }
       for (VitruvOCLParser.PreCSContext pre : preconditions) {
         symbolTable.enterScope(instanceScope);
         Value preResult = visit(pre);
-        recordConstraintResult(preResult, allResults, instance, pre.annotationCS());
+        resultRecorder.record(preResult, allResults, instance, pre.annotationCS());
       }
       for (VitruvOCLParser.PostCSContext post : postconditions) {
         symbolTable.enterScope(instanceScope);
         Value postResult = visit(post);
-        recordConstraintResult(postResult, allResults, instance, post.annotationCS());
+        resultRecorder.record(postResult, allResults, instance, post.annotationCS());
       }
 
       exitScope(instanceScope);
       environment.dropBindingsSince(contextBindings);
     }
 
-    // pre/post require a transaction this evaluation run doesn't have — record once per context
-    // (not per instance: which blocks are skipped is a static, instance-independent fact).
-    if (!transactionSupported && (!ctx.preCS().isEmpty() || !ctx.postCS().isEmpty())) {
-      String contextName = describeContextForSkipNotice(ctx);
-      for (VitruvOCLParser.PreCSContext pre : ctx.preCS()) {
-        skippedConstraints.add(new SkippedConstraint("pre", nameOf(pre.ID()), contextName));
-      }
-      for (VitruvOCLParser.PostCSContext post : ctx.postCS()) {
-        skippedConstraints.add(new SkippedConstraint("post", nameOf(post.ID()), contextName));
-      }
+    // pre/post need a transaction this evaluation run doesn't have
+    if (!transactionSupported) {
+      resultRecorder.recordSkippedBlocks(ctx);
     }
 
     return Value.of(allResults, Type.bag(Type.BOOLEAN));
@@ -528,29 +503,13 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return selfSymbol;
   }
 
-  private static String nameOf(org.antlr.v4.runtime.tree.TerminalNode idToken) {
-    return idToken != null ? idToken.getText() : null;
-  }
-
-  /** Best-effort display name for a context header, used only in skip notices. */
-  private static String describeContextForSkipNotice(
-      VitruvOCLParser.ClassifierContextCSContext ctx) {
-    if (ctx.metamodel != null && ctx.className != null) {
-      return ctx.metamodel.getText() + "::" + ctx.className.getText();
-    }
-    if (ctx.contextName != null) {
-      return ctx.contextName.getText();
-    }
-    return "<context>";
-  }
-
   /**
    * Returns the {@code pre}/{@code post} blocks that were not evaluated because this evaluation run
    * has no transaction context (see {@link #transactionSupported}). Empty whenever transaction
    * support is enabled, or whenever the evaluated document has no {@code pre}/{@code post} blocks.
    */
   public List<SkippedConstraint> getSkippedConstraints() {
-    return Collections.unmodifiableList(skippedConstraints);
+    return resultRecorder.skippedConstraints();
   }
 
   /**
@@ -574,30 +533,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /**
-   * Shared bookkeeping for one inv/pre/post evaluation result against one instance: appends the
-   * boolean element to {@code allResults} and, if the result is false (or unreadable as a
-   * boolean), records the instance as violating with its severity/message annotations.
-   */
-  private void recordConstraintResult(
-      Value result,
-      List<OCLElement> allResults,
-      EObject instance,
-      List<VitruvOCLParser.AnnotationCSContext> annotations) {
-    if (result == null || result.isEmpty()) {
-      return;
-    }
-    OCLElement elem = result.getElements().get(0);
-    allResults.add(elem);
-    Boolean boolResult = elem.tryGetBool();
-    if (boolResult == null || !boolResult) {
-      violatingInstances.add(instance);
-      String severity = extractSeverity(annotations);
-      String customMessage = extractCustomMessage(annotations, instance);
-      violationRecords.add(new ViolationRecord(severity, customMessage, instance));
-    }
-  }
-
-  /**
    * Returns EObject instances that violated the constraint during evaluation.
    *
    * <p>Each entry corresponds to one invariant evaluation that returned false. Call after visiting
@@ -606,67 +541,15 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * @return Unmodifiable list of violating EObjects in evaluation order
    */
   public List<EObject> getViolatingInstances() {
-    return Collections.unmodifiableList(violatingInstances);
+    return resultRecorder.violatingInstances();
   }
 
   /**
-   * Returns violation records produced during the last evaluation, one per violated invariant
-   * instance.
+   * Returns violation records produced during the last evaluation, one per violated constraint
+   * (inv, pre or post) and instance.
    */
   public List<ViolationRecord> getViolationRecords() {
-    return Collections.unmodifiableList(violationRecords);
-  }
-
-  private String extractSeverity(List<VitruvOCLParser.AnnotationCSContext> annotations) {
-    for (VitruvOCLParser.AnnotationCSContext ann : annotations) {
-      if (ann instanceof VitruvOCLParser.SeverityAnnotationContext sev) {
-        return sev.severityValue.getText();
-      }
-    }
-    return "WARNING";
-  }
-
-  /**
-   * Returns the interpolated {@code @message} template for the constraint, or {@code null} when no
-   * {@code @message} annotation is present.
-   */
-  private String extractCustomMessage(
-      List<VitruvOCLParser.AnnotationCSContext> annotations, EObject instance) {
-    for (VitruvOCLParser.AnnotationCSContext ann : annotations) {
-      if (ann instanceof VitruvOCLParser.MessageAnnotationContext msg) {
-        String raw = msg.message.getText();
-        String template = raw.length() >= 2 ? raw.substring(1, raw.length() - 1) : raw;
-        return interpolateTemplate(template, instance);
-      }
-    }
-    return null;
-  }
-
-  @SuppressWarnings("java:S125")
-  private String interpolateTemplate(String template, EObject instance) {
-    // Replace {self.attr}
-    java.util.regex.Matcher m = SELF_ATTRIBUTE_PLACEHOLDER.matcher(template);
-    StringBuffer sb = new StringBuffer();
-    while (m.find()) {
-      String attr = m.group(1);
-      org.eclipse.emf.ecore.EStructuralFeature feature =
-          instance.eClass().getEStructuralFeature(attr);
-      String val;
-      if (feature == null) {
-        val = "{" + attr + "}";
-      } else {
-        String raw = String.valueOf(instance.eGet(feature));
-        boolean isString =
-            feature.getEType() == org.eclipse.emf.ecore.EcorePackage.Literals.ESTRING;
-        val = isString ? "\"" + raw + "\"" : raw;
-      }
-      m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(val));
-    }
-    m.appendTail(sb);
-    // Replace bare {self}
-    return sb.toString()
-        .replace(
-            "{self}", instance.eClass().getName() + "@" + Integer.toHexString(instance.hashCode()));
+    return resultRecorder.violationRecords();
   }
 
   // ==================== Annotations ====================
@@ -1443,7 +1326,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitLogicalAnd(VitruvOCLParser.LogicalAndContext ctx) {
     Value leftValue = visit(ctx.left);
     // anything but a single true makes the conjunction false for every value of R
-    if (!isTrue(leftValue) && cannotReportErrors(ctx.right)) {
+    if (!isTrue(leftValue) && errorFreeAnalysis.cannotReportErrors(ctx.right)) {
       countShortCircuit(ctx.left);
       return Value.boolValue(false);
     }
@@ -1468,7 +1351,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   @Override
   public Value visitLogicalOr(VitruvOCLParser.LogicalOrContext ctx) {
     Value leftValue = visit(ctx.left);
-    if (isTrue(leftValue) && cannotReportErrors(ctx.right)) {
+    if (isTrue(leftValue) && errorFreeAnalysis.cannotReportErrors(ctx.right)) {
       return Value.boolValue(true); // true or R is true for every value of R, even an undefined one
     }
     Value rightValue = visit(ctx.right);
@@ -1559,7 +1442,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   public Value visitImplication(VitruvOCLParser.ImplicationContext ctx) {
     Value leftValue = visit(ctx.left);
     // anything but a single true makes the implication true for every value of R
-    if (!isTrue(leftValue) && cannotReportErrors(ctx.right)) {
+    if (!isTrue(leftValue) && errorFreeAnalysis.cannotReportErrors(ctx.right)) {
       countShortCircuit(ctx.left);
       return Value.boolValue(true);
     }
@@ -2730,175 +2613,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /**
-   * Whether skipping {@code operand} is unobservable: no expression evaluated while {@code operand}
-   * is evaluated can report a runtime error or throw because of the constraint's own content.
-   *
-   * <p>The evaluator reports runtime errors only for comparisons whose operands are not singletons
-   * at runtime, for invalid regular expressions in {@code matches()} and for unbound variables
-   * (excluded by the type checker), and throws for integer
-   * literals that do not fit an {@code int} and for {@code substring} bounds that are no integers.
-   * The check covers {@code operand}, every {@code let} initializer of the constraint (a lazily
-   * evaluated {@code let} value from outside can be forced inside {@code operand}; lazy {@code
-   * select}/{@code reject}/{@code collect} results whose body could report an error are evaluated
-   * strictly where they occur, so they cannot carry an error inside), and the absence of {@code
-   * append}/{@code iterate} anywhere in the constraint (their result types are not trusted, as in
-   * the incremental analysis, so variables bound to their elements may be mistyped). Within these
-   * parts it requires: no {@code matches}, no node typed {@code OclAny} or erroneous (an {@code
-   * OclAny} may hold a collection), every comparison operand of a non-collection type, and every
-   * integer literal within {@code int} range.
-   * Exceptions from the model access itself (the wrapper) are infrastructure failures and are not
-   * considered.
-   */
-  private boolean cannotReportErrors(ParserRuleContext operand) {
-    return isErrorFree(operand)
-        && constraintCarriesNoErrors.computeIfAbsent(
-            root(operand),
-            root -> !containsUntrustedTypes(root) && letInitializersErrorFree(root));
-  }
-
-  /**
-   * Whether {@code node}'s subtree contains an {@code append} or {@code iterate}: their result
-   * types are not checked against the values they hold, so variables bound to their elements
-   * anywhere in the constraint may hold values of another type than their static one.
-   */
-  private static boolean containsUntrustedTypes(ParseTree node) {
-    if (node instanceof VitruvOCLParser.AppendOpContext
-        || node instanceof VitruvOCLParser.IterateOpContext) {
-      return true;
-    }
-    for (int i = 0; i < node.getChildCount(); i++) {
-      if (containsUntrustedTypes(node.getChild(i))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** Whether every {@code let} initializer below {@code node} is error-free. */
-  private boolean letInitializersErrorFree(ParseTree node) {
-    if (node instanceof VitruvOCLParser.VariableDeclarationContext declaration
-        && declaration.varInit != null
-        && !isErrorFree(declaration.varInit)) {
-      return false;
-    }
-    for (int i = 0; i < node.getChildCount(); i++) {
-      if (!letInitializersErrorFree(node.getChild(i))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /** Whether no node of {@code node}'s subtree can report an error; memoized per node. */
-  private boolean isErrorFree(ParseTree node) {
-    Boolean known = errorFreeNodes.get(node);
-    if (known == null) {
-      known = computeErrorFree(node);
-      errorFreeNodes.put(node, known);
-    }
-    return known;
-  }
-
-  private boolean computeErrorFree(ParseTree node) {
-    if (node instanceof VitruvOCLParser.AppendOpContext
-        || node instanceof VitruvOCLParser.IterateOpContext
-        || node instanceof VitruvOCLParser.MatchesOpContext) {
-      return false; // matches() reports an invalid regular expression at runtime
-    }
-    if (isUntyped(nodeTypes.get(node))) {
-      return false;
-    }
-    if (isComparison(node)) {
-      ParserRuleContext ctx = (ParserRuleContext) node;
-      for (ParseTree side : List.of(ctx.getChild(0), ctx.getChild(ctx.getChildCount() - 1))) {
-        Type type = staticType(side);
-        if (type == null || type.isCollection() || isUntyped(type)) {
-          return false;
-        }
-      }
-    }
-    if (node instanceof VitruvOCLParser.NumberLitContext literal
-        && !fitsLiteral(literal.getText())) {
-      return false;
-    }
-    if (node instanceof VitruvOCLParser.SubstringOpContext substring
-        && !(isInteger(staticType(substring.start)) && isInteger(staticType(substring.end)))) {
-      return false; // visitSubstringOp casts both bounds to IntValue
-    }
-    for (int i = 0; i < node.getChildCount(); i++) {
-      if (!isErrorFree(node.getChild(i))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /** {@code OclAny} or an error type, also as the element of an optional. */
-  private static boolean isUntyped(Type type) {
-    if (type == null) {
-      return false;
-    }
-    if (type == Type.ANY || type.isError()) {
-      return true;
-    }
-    if (type.isOptional()) {
-      Type element = type.getElementType();
-      return element == Type.ANY || element != null && element.isError();
-    }
-    return false;
-  }
-
-  private static boolean isInteger(Type type) {
-    return type != null && type.equals(Type.INTEGER);
-  }
-
-  /** Mirrors {@link #visitNumberLit}: whether parsing the literal cannot throw. */
-  private static boolean fitsLiteral(String text) {
-    if (text.contains(".") || text.contains("e") || text.contains("E")) {
-      return true;
-    }
-    try {
-      Integer.parseInt(text);
-      return true;
-    } catch (NumberFormatException e) {
-      return false;
-    }
-  }
-
-  /** The type checker's type of {@code node}, looking through single-child wrapper nodes. */
-  private Type staticType(ParseTree node) {
-    ParseTree current = node;
-    while (current != null) {
-      Type type = nodeTypes.get(current);
-      if (type != null) {
-        return type;
-      }
-      current = current.getChildCount() == 1 ? current.getChild(0) : null;
-    }
-    return null;
-  }
-
-  private static boolean isComparison(ParseTree node) {
-    return node instanceof VitruvOCLParser.EqualityComparisonContext
-        || node instanceof VitruvOCLParser.InequalityComparisonContext
-        || node instanceof VitruvOCLParser.LessThanComparisonContext
-        || node instanceof VitruvOCLParser.LessThanOrEqualComparisonContext
-        || node instanceof VitruvOCLParser.GreaterThanComparisonContext
-        || node instanceof VitruvOCLParser.GreaterThanOrEqualComparisonContext
-        || node instanceof VitruvOCLParser.SingleEqualsOpContext
-        || node instanceof VitruvOCLParser.MultiEqualsOpContext
-        || node instanceof VitruvOCLParser.InvalidBinaryOpContext;
-  }
-
-  private static ParseTree root(ParseTree node) {
-    ParseTree current = node;
-    while (current.getParent() != null) {
-      current = current.getParent();
-    }
-    return current;
-  }
-
-  /**
    * Checks if two EObjects are related via a Correspondence.
    *
    * <p>The correspondence is bidirectional: obj1 can appear in leftEObjects or rightEObjects.
@@ -3431,7 +3145,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
     @Override
     public boolean mayReportErrors(ParserRuleContext expression) {
-      return !cannotReportErrors(expression);
+      return !errorFreeAnalysis.cannotReportErrors(expression);
     }
 
     @Override
