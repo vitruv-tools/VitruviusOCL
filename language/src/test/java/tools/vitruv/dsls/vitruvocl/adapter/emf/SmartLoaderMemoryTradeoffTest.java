@@ -20,9 +20,9 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import org.eclipse.emf.ecore.EObject;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 
 /**
  * Measures — without passing performance judgment — the memory-footprint tradeoff introduced by
@@ -100,11 +100,6 @@ class SmartLoaderMemoryTradeoffTest {
           "context spaceMission::Spacecraft inv sm: true",
           "context satelliteSystem::Satellite inv ss: true");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(MODELS);
-  }
-
   /** Counts every EObject reachable from the wrapper's loaded resources (roots + all contents). */
   private static long countLoadedElements(MetamodelWrapper wrapper) {
     long count = 0;
@@ -139,7 +134,7 @@ class SmartLoaderMemoryTradeoffTest {
     long sumOfIndependentSingleConstraintElementCounts = 0;
     for (String constraint : HETEROGENEOUS_CONSTRAINTS) {
       SmartLoader.LoadResult single =
-          SmartLoader.loadForConstraint(constraint, ALL_ECORES, ALL_XMIS);
+          SmartLoader.loadForConstraint(constraint, ALL_ECORES, ALL_XMIS, TestModels.DIRECTORY);
       assertFalse(single.hasErrors(), "single-constraint load failed: " + single.fileErrors);
       long elements = countLoadedElements(single.wrapper);
       maxSingleConstraintElementCount = Math.max(maxSingleConstraintElementCount, elements);
@@ -147,7 +142,8 @@ class SmartLoaderMemoryTradeoffTest {
     }
 
     SmartLoader.LoadResult union =
-        SmartLoader.loadForConstraints(HETEROGENEOUS_CONSTRAINTS, ALL_ECORES, ALL_XMIS);
+        SmartLoader.loadForConstraints(
+            HETEROGENEOUS_CONSTRAINTS, ALL_ECORES, ALL_XMIS, TestModels.DIRECTORY);
     assertFalse(union.hasErrors(), "union load failed: " + union.fileErrors);
     long unionElementCount = countLoadedElements(union.wrapper);
 
@@ -184,7 +180,8 @@ class SmartLoaderMemoryTradeoffTest {
     // Isolated single-constraint scenario.
     long beforeSingle = heapUsedBytes();
     SmartLoader.LoadResult single =
-        SmartLoader.loadForConstraint(HETEROGENEOUS_CONSTRAINTS.get(0), ALL_ECORES, ALL_XMIS);
+        SmartLoader.loadForConstraint(
+            HETEROGENEOUS_CONSTRAINTS.get(0), ALL_ECORES, ALL_XMIS, TestModels.DIRECTORY);
     assertFalse(single.hasErrors());
     long afterSingle = heapUsedBytes();
     final long singleDelta = afterSingle - beforeSingle;
@@ -194,7 +191,8 @@ class SmartLoaderMemoryTradeoffTest {
     // Isolated union scenario (separate JVM state - not directly summed with the above).
     long beforeUnion = heapUsedBytes();
     SmartLoader.LoadResult union =
-        SmartLoader.loadForConstraints(HETEROGENEOUS_CONSTRAINTS, ALL_ECORES, ALL_XMIS);
+        SmartLoader.loadForConstraints(
+            HETEROGENEOUS_CONSTRAINTS, ALL_ECORES, ALL_XMIS, TestModels.DIRECTORY);
     assertFalse(union.hasErrors());
     long afterUnion = heapUsedBytes();
     long unionDelta = afterUnion - beforeUnion;

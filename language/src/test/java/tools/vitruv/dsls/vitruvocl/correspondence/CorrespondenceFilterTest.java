@@ -21,13 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -82,7 +81,7 @@ class CorrespondenceFilterTest {
       Path.of("src/test/resources/test-metamodels/correspondence.ecore");
 
   // ================================================================
-  // Model instance paths (relative — resolved against TEST_MODELS_PATH)
+  // Model instance paths (relative — resolved against TestModels.DIRECTORY)
   // ================================================================
 
   private static final Path FAMILY_MODEL = Path.of("testmodel.family");
@@ -92,17 +91,14 @@ class CorrespondenceFilterTest {
   private static final Path[] ECORES = {FAMILY_ECORE, PERSONS_ECORE, CORRESPONDENCE_ECORE};
   private static final Path[] MODELS = {FAMILY_MODEL, PERSONS_MODEL, CORR_MODEL};
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   // ================================================================
   // Evaluate helper
   // ================================================================
 
   private ConstraintResult eval(String constraint) {
-    return VitruvOclEngine.forFiles(ECORES, MODELS).evaluate(constraint);
+    return VitruvOclEngine.forFiles(ECORES, MODELS)
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(constraint);
   }
 
   // ================================================================
@@ -1182,7 +1178,9 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep3_trivialConstraint() {
     ConstraintResult result =
-        VitruvOclEngine.forFiles(ECORES, MODELS).evaluate("context family::Member inv: true");
+        VitruvOclEngine.forFiles(ECORES, MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate("context family::Member inv: true");
     assertTrue(
         result.isSuccess(), "Trivial constraint should compile: " + result.getWarningsSummary());
     assertTrue(result.isSatisfied(), "Trivial 'true' constraint must be satisfied");
@@ -1192,6 +1190,7 @@ class CorrespondenceFilterTest {
   void debugStep4_oldSelectTildeNoFilter() {
     ConstraintResult result =
         VitruvOclEngine.forFiles(ECORES, MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(
                 """
             context family::Member inv:
@@ -1204,7 +1203,9 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep_trivialTrue() {
     ConstraintResult result =
-        VitruvOclEngine.forFiles(ECORES, MODELS).evaluate("context family::Member inv: true");
+        VitruvOclEngine.forFiles(ECORES, MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate("context family::Member inv: true");
     assertTrue(
         result.isSuccess(), "Trivial constraint must compile: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "Trivial 'true' constraint must be satisfied");

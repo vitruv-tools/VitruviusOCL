@@ -89,19 +89,6 @@ public class MetamodelWrapper implements ModelAccess {
   private static final String REACTIONS_NS_URI =
       "http://vitruv.tools/metamodels/dsls/reactions/runtime/correspondence/1.0";
 
-  /** Default directory for test model files (legacy support). */
-  private static Path testModelsPath = Path.of("test-models");
-
-  /** Returns the current test models path. */
-  public static Path getTestModelsPath() {
-    return testModelsPath;
-  }
-
-  /** Sets the test models path (for test setup). */
-  public static void setTestModelsPath(Path path) {
-    testModelsPath = path;
-  }
-
   /** Maps package names to loaded EPackages. */
   private final Map<String, EPackage> metamodelRegistry = new HashMap<>();
 
@@ -750,16 +737,6 @@ public class MetamodelWrapper implements ModelAccess {
     // New roots extend the traversal root set, so every cached extension may have grown.
     invalidateAllInstancesCache(false);
     invalidateCorrespondenceIndex(); // stored URIs may resolve to the new objects
-  }
-
-  /**
-   * Loads model instance from TEST_MODELS_PATH directory (legacy method).
-   *
-   * @param xmiFileName Filename relative to TEST_MODELS_PATH
-   * @throws IOException If file cannot be read
-   */
-  public synchronized void loadModelInstance(String xmiFileName) throws IOException {
-    loadModelInstance(testModelsPath.resolve(xmiFileName));
   }
 
   /**

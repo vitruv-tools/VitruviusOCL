@@ -18,13 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -94,12 +93,6 @@ class LabelGraphCrossMetamodelTest {
    */
   private static final Path BASE_LABELGRAPH2 = Path.of("base.labelgraph2");
 
-  /** Registers the test model base path before all tests run. */
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   // ==================== Constraints 1-4: satisfied correspondence checks ====================
 
   /**
@@ -119,6 +112,7 @@ class LabelGraphCrossMetamodelTest {
         VitruvOclEngine.forFiles(
                 new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE},
                 new Path[] {BASE_LABELGRAPH1, BASE_LABELGRAPH2})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
 
     assertTrue(result.isSuccess(), "Compilation and evaluation should succeed");
@@ -192,6 +186,7 @@ class LabelGraphCrossMetamodelTest {
     ConstraintResult result =
         VitruvOclEngine.forFiles(
                 new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE}, new Path[] {BASE_LABELGRAPH1})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
 
     assertTrue(result.isSuccess(), "Compilation and evaluation should succeed");
@@ -225,6 +220,7 @@ class LabelGraphCrossMetamodelTest {
     ConstraintResult result =
         VitruvOclEngine.forFiles(
                 new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE}, new Path[] {BASE_LABELGRAPH1})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
 
     assertTrue(result.isSuccess(), "Compilation and evaluation should succeed");

@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import tools.vitruv.dsls.vitruvocl.compiler.DependencyAnalyzer;
 import tools.vitruv.dsls.vitruvocl.result.FileError;
@@ -33,8 +34,8 @@ import tools.vitruv.dsls.vitruvocl.result.Warning;
  * referenced, then selectively loads only necessary files. Provides comprehensive error reporting
  * and warnings for missing dependencies, unused files, and duplicate definitions.
  *
- * <p>Handles file resolution with fallback logic: absolute paths used as-is, relative paths
- * resolved via TEST_MODELS_PATH then current working directory.
+ * <p>Absolute paths are used as they are; relative paths are looked up in the model directory a
+ * caller passes, if any, and otherwise resolved against the working directory.
  */
 public class SmartLoader {
 
@@ -92,13 +93,24 @@ public class SmartLoader {
    * </ol>
    *
    * @param constraint OCL constraint expression to analyze
-   * @param ecoreFiles Metamodel files (absolute or relative paths)
-   * @param xmiFiles Model instance files (absolute or relative paths)
+   * @param ecoreFiles Metamodel files (absolute, or relative to the working directory)
+   * @param xmiFiles Model instance files (absolute, or relative to the working directory)
    * @return Load result with configured wrapper, errors, and warnings
    */
   public static LoadResult loadForConstraint(
       String constraint, Path[] ecoreFiles, Path[] xmiFiles) {
     return loadForConstraints(List.of(constraint), ecoreFiles, xmiFiles);
+  }
+
+  /**
+   * Same as {@link #loadForConstraint(String, Path[], Path[])}, looking up relative files in {@code
+   * modelDirectory} first and in the working directory second.
+   *
+   * @throws NullPointerException if {@code modelDirectory} is {@code null}
+   */
+  public static LoadResult loadForConstraint(
+      String constraint, Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory) {
+    return loadForConstraints(List.of(constraint), ecoreFiles, xmiFiles, modelDirectory);
   }
 
   /**
@@ -121,18 +133,45 @@ public class SmartLoader {
    * that constraint's own packages.
    *
    * @param constraints OCL constraint expressions to analyze, in any order
-   * @param ecoreFiles Metamodel files (absolute or relative paths)
-   * @param xmiFiles Model instance files (absolute or relative paths)
+   * @param ecoreFiles Metamodel files (absolute, or relative to the working directory)
+   * @param xmiFiles Model instance files (absolute, or relative to the working directory)
    * @return Load result with configured wrapper, errors, and warnings
    */
   public static LoadResult loadForConstraints(
       List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles) {
+    return load(constraints, ecoreFiles, xmiFiles, null);
+  }
+
+  /**
+   * Same as {@link #loadForConstraints(List, Path[], Path[])}, looking up relative files in {@code
+   * modelDirectory} first and in the working directory second.
+   *
+   * @throws NullPointerException if {@code modelDirectory} is {@code null}
+   */
+  public static LoadResult loadForConstraints(
+      List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory) {
+    return load(
+        constraints,
+        ecoreFiles,
+        xmiFiles,
+        Objects.requireNonNull(modelDirectory, "modelDirectory"));
+  }
+
+  /**
+   * Loads the files the constraints need, resolving relative paths as {@link #resolveFilePath}
+   * describes.
+   *
+   * @param modelDirectory where relative files are looked up first, or {@code null} to resolve them
+   *     against the working directory only
+   */
+  private static LoadResult load(
+      List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory) {
     MetamodelWrapper wrapper = new MetamodelWrapper();
     List<FileError> fileErrors = new ArrayList<>();
     List<Warning> warnings = new ArrayList<>();
 
-    List<Path> resolvedEcores = resolveAndValidate(ecoreFiles, fileErrors);
-    List<Path> resolvedXmis = resolveAndValidate(xmiFiles, fileErrors);
+    List<Path> resolvedEcores = resolveAndValidate(ecoreFiles, modelDirectory, fileErrors);
+    List<Path> resolvedXmis = resolveAndValidate(xmiFiles, modelDirectory, fileErrors);
     if (!fileErrors.isEmpty()) {
       return new LoadResult(wrapper, fileErrors, warnings);
     }
@@ -178,10 +217,11 @@ public class SmartLoader {
   }
 
   /** Resolves and validates each path, collecting file-level errors as they are found. */
-  private static List<Path> resolveAndValidate(Path[] paths, List<FileError> fileErrors) {
+  private static List<Path> resolveAndValidate(
+      Path[] paths, Path modelDirectory, List<FileError> fileErrors) {
     List<Path> resolved = new ArrayList<>();
     for (Path path : paths) {
-      Path resolvedPath = resolveFilePath(path);
+      Path resolvedPath = resolveFilePath(path, modelDirectory);
       FileValidator.validateFile(resolvedPath).ifPresent(fileErrors::add);
       resolved.add(resolvedPath);
     }
@@ -321,31 +361,22 @@ public class SmartLoader {
   }
 
   /**
-   * Resolves file path with fallback logic.
+   * Resolves a file path: absolute paths as they are; relative paths under {@code modelDirectory}
+   * if that file exists there, otherwise against the working directory.
    *
-   * <p>Resolution order:
-   *
-   * <ol>
-   *   <li>Absolute paths used as-is
-   *   <li>Relative paths tried under TEST_MODELS_PATH
-   *   <li>Fallback to current working directory
-   * </ol>
-   *
-   * @param path Path to resolve
-   * @return Resolved absolute path
+   * @param modelDirectory where relative files are looked up first, or {@code null}
+   * @return the resolved absolute or working-directory-based path
    */
-  private static Path resolveFilePath(Path path) {
+  private static Path resolveFilePath(Path path, Path modelDirectory) {
     if (path.isAbsolute()) {
       return path;
     }
-
-    // Try TEST_MODELS_PATH first
-    Path testPath = MetamodelWrapper.getTestModelsPath().resolve(path);
-    if (Files.exists(testPath)) {
-      return testPath;
+    if (modelDirectory != null) {
+      Path inModelDirectory = modelDirectory.resolve(path);
+      if (Files.exists(inModelDirectory)) {
+        return inModelDirectory;
+      }
     }
-
-    // Fallback to absolute from current working directory
     return path.toAbsolutePath();
   }
 }

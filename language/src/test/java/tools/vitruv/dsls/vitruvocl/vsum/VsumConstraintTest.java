@@ -35,14 +35,12 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.change.correspondence.Correspondence;
 import tools.vitruv.change.correspondence.view.EditableCorrespondenceModelView;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
@@ -76,11 +74,6 @@ class VsumConstraintTest {
       Path.of("src/test/resources/test-inputs/valid/simple.ocl");
 
   private InternalVirtualModel mockVsum;
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   @BeforeEach
   void setUp() {

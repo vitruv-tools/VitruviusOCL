@@ -23,14 +23,13 @@ import java.util.stream.Stream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
@@ -64,11 +63,6 @@ class OCLAsTypeTest extends DummyTestSpecification {
   private static final Path SPACECRAFT_VOYAGER = Path.of("spacecraft-voyager.spacemission");
   private static final Path SPACECRAFT_ATLAS = Path.of("spacecraft-atlas.spacemission");
   private static final Path SATELLITE_VOYAGER = Path.of("satellite-voyager.satellitesystem");
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   /** Tests casting Integer collection to Integer → same elements preserved. */
   @Test
@@ -209,6 +203,7 @@ context spaceMission::Spacecraft inv asTypeSpacecraft:
         VitruvOclEngine.forFiles(
                 new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
                 new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
 
     result
@@ -234,6 +229,7 @@ context spaceMission::Spacecraft inv selectThenAsType:
         VitruvOclEngine.forFiles(
                 new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
                 new Path[] {SPACECRAFT_VOYAGER, SPACECRAFT_ATLAS, SATELLITE_VOYAGER})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
 
     result

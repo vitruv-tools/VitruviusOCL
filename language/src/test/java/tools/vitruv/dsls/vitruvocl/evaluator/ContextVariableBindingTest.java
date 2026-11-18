@@ -17,9 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import org.eclipse.emf.ecore.EObject;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -36,14 +35,10 @@ class ContextVariableBindingTest {
       Path.of("src/test/resources/test-metamodels/brakesystem.ecore");
   private static final Path BRAKESYSTEM_INSTANCE = Path.of("brakesystem.brakesystem");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   private static ConstraintResult evalCad(String constraint) {
     ConstraintResult result =
         VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
     assertThat(result.isSuccess()).as(result.toDetailedErrorString()).isTrue();
     return result;
@@ -52,6 +47,7 @@ class ContextVariableBindingTest {
   private static ConstraintResult evalBrakeSystem(String constraint) {
     ConstraintResult result =
         VitruvOclEngine.forFiles(new Path[] {BRAKESYSTEM_ECORE}, new Path[] {BRAKESYSTEM_INSTANCE})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate(constraint);
     assertThat(result.isSuccess()).as(result.toDetailedErrorString()).isTrue();
     return result;

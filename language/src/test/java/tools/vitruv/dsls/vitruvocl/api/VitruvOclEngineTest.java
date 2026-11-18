@@ -21,10 +21,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.SmartLoader;
 import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
@@ -64,13 +63,8 @@ class VitruvOclEngineTest {
 
   @TempDir Path dir;
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   private static VitruvOclEngine files() {
-    return VitruvOclEngine.forFiles(ECORE, XMI);
+    return VitruvOclEngine.forFiles(ECORE, XMI).withModelDirectory(TestModels.DIRECTORY);
   }
 
   // ------------------------------------------------------------------ single constraints
@@ -108,7 +102,8 @@ class VitruvOclEngineTest {
 
   @Test
   void evaluatesAgainstAGivenModel() {
-    SmartLoader.LoadResult load = SmartLoader.loadForConstraint(VIOLATED, ECORE, XMI);
+    SmartLoader.LoadResult load =
+        SmartLoader.loadForConstraint(VIOLATED, ECORE, XMI, TestModels.DIRECTORY);
 
     assertThat(describe(VitruvOclEngine.forModel(load.wrapper).evaluate(VIOLATED)))
         .isEqualTo(describe(files().evaluate(VIOLATED)));
@@ -232,7 +227,8 @@ class VitruvOclEngineTest {
   void filePathArraysAreCopied() {
     Path[] ecore = ECORE.clone();
     Path[] xmi = XMI.clone();
-    VitruvOclEngine engine = VitruvOclEngine.forFiles(ecore, xmi);
+    VitruvOclEngine engine =
+        VitruvOclEngine.forFiles(ecore, xmi).withModelDirectory(TestModels.DIRECTORY);
     ecore[0] = dir.resolve("missing.ecore");
     xmi[0] = MISSING_XMI[0];
 
@@ -252,6 +248,75 @@ class VitruvOclEngineTest {
     assertThatThrownBy(() -> files().evaluate(SATISFIED, null))
         .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> files().evaluateAll(List.of(SATISFIED), null))
+        .isInstanceOf(NullPointerException.class);
+  }
+
+  // ------------------------------------------------------------------ model directory
+
+  @Test
+  void relativeFilesAreResolvedAgainstTheModelDirectory() {
+    VitruvOclEngine engine =
+        VitruvOclEngine.forFiles(ECORE, XMI).withModelDirectory(TestModels.DIRECTORY);
+
+    assertThat(engine.evaluate(SATISFIED).getFileErrors()).isEmpty();
+  }
+
+  @Test
+  void withoutAModelDirectoryRelativeFilesAreResolvedAgainstTheWorkingDirectory() {
+    Path[] relativeToWorkingDirectory = {TestModels.DIRECTORY.resolve(XMI[0])};
+
+    assertThat(VitruvOclEngine.forFiles(ECORE, XMI).evaluate(SATISFIED).getFileErrors())
+        .isNotEmpty();
+    assertThat(
+            VitruvOclEngine.forFiles(ECORE, relativeToWorkingDirectory)
+                .evaluate(SATISFIED)
+                .getFileErrors())
+        .isEmpty();
+  }
+
+  @Test
+  void aFileMissingInTheModelDirectoryIsLookedUpInTheWorkingDirectory() {
+    Path[] relativeToWorkingDirectory = {TestModels.DIRECTORY.resolve(XMI[0])};
+    VitruvOclEngine engine =
+        VitruvOclEngine.forFiles(ECORE, relativeToWorkingDirectory).withModelDirectory(dir);
+
+    assertThat(engine.evaluate(SATISFIED).getFileErrors()).isEmpty();
+  }
+
+  @Test
+  void theModelDirectoryWinsOverTheWorkingDirectory() throws IOException {
+    // the same relative path names Atlas in the working directory and Voyager in the model
+    // directory
+    Path relative = TestModels.DIRECTORY.resolve(XMI[0]);
+    Path shadow = dir.resolve(relative);
+    Files.createDirectories(shadow.getParent());
+    Files.copy(TestModels.DIRECTORY.resolve("spacecraft-voyager.spacemission"), shadow);
+    Path[] relativeFiles = {relative};
+    String isAtlas = "context spaceMission::Spacecraft inv: self.name == \"Atlas\"";
+
+    VitruvOclEngine fromWorkingDirectory = VitruvOclEngine.forFiles(ECORE, relativeFiles);
+    VitruvOclEngine fromModelDirectory = fromWorkingDirectory.withModelDirectory(dir);
+
+    assertThat(fromWorkingDirectory.evaluate(isAtlas).isSatisfied()).isTrue();
+    assertThat(fromModelDirectory.evaluate(isAtlas).getViolations()).isNotEmpty();
+  }
+
+  @Test
+  void withModelDirectoryReturnsANewEngine() {
+    VitruvOclEngine engine = VitruvOclEngine.forFiles(ECORE, XMI);
+
+    assertThat(engine.withModelDirectory(TestModels.DIRECTORY)).isNotSameAs(engine);
+    assertThat(engine.evaluate(SATISFIED).getFileErrors()).isNotEmpty();
+  }
+
+  @Test
+  void aModelDirectoryOnlyAppliesToFileBasedEngines() {
+    LiveModel live = EdgeFixture.create().model();
+    VitruvOclEngine engine = VitruvOclEngine.forModel(live.wrapper());
+
+    assertThatThrownBy(() -> engine.withModelDirectory(TestModels.DIRECTORY))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> files().withModelDirectory(null))
         .isInstanceOf(NullPointerException.class);
   }
 

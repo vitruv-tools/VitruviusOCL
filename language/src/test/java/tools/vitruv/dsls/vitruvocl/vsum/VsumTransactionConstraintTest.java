@@ -35,14 +35,12 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.change.composite.description.TransactionalChange;
 import tools.vitruv.change.composite.recording.ChangeRecorder;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
@@ -64,11 +62,6 @@ class VsumTransactionConstraintTest {
       Path.of("src/test/resources/test-models/spacecraft-voyager.spacemission");
 
   private InternalVirtualModel mockVsum;
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   @BeforeEach
   void setUp() {

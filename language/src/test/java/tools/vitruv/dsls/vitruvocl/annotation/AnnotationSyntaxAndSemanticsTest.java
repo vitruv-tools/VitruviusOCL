@@ -26,16 +26,15 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.eclipse.emf.ecore.EPackage;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
@@ -68,11 +67,6 @@ class AnnotationSyntaxAndSemanticsTest {
   private static final Path ECORE = Path.of("src/test/resources/test-metamodels/brakesystem.ecore");
   private static final Path XMI = Path.of("brakesystem.brakesystem");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   @AfterAll
   static void cleanupRegistry() {
     EPackage.Registry.INSTANCE.remove("http://vitruv.tools/brakesystem/model");
@@ -87,7 +81,9 @@ class AnnotationSyntaxAndSemanticsTest {
 
   /** Runs the full three-pass pipeline and returns a {@link ConstraintResult}. */
   private static ConstraintResult eval(String constraint) {
-    return VitruvOclEngine.forFiles(new Path[] {ECORE}, new Path[] {XMI}).evaluate(constraint);
+    return VitruvOclEngine.forFiles(new Path[] {ECORE}, new Path[] {XMI})
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(constraint);
   }
 
   /**
@@ -527,7 +523,7 @@ class AnnotationSyntaxAndSemanticsTest {
     private List<EvaluationVisitor.ViolationRecord> getRecords(String constraint) {
       var loadResult =
           tools.vitruv.dsls.vitruvocl.adapter.emf.SmartLoader.loadForConstraint(
-              constraint, new Path[] {ECORE}, new Path[] {XMI});
+              constraint, new Path[] {ECORE}, new Path[] {XMI}, TestModels.DIRECTORY);
       assertFalse(loadResult.hasErrors(), "Load must succeed");
       var compiler = new VitruvOCLCompiler(loadResult.wrapper, null);
       compiler.compile(constraint);

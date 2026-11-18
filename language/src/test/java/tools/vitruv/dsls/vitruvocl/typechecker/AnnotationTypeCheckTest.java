@@ -6,9 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import org.eclipse.emf.ecore.EPackage;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -23,11 +22,6 @@ class AnnotationTypeCheckTest {
   private static final Path BRAKESYSTEM_ECORE =
       Path.of("src/test/resources/test-metamodels/brakesystem.ecore");
   private static final Path BRAKESYSTEM_INSTANCE = Path.of("brakesystem.brakesystem");
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   @AfterAll
   static void cleanupRegistry() {
@@ -176,6 +170,7 @@ class AnnotationTypeCheckTest {
   private ConstraintResult eval(String constraint) {
     return VitruvOclEngine.forFiles(
             new Path[] {BRAKESYSTEM_ECORE}, new Path[] {BRAKESYSTEM_INSTANCE})
+        .withModelDirectory(TestModels.DIRECTORY)
         .evaluate(constraint);
   }
 }

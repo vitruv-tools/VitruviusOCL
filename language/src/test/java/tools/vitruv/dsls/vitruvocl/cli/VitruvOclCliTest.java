@@ -23,11 +23,9 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 
 /**
  * Integration tests for the {@link VitruvOclCli} command-line interface.
@@ -51,12 +49,6 @@ class VitruvOclCliTest {
   private PrintStream originalErr;
   private ByteArrayOutputStream capturedOut;
   private ByteArrayOutputStream capturedErr;
-
-  /** Sets up the test model path before all tests. */
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   /** Redirects stdout and stderr before each test to capture CLI output. */
   @BeforeEach

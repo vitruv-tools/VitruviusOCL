@@ -17,12 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -48,15 +47,11 @@ class SingleMetamodelConstraintTest {
   private static final Path SPACECRAFT_ACTIVE = Path.of("spacecraft-active.spacemission");
   private static final Path SPACECRAFT_INACTIVE = Path.of("spacecraft-inactive.spacemission");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   // ── helpers ──────────────────────────────────────────────────────────────────
 
   private static ConstraintResult eval(String c, Path instance) {
     return VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {instance})
+        .withModelDirectory(TestModels.DIRECTORY)
         .evaluate(c);
   }
 
@@ -215,6 +210,7 @@ class SingleMetamodelConstraintTest {
         VitruvOclEngine.forFiles(
                 new Path[] {SPACEMISSION_ECORE},
                 new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE})
+            .withModelDirectory(TestModels.DIRECTORY)
             .evaluate("context spaceMission::Spacecraft inv: self.operational");
     assertTrue(r.isSuccess());
   }

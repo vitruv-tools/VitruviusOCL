@@ -48,8 +48,9 @@ import tools.vitruv.framework.vsum.VirtualModel;
  * return a new engine. Concurrent calls are as safe as the model they evaluate against: an engine
  * over a given {@link ModelAccess} shares it between calls. File-based engines load, for every
  * call, those of their metamodel and instance files that the evaluated constraints need; the set of
- * files is fixed when the engine is created. The {@code evaluate*} methods report load errors in
- * their results rather than throwing them.
+ * files is fixed when the engine is created. Relative file paths are resolved against the working
+ * directory unless {@link #withModelDirectory} names another directory. The {@code evaluate*}
+ * methods report load errors in their results rather than throwing them.
  *
  * <p>Evaluating without a transaction skips {@code pre}/{@code post} blocks (and reports that as a
  * warning); passing a transaction, even an empty one, evaluates them against it.
@@ -84,7 +85,8 @@ public final class VitruvOclEngine {
     return new VitruvOclEngine(
         new ModelFiles(
             Objects.requireNonNull(ecoreFiles, "ecoreFiles").clone(),
-            Objects.requireNonNull(xmiFiles, "xmiFiles").clone()),
+            Objects.requireNonNull(xmiFiles, "xmiFiles").clone(),
+            null),
         DEFAULT_THREAD_POOL_SIZE);
   }
 
@@ -113,6 +115,23 @@ public final class VitruvOclEngine {
       throw new IllegalArgumentException("threadPoolSize must be at least 1: " + threadPoolSize);
     }
     return new VitruvOclEngine(source, threadPoolSize);
+  }
+
+  /**
+   * This file-based engine, looking up relative metamodel and instance files in {@code
+   * modelDirectory} first and in the working directory second. Without a model directory, relative
+   * files are resolved against the working directory only.
+   *
+   * @throws IllegalStateException if this engine does not load files ({@link #forFiles} and {@link
+   *     #forProject} engines do)
+   */
+  public VitruvOclEngine withModelDirectory(Path modelDirectory) {
+    Objects.requireNonNull(modelDirectory, "modelDirectory");
+    if (!(source instanceof ModelFiles files)) {
+      throw new IllegalStateException("A model directory only applies to file-based engines");
+    }
+    return new VitruvOclEngine(
+        new ModelFiles(files.ecoreFiles(), files.xmiFiles(), modelDirectory), threadPoolSize);
   }
 
   // ------------------------------------------------------------------ single constraint
@@ -295,12 +314,18 @@ public final class VitruvOclEngine {
     }
   }
 
-  /** Metamodel and instance files, loaded per call as far as the constraints need them. */
-  private record ModelFiles(Path[] ecoreFiles, Path[] xmiFiles) implements ModelSource {
+  /**
+   * Metamodel and instance files, loaded per call as far as the constraints need them; relative
+   * paths are looked up in {@code modelDirectory} first, if it is not {@code null}.
+   */
+  private record ModelFiles(Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory)
+      implements ModelSource {
     @Override
     public Loaded load(List<String> constraints) {
       SmartLoader.LoadResult result =
-          SmartLoader.loadForConstraints(constraints, ecoreFiles, xmiFiles);
+          modelDirectory == null
+              ? SmartLoader.loadForConstraints(constraints, ecoreFiles, xmiFiles)
+              : SmartLoader.loadForConstraints(constraints, ecoreFiles, xmiFiles, modelDirectory);
       return new Loaded(result.wrapper, result.hasErrors(), result.fileErrors, result.warnings);
     }
   }

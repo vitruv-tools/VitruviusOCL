@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 
 /**
  * Tests for {@link SmartLoader#loadForConstraints}, which replaced first-constraint-only dependency
@@ -43,11 +43,6 @@ class SmartLoaderTest {
   private static final Path[] BOTH_ECORES = {SPACEMISSION_ECORE, SATELLITE_ECORE};
   private static final Path[] BOTH_MODELS = {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER};
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   /**
    * The bug this method fixes: a constraint list where only the *second* constraint references
    * {@code satelliteSystem} must still get that package loaded, even though the first constraint
@@ -62,7 +57,7 @@ class SmartLoaderTest {
                 + " satelliteSystem::Satellite.allInstances().size() >= 0");
 
     SmartLoader.LoadResult result =
-        SmartLoader.loadForConstraints(constraints, BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraints(constraints, BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
 
     assertFalse(result.hasErrors(), "should load without file errors: " + result.fileErrors);
     Set<String> available = result.wrapper.getAvailableMetamodels();
@@ -85,7 +80,8 @@ class SmartLoaderTest {
             "context spaceMission::Spacecraft inv onlySpaceMission: true");
 
     SmartLoader.LoadResult result =
-        SmartLoader.loadForConstraints(reversedOrder, BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraints(
+            reversedOrder, BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
 
     assertFalse(result.hasErrors());
     Set<String> available = result.wrapper.getAvailableMetamodels();
@@ -105,9 +101,10 @@ class SmartLoaderTest {
     List<String> homogeneousBatch = List.of(constraint, constraint, constraint, constraint);
 
     SmartLoader.LoadResult single =
-        SmartLoader.loadForConstraint(constraint, BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraint(constraint, BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
     SmartLoader.LoadResult batch =
-        SmartLoader.loadForConstraints(homogeneousBatch, BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraints(
+            homogeneousBatch, BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
 
     assertFalse(single.hasErrors());
     assertFalse(batch.hasErrors());
@@ -132,7 +129,7 @@ class SmartLoaderTest {
             "context spaceMission::Spacecraft inv c: self.operational");
 
     SmartLoader.LoadResult result =
-        SmartLoader.loadForConstraints(constraints, BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraints(constraints, BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
 
     assertFalse(result.hasErrors());
     assertEquals(Set.of("spaceMission"), result.wrapper.getAvailableMetamodels());
@@ -144,9 +141,10 @@ class SmartLoaderTest {
     String constraint = "context spaceMission::Spacecraft inv c: true";
 
     SmartLoader.LoadResult direct =
-        SmartLoader.loadForConstraint(constraint, BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraint(constraint, BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
     SmartLoader.LoadResult viaList =
-        SmartLoader.loadForConstraints(List.of(constraint), BOTH_ECORES, BOTH_MODELS);
+        SmartLoader.loadForConstraints(
+            List.of(constraint), BOTH_ECORES, BOTH_MODELS, TestModels.DIRECTORY);
 
     assertEquals(direct.wrapper.getAvailableMetamodels(), viaList.wrapper.getAvailableMetamodels());
     assertEquals(direct.hasErrors(), viaList.hasErrors());

@@ -18,11 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -44,12 +43,6 @@ class BrakeSystemConstraintTest {
   private static final Path BRAKESYSTEM_INSTANCE = Path.of("brakesystem.brakesystem");
   private static final Path CAD_INSTANCE = Path.of("brake_disc_and_caliper_plate.cad");
 
-  /** Registers the test model base path before all tests run. */
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -58,11 +51,14 @@ class BrakeSystemConstraintTest {
     return VitruvOclEngine.forFiles(
             new Path[] {BRAKESYSTEM_ECORE, CAD_ECORE},
             new Path[] {BRAKESYSTEM_INSTANCE, CAD_INSTANCE})
+        .withModelDirectory(TestModels.DIRECTORY)
         .evaluate(c);
   }
 
   private static ConstraintResult evalCad(String c) {
-    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE}).evaluate(c);
+    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE})
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(c);
   }
 
   // ---------------------------------------------------------------------------

@@ -20,9 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.IntStream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
@@ -65,11 +63,6 @@ class ParallelBatchEvaluationTest {
   private static final Path[] ALL_MODELS = {
     SPACECRAFT_ACTIVE, SPACECRAFT_VOYAGER, SPACECRAFT_INACTIVE, SATELLITE_VOYAGER, SATELLITE_ATLAS
   };
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   /**
    * A deliberately mixed batch: satisfied / violated (with varying violation counts) / a compiler
@@ -140,6 +133,7 @@ class ParallelBatchEvaluationTest {
 
     BatchValidationResult sequential =
         VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
             .withThreadPoolSize(1)
             .evaluateAll(constraints);
     assertEquals(constraints.size(), sequential.getResults().size());
@@ -147,6 +141,7 @@ class ParallelBatchEvaluationTest {
     for (int poolSize : new int[] {2, 4, 8, 16}) {
       BatchValidationResult parallel =
           VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+              .withModelDirectory(TestModels.DIRECTORY)
               .withThreadPoolSize(poolSize)
               .evaluateAll(constraints);
 
@@ -183,6 +178,7 @@ class ParallelBatchEvaluationTest {
 
     BatchValidationResult baseline =
         VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
             .withThreadPoolSize(1)
             .evaluateAll(constraints);
     ConstraintResult expectedSerialMatch = baseline.getResults().get(serialNumberMatchIndex);
@@ -192,6 +188,7 @@ class ParallelBatchEvaluationTest {
     for (int run = 0; run < 20; run++) {
       BatchValidationResult parallel =
           VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+              .withModelDirectory(TestModels.DIRECTORY)
               .withThreadPoolSize(16)
               .evaluateAll(constraints);
       assertSameOutcome(expectedSerialMatch, parallel.getResults().get(serialNumberMatchIndex));
@@ -214,6 +211,7 @@ class ParallelBatchEvaluationTest {
 
     BatchValidationResult result =
         VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
             .withThreadPoolSize(16)
             .evaluateAll(constraints);
 
@@ -239,6 +237,7 @@ class ParallelBatchEvaluationTest {
 
     BatchValidationResult result =
         VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
             .withThreadPoolSize(8)
             .evaluateAll(constraints);
 
@@ -258,7 +257,9 @@ class ParallelBatchEvaluationTest {
   void defaultThreadPoolSizeOverloadStillWorks() {
     List<String> constraints = mixedConstraintBatch();
     BatchValidationResult result =
-        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS).evaluateAll(constraints);
+        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluateAll(constraints);
     assertEquals(constraints.size(), result.getResults().size());
   }
 
@@ -283,6 +284,7 @@ class ParallelBatchEvaluationTest {
     for (int poolSize : new int[] {1, 4}) {
       BatchValidationResult result =
           VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+              .withModelDirectory(TestModels.DIRECTORY)
               .withThreadPoolSize(poolSize)
               .evaluateAll(constraints);
 
