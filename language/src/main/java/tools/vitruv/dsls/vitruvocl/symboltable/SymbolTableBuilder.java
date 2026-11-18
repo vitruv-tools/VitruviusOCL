@@ -151,6 +151,14 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
   private final ScopeAnnotator scopeAnnotator;
 
   /**
+   * Resolves declared types of let variables and operation parameters; unresolvable ones become
+   * {@code OclAny}. Pass 2 reports those it visits again (let declarations), not those of operation
+   * parameters.
+   */
+  private final TypeExpressionResolver typeExpressions =
+      new TypeExpressionResolver(symbolTable, TypeExpressionResolver.LENIENT);
+
+  /**
    * Constructs a SymbolTableBuilder for Phase 1 symbol table construction.
    *
    * @param st The symbol table to populate with variable definitions
@@ -268,7 +276,7 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
     if (ctx.operationParamListCS() != null) {
       for (VitruvOCLParser.OperationParamCSContext param :
           ctx.operationParamListCS().operationParamCS()) {
-        Type paramType = resolveTypeExpression(param.paramType);
+        Type paramType = typeExpressions.resolve(param.paramType);
         symbolTable.defineVariable(
             new VariableSymbol(param.paramName.getText(), paramType, contextScope, false));
       }
@@ -431,7 +439,7 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
     // Resolve declared type (or use Type.ANY if no type annotation)
     Type declaredType = Type.ANY;
     if (ctx.varType != null) {
-      declaredType = resolveTypeExpression(ctx.varType);
+      declaredType = typeExpressions.resolve(ctx.varType);
     }
 
     // Define variable in current scope
@@ -441,134 +449,6 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
     visit(ctx.varInit);
 
     return null;
-  }
-
-  /**
-   * Resolves a type expression from the grammar to a Type object.
-   *
-   * <p>Handles both named types and type literals:
-   *
-   * <ul>
-   *   <li>Type names: {@code Integer}, {@code model::Employee}
-   *   <li>Type literals: {@code Set{Integer}}, {@code Sequence[String]}
-   * </ul>
-   *
-   * <p>Returns Type.ANY if resolution fails to allow compilation to continue.
-   *
-   * @param ctx The type expression parse tree node
-   * @return The resolved Type, or Type.ANY if unresolvable
-   */
-  private Type resolveTypeExpression(VitruvOCLParser.TypeExpCSContext ctx) {
-    if (ctx.typeNameExpCS() != null) {
-      return resolveTypeName(ctx.typeNameExpCS());
-    }
-    if (ctx.typeLiteralCS() != null) {
-      return resolveTypeLiteral(ctx.typeLiteralCS());
-    }
-    return Type.ANY;
-  }
-
-  /**
-   * Resolves a type name (qualified or unqualified).
-   *
-   * <p>Examples:
-   *
-   * <ul>
-   *   <li>{@code Integer} → Type.INTEGER
-   *   <li>{@code String} → Type.STRING
-   *   <li>{@code model::Employee} → looked up in TypeRegistry
-   * </ul>
-   *
-   * @param ctx The type name parse tree node
-   * @return The resolved Type, or Type.ANY if unresolvable
-   */
-  private Type resolveTypeName(VitruvOCLParser.TypeNameExpCSContext ctx) {
-    String typeName;
-
-    if (ctx.metamodel != null && ctx.className != null) {
-      // Qualified: metamodel::ClassName
-      typeName = ctx.metamodel.getText() + "::" + ctx.className.getText();
-    } else if (ctx.unqualified != null) {
-      // Unqualified: ClassName
-      typeName = ctx.unqualified.getText();
-    } else {
-      return Type.ANY;
-    }
-
-    // Primitive names (Double, Float, ...) and metamodel types; see SymbolTable#lookupType
-    Type resolvedType = symbolTable.lookupType(typeName);
-    return (resolvedType != null) ? resolvedType : Type.ANY;
-  }
-
-  /**
-   * Resolves a type literal (primitive or collection type).
-   *
-   * @param ctx The type literal parse tree node
-   * @return The resolved Type, or Type.ANY if unresolvable
-   */
-  private Type resolveTypeLiteral(VitruvOCLParser.TypeLiteralCSContext ctx) {
-    if (ctx.primitiveTypeCS() != null) {
-      return resolvePrimitiveType(ctx.primitiveTypeCS());
-    }
-    if (ctx.collectionTypeCS() != null) {
-      return resolveCollectionType(ctx.collectionTypeCS());
-    }
-    return Type.ANY;
-  }
-
-  /**
-   * Resolves a primitive type literal.
-   *
-   * <p>Maps OCL primitive type names to OCL Type constants:
-   *
-   * <ul>
-   *   <li>Boolean → Type.BOOLEAN
-   *   <li>Integer, UnlimitedNatural → Type.INTEGER
-   *   <li>Real → Type.DOUBLE
-   *   <li>String, ID → Type.STRING
-   *   <li>OclAny → Type.ANY
-   * </ul>
-   *
-   * @param ctx The primitive type parse tree node
-   * @return The primitive Type constant
-   */
-  private Type resolvePrimitiveType(VitruvOCLParser.PrimitiveTypeCSContext ctx) {
-    Type primitiveType = Type.fromPrimitiveKeyword(ctx.getText());
-    return primitiveType != null ? primitiveType : Type.ANY;
-  }
-
-  /**
-   * Resolves a collection type literal.
-   *
-   * <p>Examples:
-   *
-   * <ul>
-   *   <li>{@code Set{Integer}} → Type.set(Type.INTEGER)
-   *   <li>{@code Sequence[String]} → Type.sequence(Type.STRING)
-   *   <li>{@code Bag{{Real}}} → Type.bag(Type.DOUBLE)
-   * </ul>
-   *
-   * <p>Element type is resolved recursively, defaulting to Type.ANY if unresolvable.
-   *
-   * @param ctx The collection type parse tree node
-   * @return The collection Type
-   */
-  private Type resolveCollectionType(VitruvOCLParser.CollectionTypeCSContext ctx) {
-    String kind = ctx.collectionKind.getText();
-    Type elementType = Type.ANY;
-
-    if (ctx.typeExpCS() != null) {
-      elementType = resolveTypeExpression(ctx.typeExpCS());
-    }
-
-    return switch (kind) {
-      case "Set" -> Type.set(elementType);
-      case "Sequence" -> Type.sequence(elementType);
-      case "Bag" -> Type.bag(elementType);
-      case "OrderedSet" -> Type.orderedSet(elementType);
-      case "Collection" -> Type.set(elementType); // Generic collection defaults to Set
-      default -> Type.set(Type.ANY);
-    };
   }
 
   // ==================== Iterator Operations ====================
@@ -871,8 +751,8 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
   /**
    * Visits type expression node.
    *
-   * <p>Type expressions don't affect symbol table - they're resolved during type checking in Pass
-   * 2.
+   * <p>Visiting a type expression has no symbol-table effect; declared types are resolved
+   * explicitly through {@link TypeExpressionResolver}.
    *
    * @param ctx The type expression parse tree node
    * @return null (void visitor)
@@ -885,7 +765,8 @@ public class SymbolTableBuilder extends AbstractPhaseVisitor<Void> {
   /**
    * Visits type literal node.
    *
-   * <p>Type literals are resolved during type checking, not during symbol table construction.
+   * <p>Visiting a type literal has no symbol-table effect; declared types are resolved explicitly
+   * through {@link TypeExpressionResolver}.
    *
    * @param ctx The type literal parse tree node
    * @return null (void visitor)

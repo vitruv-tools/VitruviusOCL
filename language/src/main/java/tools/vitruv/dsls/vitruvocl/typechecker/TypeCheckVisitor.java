@@ -22,6 +22,7 @@ import tools.vitruv.dsls.vitruvocl.symboltable.Scope;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
+import tools.vitruv.dsls.vitruvocl.symboltable.TypeExpressionResolver;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
 import tools.vitruv.dsls.vitruvocl.types.Multiplicity;
 import tools.vitruv.dsls.vitruvocl.types.Type;
@@ -144,6 +145,23 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    */
   private final ParseTreeProperty<Type> nodeTypes = new ParseTreeProperty<>();
 
+  /** Resolves type expressions, reporting unresolvable ones and recording resolved node types. */
+  private final TypeExpressionResolver typeExpressions =
+      new TypeExpressionResolver(
+          symbolTable,
+          new TypeExpressionResolver.Listener() {
+            @Override
+            public Type unresolved(ParserRuleContext ctx, String message) {
+              reportError(ctx, message);
+              return Type.ERROR;
+            }
+
+            @Override
+            public void resolved(ParserRuleContext ctx, Type type) {
+              nodeTypes.put(ctx, type);
+            }
+          });
+
   /**
    * Error recovery over the raw token stream; without a token stream (see {@link #setTokenStream})
    * it reports nothing. Not final because {@link #setTokenStream} replaces it.
@@ -228,9 +246,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   private static final String OP_AS_BAG = "asBag";
   private static final String OP_AS_SEQUENCE = "asSequence";
   private static final String OP_AS_ORDERED_SET = "asOrderedSet";
-  private static final String TYPE_BOOLEAN = "Boolean";
-  private static final String TYPE_INTEGER = "Integer";
-  private static final String TYPE_STRING = "String";
   private static final String ERR_OP_DOES_NOT_EXIST = "' — this operation does not exist";
 
   @Override
@@ -491,97 +506,44 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   // ==================== Type Expressions ====================
 
   /**
-   * Type checks a type expression.
-   *
-   * <p>Type expressions represent types in declarations and type operations. Delegates to either
-   * type name or type literal checking.
+   * Resolves a type expression, see {@link TypeExpressionResolver#resolve}.
    *
    * @param ctx The type expression node
-   * @return The resolved type
+   * @return The resolved type, or {@link Type#ERROR} after reporting why it is unresolvable
    */
   @Override
   public Type visitTypeExpCS(VitruvOCLParser.TypeExpCSContext ctx) {
-    if (ctx.typeNameExpCS() != null) {
-      return visitTypeNameExpCS(ctx.typeNameExpCS());
-    }
-    if (ctx.typeLiteralCS() != null) {
-      return visitTypeLiteralCS(ctx.typeLiteralCS());
-    }
-
-    reportError(ctx, "Invalid type expression");
-    return Type.ERROR;
+    return typeExpressions.resolve(ctx);
   }
 
   /**
-   * Type checks a type literal (primitive or collection type).
+   * Resolves a type literal (primitive or collection type), see {@link
+   * TypeExpressionResolver#resolveLiteral}.
    *
    * @param ctx The type literal node
-   * @return The resolved type
+   * @return The resolved type, or {@link Type#ERROR} after reporting why it is unresolvable
    */
   @Override
   public Type visitTypeLiteralCS(VitruvOCLParser.TypeLiteralCSContext ctx) {
-    if (ctx.primitiveTypeCS() != null) {
-      return visitPrimitiveTypeCS(ctx.primitiveTypeCS());
-    }
-    if (ctx.collectionTypeCS() != null) {
-      return visit(ctx.collectionTypeCS());
-    }
-
-    reportError(ctx, "Invalid type literal");
-    return Type.ERROR;
+    return typeExpressions.resolveLiteral(ctx);
   }
 
   /**
-   * Type checks a collection type declaration.
-   *
-   * <p>Constructs collection types from their syntax. Supports:
-   *
-   * <ul>
-   *   <li>{@code Set(T)} - unordered, unique
-   *   <li>{@code Bag(T)} - unordered, non-unique
-   *   <li>{@code Sequence(T)} - ordered, non-unique
-   *   <li>{@code OrderedSet(T)} - ordered, unique
-   *   <li>{@code Collection(T)} - generic (defaults to Set)
-   * </ul>
-   *
-   * <p><b>Example:</b> {@code Set(Integer)}, {@code Sequence(Person)}
+   * Resolves a collection type such as {@code Set(Integer)}, see {@link
+   * TypeExpressionResolver#resolveCollection}.
    *
    * @param ctx The collection type node
-   * @return The constructed collection type
+   * @return The collection type, or {@link Type#ERROR} if its element type is unresolvable
    */
   @Override
   public Type visitCollectionTypeCS(VitruvOCLParser.CollectionTypeCSContext ctx) {
-    String kind = ctx.collectionKind.getText();
-
-    // Get element type if specified
-    Type elementType = Type.ANY; // Default placeholder
-    if (ctx.typeExpCS() != null) {
-      elementType = visit(ctx.typeExpCS());
-      if (elementType == Type.ERROR) {
-        return Type.ERROR;
-      }
-    }
-
-    Type collectionType = switch (kind) {
-      case "Set" -> Type.set(elementType);
-      case "Sequence" -> Type.sequence(elementType);
-      case "Bag" -> Type.bag(elementType);
-      case "OrderedSet" -> Type.orderedSet(elementType);
-      case "Collection" -> Type.set(elementType); // Generic → Set
-      default -> {
-        reportError(ctx, "Unknown collection type: " + kind);
-        yield Type.ERROR;
-      }
-    };
-
-    nodeTypes.put(ctx, collectionType);
-    return collectionType;
+    return typeExpressions.resolveCollection(ctx);
   }
 
   /**
    * Handles collection type identifiers (lexical tokens).
    *
-   * <p>Not used for actual type construction - parent {@link #visitCollectionTypeCS} handles that.
+   * <p>Not used for actual type construction - the enclosing collection type handles that.
    *
    * @param ctx The collection type identifier node
    * @return Type.ANY (placeholder)
@@ -592,82 +554,25 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   }
 
   /**
-   * Type checks a primitive type reference.
-   *
-   * <p>Maps OCL primitive type names to internal {@link Type} constants:
-   *
-   * <ul>
-   *   <li>Boolean → {@link Type#BOOLEAN}
-   *   <li>Integer → {@link Type#INTEGER}
-   *   <li>Real → {@link Type#DOUBLE}
-   *   <li>String → {@link Type#STRING}
-   *   <li>ID → {@link Type#STRING} (mapped)
-   *   <li>UnlimitedNatural → {@link Type#INTEGER} (mapped)
-   *   <li>OclAny → {@link Type#ANY}
-   * </ul>
+   * Resolves a primitive type keyword, see {@link TypeExpressionResolver#resolvePrimitive}.
    *
    * @param ctx The primitive type node
    * @return The corresponding primitive type
    */
   @Override
   public Type visitPrimitiveTypeCS(VitruvOCLParser.PrimitiveTypeCSContext ctx) {
-    String typeName = ctx.getText();
-
-    Type primitiveType = Type.fromPrimitiveKeyword(typeName);
-
-    if (primitiveType == null) {
-      reportError(ctx, "Unknown primitive type: " + typeName);
-      return Type.ERROR;
-    }
-
-    nodeTypes.put(ctx, primitiveType);
-    return primitiveType;
+    return typeExpressions.resolvePrimitive(ctx);
   }
 
   /**
-   * Type checks a type name expression (qualified or unqualified).
-   *
-   * <p>Resolves type names to their corresponding types. Handles:
-   *
-   * <ul>
-   *   <li>Primitive types: Integer, String, Boolean, Real
-   *   <li>Metamodel types (qualified): {@code metamodel::ClassName}
-   *   <li>Metamodel types (unqualified): {@code ClassName}
-   * </ul>
-   *
-   * <p><b>Examples:</b>
-   *
-   * <ul>
-   *   <li>{@code Integer} → Type.INTEGER
-   *   <li>{@code Person} → metaclass type for Person
-   *   <li>{@code company::Employee} → metaclass type for Employee
-   * </ul>
+   * Resolves a qualified or unqualified type name, see {@link TypeExpressionResolver#resolveName}.
    *
    * @param ctx The type name expression node
-   * @return The resolved type
+   * @return The resolved type, or {@link Type#ERROR} after reporting an unknown type
    */
   @Override
   public Type visitTypeNameExpCS(VitruvOCLParser.TypeNameExpCSContext ctx) {
-    String typeName;
-
-    if (ctx.metamodel != null && ctx.className != null) {
-      typeName = ctx.metamodel.getText() + "::" + ctx.className.getText();
-    } else if (ctx.unqualified != null) {
-      typeName = ctx.unqualified.getText();
-    } else {
-      reportError(ctx, "Invalid type name");
-      return Type.ERROR;
-    }
-
-    // Primitive names (Double, Float, ...) and metamodel types; see SymbolTable#lookupType
-    Type resolvedType = symbolTable.lookupType(typeName);
-    if (resolvedType == null) {
-      reportError(ctx, "Unknown type: " + typeName);
-      return Type.ERROR;
-    }
-
-    nodeTypes.put(ctx, resolvedType);
-    return resolvedType;
+    return typeExpressions.resolveName(ctx);
   }
 
   // ==================== Specifications & Expressions ====================
@@ -2487,9 +2392,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
 
     Type targetType = visit(ctx.type);
-    if (targetType == null && ctx.type != null) {
-      targetType = resolveTypeExpression(ctx.type);
-    }
 
     // Mirror the logic of visitOclAsTypeOp: Singleton !T! must not be wrapped in Set first,
     // otherwise preserveCollectionKind would return Set{Boolean} = {Boolean} instead of !Boolean!
@@ -2505,17 +2407,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     nodeTypes.put(ctx, resultType);
     nodeTypes.put(ctx.type, targetType);
     return resultType;
-  }
-
-  /** Helper to resolve type expressions for type operations. */
-  private Type resolveTypeExpression(VitruvOCLParser.TypeExpCSContext ctx) {
-    String text = ctx.getText();
-    return switch (text) {
-      case TYPE_INTEGER -> Type.INTEGER;
-      case TYPE_STRING -> Type.STRING;
-      case TYPE_BOOLEAN -> Type.BOOLEAN;
-      default -> Type.ANY;
-    };
   }
 
   /**
@@ -2542,9 +2433,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
 
     Type targetType = visit(ctx.type);
-    if (targetType == null && ctx.type != null) {
-      targetType = resolveTypeExpression(ctx.type);
-    }
 
     // Mirror visitOclIsKindOfOp: Singleton !T! must not be wrapped in Set first
     Type resultType;
@@ -2618,16 +2506,13 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     }
 
     Type targetType = visit(ctx.type);
-    if (targetType == null && ctx.type != null) {
-      targetType = resolveTypeExpression(ctx.type);
-    }
 
-    if (targetType != null && !isPossibleCast(receiverType, targetType)) {
+    if (!isPossibleCast(receiverType, targetType)) {
       reportError(ctx, "Cannot cast " + receiverType + " to unrelated type " + targetType);
       nodeTypes.put(ctx, Type.ERROR);
       return Type.ERROR;
     }
-    if (targetType != null && targetType.isCollection() && !targetType.isSingleton()) {
+    if (targetType.isCollection() && !targetType.isSingleton()) {
       // the evaluator casts the members and keeps the receiver's kind: only the member counts
       targetType = memberType(targetType);
     }
