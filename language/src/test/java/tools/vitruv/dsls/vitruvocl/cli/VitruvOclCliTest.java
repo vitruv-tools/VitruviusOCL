@@ -546,7 +546,7 @@ class VitruvOclCliTest {
 
   /**
    * Tests that eval-batch accepts the optional {@code --threads <N>} flag (passed through to {@code
-   * VitruvOCL.evaluateConstraints(..., threadPoolSize)}) without changing output shape or content
+   * VitruvOclEngine.withThreadPoolSize(threadPoolSize)}) without changing output shape or content
    * compared to the default (no {@code --threads}) invocation.
    */
   @Test
@@ -577,11 +577,11 @@ class VitruvOclCliTest {
   }
 
   /**
-   * Documents the (accepted) behavior change from switching {@code evalBatch} to the {@code
-   * evaluateConstraints(...)} batch path: byte-identical duplicate constraints within one batch
+   * Documents the (accepted) behavior change from switching {@code evalBatch} to the batch path
+   * ({@code VitruvOclEngine#evaluateFile}): byte-identical duplicate constraints within one batch
    * file are now detected — the second (and any later) occurrence is reported as {@code
    * satisfied:false} with a duplicate-constraint warning rather than being independently evaluated
-   * again, matching {@code evaluateConstraints}'s existing duplicate-detection pre-pass (see {@code
+   * again, matching the batch path's duplicate-detection pre-pass (see {@code
    * VitruvOclCliTest#testEvalBatchMultipleConstraints} and {@code ParallelBatchEvaluationTest
    * #duplicateConstraintDetectionStillWorksWithParallelEvaluation} for the underlying, unmodified
    * batch-path behavior this now surfaces through the CLI too).
@@ -627,8 +627,8 @@ class VitruvOclCliTest {
    * dependencies for the whole list — a later constraint referencing a package the first one didn't
    * need would fail to resolve it (confirmed empirically). {@code SmartLoader#loadForConstraints}
    * was then changed to union every constraint's dependencies before loading, which removed that
-   * limitation; {@code evalBatch} now loads the context once via {@code evaluateConstraints(...)}
-   * and this test guards that the cross-metamodel case keeps working end-to-end.
+   * limitation; {@code evalBatch} now loads the context once via the engine's batch path and this
+   * test guards that the cross-metamodel case keeps working end-to-end.
    */
   @Test
   void testEvalBatchHandlesConstraintsWithDifferentMetamodelDependencies(@TempDir Path tempDir)

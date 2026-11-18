@@ -248,17 +248,23 @@ Coverage report: `language/target/site/jacoco/index.html`
 
 ```java
 import java.nio.file.Path;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 
-// Evaluate all constraints in a project directory
-BatchValidationResult result = VitruvOCL.evaluateProject(Path.of("."));
+// Evaluate all constraints of a project (model/src/main/{constraints.ocl,ecore,instances})
+Path project = Path.of(".");
+BatchValidationResult result =
+    VitruvOclEngine.forProject(project).evaluateFile(ConstraintFiles.projectConstraints(project));
 
 System.out.println("Satisfied: " + result.getSatisfiedConstraints().size());
 System.out.println("Violated:  " + result.getViolatedConstraints().size());
 ```
 
-See `tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL` for the full API.
+See `tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine` for the full API: engines for a
+`ModelAccess`, a Vitruvius virtual model (`forVsum`), files (`forFiles`) or a project
+(`forProject`), each evaluating single constraints, lists and `.ocl` files, with or without a
+transaction, and opening incremental sessions.
 
 ### Constraints of a Vitruvius VSUM
 

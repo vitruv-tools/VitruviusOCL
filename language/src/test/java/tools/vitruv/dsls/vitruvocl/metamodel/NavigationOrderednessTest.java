@@ -19,7 +19,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -46,8 +46,9 @@ class NavigationOrderednessTest {
   }
 
   private static ConstraintResult eval(String constraint) {
-    return VitruvOCL.evaluateConstraint(
-        constraint, new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_WITH_PAYLOADS});
+    return VitruvOclEngine.forFiles(
+            new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_WITH_PAYLOADS})
+        .evaluate(constraint);
   }
 
   /**

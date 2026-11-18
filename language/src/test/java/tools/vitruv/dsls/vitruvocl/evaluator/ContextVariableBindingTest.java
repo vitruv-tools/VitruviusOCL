@@ -20,7 +20,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -43,15 +43,16 @@ class ContextVariableBindingTest {
 
   private static ConstraintResult evalCad(String constraint) {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(constraint, new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE});
+        VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE})
+            .evaluate(constraint);
     assertThat(result.isSuccess()).as(result.toDetailedErrorString()).isTrue();
     return result;
   }
 
   private static ConstraintResult evalBrakeSystem(String constraint) {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint, new Path[] {BRAKESYSTEM_ECORE}, new Path[] {BRAKESYSTEM_INSTANCE});
+        VitruvOclEngine.forFiles(new Path[] {BRAKESYSTEM_ECORE}, new Path[] {BRAKESYSTEM_INSTANCE})
+            .evaluate(constraint);
     assertThat(result.isSuccess()).as(result.toDetailedErrorString()).isTrue();
     return result;
   }

@@ -27,7 +27,7 @@ import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -84,7 +84,7 @@ class AllInstancesPrescanTest {
             + " spaceMission::Payload.allInstances().size() >= 0"
             + " and satelliteSystem::Satellite.allInstances().size() == 1";
 
-    ConstraintResult result = VitruvOCL.evaluateConstraint(constraint, wrapper);
+    ConstraintResult result = VitruvOclEngine.forModel(wrapper).evaluate(constraint);
 
     assertTrue(result.isSuccess(), () -> String.valueOf(result.getCompilerErrors()));
     assertTrue(result.isSatisfied());

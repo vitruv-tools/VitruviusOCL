@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /** Type Matrix: self — context type x property access. */
@@ -30,11 +30,11 @@ class SelfContextMetamodelTest {
   }
 
   private static ConstraintResult evalCad(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {CAD_ECORE}, new Path[] {CAD_INST});
+    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INST}).evaluate(c);
   }
 
   private static ConstraintResult evalBrake(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {BS_ECORE}, new Path[] {BS_INST});
+    return VitruvOclEngine.forFiles(new Path[] {BS_ECORE}, new Path[] {BS_INST}).evaluate(c);
   }
 
   @ParameterizedTest

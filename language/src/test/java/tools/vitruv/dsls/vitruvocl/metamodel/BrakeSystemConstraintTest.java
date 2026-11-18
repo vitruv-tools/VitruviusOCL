@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -55,14 +55,14 @@ class BrakeSystemConstraintTest {
   // ---------------------------------------------------------------------------
 
   private static ConstraintResult eval(String c) {
-    return VitruvOCL.evaluateConstraint(
-        c,
-        new Path[] {BRAKESYSTEM_ECORE, CAD_ECORE},
-        new Path[] {BRAKESYSTEM_INSTANCE, CAD_INSTANCE});
+    return VitruvOclEngine.forFiles(
+            new Path[] {BRAKESYSTEM_ECORE, CAD_ECORE},
+            new Path[] {BRAKESYSTEM_INSTANCE, CAD_INSTANCE})
+        .evaluate(c);
   }
 
   private static ConstraintResult evalCad(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE});
+    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INSTANCE}).evaluate(c);
   }
 
   // ---------------------------------------------------------------------------

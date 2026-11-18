@@ -32,11 +32,11 @@ import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
@@ -249,10 +249,10 @@ class OCLIsKindOfTest extends DummyTestSpecification {
   @MethodSource("metamodelKindOfSatisfiedConstraints")
   void testMetamodelKindOfConstraintSatisfied(String constraint) {
     ConstraintResult r =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
+                new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER})
+            .evaluate(constraint);
     assertTrue(r.isSuccess(), "Evaluation should succeed");
     assertTrue(r.isSatisfied());
   }
@@ -289,10 +289,10 @@ context satelliteSystem::Satellite inv kindOfSatellite:
           ).size() > 0
         """;
     ConstraintResult r =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER, SPACECRAFT_ATLAS, SATELLITE_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
+                new Path[] {SPACECRAFT_VOYAGER, SPACECRAFT_ATLAS, SATELLITE_VOYAGER})
+            .evaluate(constraint);
     assertTrue(r.isSuccess(), "Evaluation should succeed: " + r.toDetailedErrorString());
     assertTrue(r.isSatisfied(), "Should find Spacecraft instances via oclIsKindOf");
   }

@@ -13,7 +13,8 @@
 
 import java.nio.file.Path;
 import java.util.List;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -54,7 +55,7 @@ import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
  *       extensions
  * </ul>
  *
- * @see VitruvOCL for main API documentation
+ * @see VitruvOclEngine for the API documentation
  * @see BatchValidationResult for batch result handling
  * @see ConstraintResult for single constraint results
  */
@@ -107,7 +108,9 @@ public class Main {
   private static void demoProjectEvaluation() throws Exception {
     printSection("1. Project-Based Evaluation (Convention over Configuration)");
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(Path.of("."));
+    BatchValidationResult result =
+        VitruvOclEngine.forProject(Path.of("."))
+            .evaluateFile(ConstraintFiles.projectConstraints(Path.of(".")));
 
     System.out.println("Result: " + result.getSummary());
     System.out.println("Detailed Report: \n" + result.getDetailedReport());
@@ -135,7 +138,7 @@ public class Main {
     printSection("2. Custom Constraint File Location");
 
     BatchValidationResult result =
-        VitruvOCL.evaluateProject(Path.of("constraints.ocl"), Path.of("."));
+        VitruvOclEngine.forProject(Path.of(".")).evaluateFile(Path.of("constraints.ocl"));
 
     System.out.println("Result: " + result.getSummary());
     System.out.println();
@@ -165,18 +168,19 @@ public class Main {
 
     // Only use matching instances to demonstrate clean file-based evaluation
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(
-            Path.of("constraints.ocl"),
-            new Path[] {
-              Path.of("metamodels/spaceMission.ecore"), Path.of("metamodels/satelliteSystem.ecore")
-            },
-            new Path[] {
-              Path.of("instances/spacecraft-voyager.spacemission"),
-              Path.of("instances/spacecraft-atlas.spacemission"),
-              Path.of("instances/satellite-voyager.satellitesystem"),
-              Path.of("instances/satellite-atlas.satellitesystem"),
-              Path.of("instances/satellite-hubble.satellitesystem")
-            });
+        VitruvOclEngine.forFiles(
+                new Path[] {
+                  Path.of("metamodels/spaceMission.ecore"),
+                  Path.of("metamodels/satelliteSystem.ecore")
+                },
+                new Path[] {
+                  Path.of("instances/spacecraft-voyager.spacemission"),
+                  Path.of("instances/spacecraft-atlas.spacemission"),
+                  Path.of("instances/satellite-voyager.satellitesystem"),
+                  Path.of("instances/satellite-atlas.satellitesystem"),
+                  Path.of("instances/satellite-hubble.satellitesystem")
+                })
+            .evaluateFile(Path.of("constraints.ocl"));
 
     System.out.println("Result: " + result.getSummary());
     System.out.println("Note: Using only matching instances to demonstrate file-based evaluation");
@@ -213,10 +217,10 @@ public class Main {
             "context spaceMission::Spacecraft inv: self.operational");
 
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(
-            constraints,
-            new Path[] {Path.of("metamodels/spaceMission.ecore")},
-            new Path[] {Path.of("instances/spacecraft-voyager.spacemission")});
+        VitruvOclEngine.forFiles(
+                new Path[] {Path.of("metamodels/spaceMission.ecore")},
+                new Path[] {Path.of("instances/spacecraft-voyager.spacemission")})
+            .evaluateAll(constraints);
 
     System.out.println("Result: " + result.getSummary());
     System.out.println();
@@ -254,10 +258,10 @@ public class Main {
     printSection("5. Single Constraint Evaluation");
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.mass > 0",
-            new Path[] {Path.of("metamodels/spaceMission.ecore")},
-            new Path[] {Path.of("instances/spacecraft-voyager.spacemission")});
+        VitruvOclEngine.forFiles(
+                new Path[] {Path.of("metamodels/spaceMission.ecore")},
+                new Path[] {Path.of("instances/spacecraft-voyager.spacemission")})
+            .evaluate("context spaceMission::Spacecraft inv: self.mass > 0");
 
     System.out.println("Success: " + result.isSuccess());
     System.out.println("Satisfied: " + result.isSatisfied());
@@ -304,15 +308,16 @@ public class Main {
         """;
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {
-              Path.of("metamodels/spaceMission.ecore"), Path.of("metamodels/satelliteSystem.ecore")
-            },
-            new Path[] {
-              Path.of("instances/spacecraft-voyager.spacemission"),
-              Path.of("instances/satellite-voyager.satellitesystem")
-            });
+        VitruvOclEngine.forFiles(
+                new Path[] {
+                  Path.of("metamodels/spaceMission.ecore"),
+                  Path.of("metamodels/satelliteSystem.ecore")
+                },
+                new Path[] {
+                  Path.of("instances/spacecraft-voyager.spacemission"),
+                  Path.of("instances/satellite-voyager.satellitesystem")
+                })
+            .evaluate(constraint);
 
     System.out.println("Cross-metamodel constraint satisfied: " + result.isSatisfied());
     System.out.println();
@@ -344,7 +349,9 @@ public class Main {
   private static void demoBatchAnalysis() throws Exception {
     printSection("7. Batch Result Analysis");
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(Path.of("."));
+    BatchValidationResult result =
+        VitruvOclEngine.forProject(Path.of("."))
+            .evaluateFile(ConstraintFiles.projectConstraints(Path.of(".")));
 
     System.out.println("Total constraints evaluated: " + result.getResults().size());
     System.out.println("All compiled successfully: " + result.allSucceeded());

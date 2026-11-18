@@ -20,10 +20,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalLevel;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
@@ -75,7 +76,7 @@ public class VitruvOclCli {
     String constraintText = Files.readString(parsed.constraintFile);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(constraintText, parsed.ecoreFiles, new Path[0]);
+        VitruvOclEngine.forFiles(parsed.ecoreFiles, new Path[0]).evaluate(constraintText);
 
     System.out.println(buildCheckJson(result));
   }
@@ -85,7 +86,7 @@ public class VitruvOclCli {
     String constraintText = Files.readString(parsed.constraintFile);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(constraintText, parsed.ecoreFiles, parsed.xmiFiles);
+        VitruvOclEngine.forFiles(parsed.ecoreFiles, parsed.xmiFiles).evaluate(constraintText);
 
     System.out.println(buildEvalJson(result));
   }
@@ -94,23 +95,23 @@ public class VitruvOclCli {
    * Evaluates all constraints in a file and returns individual results for each.
    *
    * <p>Loads the metamodel/instance context once for the whole batch — via {@link
-   * VitruvOCL#evaluateConstraints(Path, Path[], Path[], int)}, whose {@code SmartLoader} loading
-   * step unions every constraint's dependencies (not just the first one's) before any evaluation
-   * starts — and then evaluates the full constraint list through the existing parallel batch path
-   * ({@code ConstraintListEvaluator}), instead of the old per-constraint loop that re-loaded the
-   * context on every iteration. Per-constraint JSON shape and field content are unchanged; only how
-   * the underlying results are produced differs.
+   * VitruvOclEngine#evaluateFile(Path)}, whose {@code SmartLoader} loading step unions every
+   * constraint's dependencies (not just the first one's) before any evaluation starts — and then
+   * evaluates the full constraint list through the parallel batch path ({@code
+   * ConstraintListEvaluator}), instead of a per-constraint loop that re-loads the context on every
+   * iteration.
    *
-   * <p>Delegates constraints-file parsing to {@link VitruvOCL} itself rather than keeping a second,
-   * divergent copy of the same splitting logic here — the CLI's own copy was missing {@code import}
-   * line filtering, which silently corrupted every constraint's compiled text whenever the file
-   * being evaluated declared an {@code import} (breaking compilation of the whole batch).
+   * <p>Constraints-file parsing is left to {@link ConstraintFiles} rather than keeping a second,
+   * divergent copy of the same splitting logic here — an earlier CLI copy was missing {@code
+   * import} line filtering, which silently corrupted every constraint's compiled text whenever the
+   * file being evaluated declared an {@code import} (breaking compilation of the whole batch).
    */
   private static void evalBatch(String[] args) throws IOException {
     CLIArgs parsed = parseArgs(args);
     Integer threadPoolSize = parseThreadPoolSize(args);
     IncrementalLevel incrementalLevel = parseIncrementalLevel(args);
 
+    VitruvOclEngine engine = VitruvOclEngine.forFiles(parsed.ecoreFiles, parsed.xmiFiles);
     BatchValidationResult batch;
     if (incrementalLevel != null && incrementalLevel != IncrementalLevel.FULL) {
       // The CLI has no transaction: an incremental session can only perform its initial full
@@ -119,11 +120,10 @@ public class VitruvOclCli {
           IncrementalConfig.fromSystemProperties()
               .withLevel(incrementalLevel)
               .withThreads(threadPoolSize != null ? threadPoolSize : 1);
+      List<String> constraints = ConstraintFiles.read(parsed.constraintFile);
       IncrementalSession session;
       try {
-        session =
-            VitruvOCL.openIncrementalSession(
-                parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles, config);
+        session = engine.openIncrementalSession(constraints, config);
       } catch (IllegalStateException loadFailure) {
         session = null; // model files could not be loaded: report exactly as level 0 does
       }
@@ -132,17 +132,12 @@ public class VitruvOclCli {
           batch = s.latestResult().result();
         }
       } else {
-        batch =
-            VitruvOCL.evaluateConstraints(
-                parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles, config.threads());
+        batch = engine.withThreadPoolSize(config.threads()).evaluateFile(parsed.constraintFile);
       }
     } else {
-      batch =
-          threadPoolSize != null
-              ? VitruvOCL.evaluateConstraints(
-                  parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles, threadPoolSize)
-              : VitruvOCL.evaluateConstraints(
-                  parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles);
+      VitruvOclEngine configured =
+          threadPoolSize != null ? engine.withThreadPoolSize(threadPoolSize) : engine;
+      batch = configured.evaluateFile(parsed.constraintFile);
     }
 
     // Build batch result JSON
@@ -190,12 +185,12 @@ public class VitruvOclCli {
 
   /**
    * Parses an optional {@code --threads <N>} argument for {@code eval-batch}, controlling how many
-   * worker threads {@link VitruvOCL#evaluateConstraints(List, Path[], Path[], int)} distributes
-   * constraint evaluation across.
+   * worker threads {@link VitruvOclEngine#withThreadPoolSize(int)} distributes constraint
+   * evaluation across.
    *
    * @param args full CLI argument array
    * @return the requested thread pool size, or {@code null} if {@code --threads} was not given (in
-   *     which case the caller uses {@code evaluateConstraints}'s own default)
+   *     which case the caller uses the engine's default thread pool size)
    */
   @SuppressWarnings("java:S127")
   private static Integer parseThreadPoolSize(String[] args) {

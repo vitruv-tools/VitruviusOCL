@@ -35,7 +35,6 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,8 +43,8 @@ import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.change.composite.description.TransactionalChange;
 import tools.vitruv.change.composite.recording.ChangeRecorder;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.framework.views.ViewSource;
@@ -74,11 +73,6 @@ class VsumTransactionConstraintTest {
   @BeforeEach
   void setUp() {
     mockVsum = mock(InternalVirtualModel.class, withSettings().extraInterfaces(ViewSource.class));
-  }
-
-  @AfterEach
-  void tearDown() {
-    VitruvOCL.clearVSUM();
   }
 
   /** Loads the spaceMission ecore + the Voyager spacecraft instance into a fresh ResourceSet. */
@@ -140,11 +134,10 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft post: self.mass@pre == 722", transaction);
+        engine.evaluate("context spaceMission::Spacecraft post: self.mass@pre == 722", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(
@@ -163,10 +156,10 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft post: self.mass == self.mass@pre + 178", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
@@ -193,11 +186,10 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft post: self.mass@pre == 999", transaction);
+        engine.evaluate("context spaceMission::Spacecraft post: self.mass@pre == 999", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertFalse(
@@ -208,7 +200,7 @@ class VsumTransactionConstraintTest {
 
   /**
    * Same proof as {@link #postOperator_withRealTransaction_reportsGenuineViolation}, but through
-   * the whole-file batch entry point ({@link VitruvOCL#evaluateConstraints(Path, List)}) instead of
+   * the whole-file batch entry point ({@link VitruvOclEngine#evaluateFile(Path, List)}) instead of
    * the single-constraint one. This is the path a Reaction-execution hook uses: it has a real
    * transaction and a {@code .ocl} file with several {@code inv}/{@code pre}/{@code post} blocks to
    * check after one commit, not one constraint string at a time.
@@ -226,7 +218,7 @@ class VsumTransactionConstraintTest {
     final List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     Path oclFile = tempDir.resolve("batch.ocl");
     Files.writeString(
@@ -238,7 +230,7 @@ class VsumTransactionConstraintTest {
           self.mass@pre == 999
         """);
 
-    BatchValidationResult result = VitruvOCL.evaluateConstraints(oclFile, transaction);
+    BatchValidationResult result = engine.evaluateFile(oclFile, transaction);
 
     assertFalse(
         result.allSatisfied(),
@@ -259,14 +251,14 @@ class VsumTransactionConstraintTest {
   void noTransactionOverload_skipsPostBlockAndReportsIt() {
     Collection<Resource> resources = loadResources();
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     // No transaction argument at all — the pre-existing, transaction-unaware overload used by the
     // CLI and the VS Code plugin (neither has any notion of a transaction). The post block must be
     // skipped outright, not silently evaluated with vacuous empty-transaction semantics — see
     // noTransactionOverload_doesNotFalsePositiveOnLifecyclePredicate below for why that matters.
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context spaceMission::Spacecraft post: self.mass@pre == 722");
+        engine.evaluate("context spaceMission::Spacecraft post: self.mass@pre == 722");
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "Skipped post block must not count as a violation");
@@ -285,14 +277,14 @@ class VsumTransactionConstraintTest {
   void noTransactionOverload_doesNotFalsePositiveOnLifecyclePredicate() {
     Collection<Resource> resources = loadResources();
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     // Without the fix, OCLisModified would evaluate to false with an empty/no-op transaction and
     // get reported as a violated postcondition even though nothing about this constraint is wrong
     // — it simply cannot be checked without a transaction. Skipping it must avoid that false
     // positive.
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context spaceMission::Spacecraft post: self.OCLisModified");
+        engine.evaluate("context spaceMission::Spacecraft post: self.OCLisModified");
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "A skipped post block must never be reported as violated");
@@ -302,16 +294,16 @@ class VsumTransactionConstraintTest {
   void noTransactionOverload_stillEvaluatesInvAlongsideSkippedPost() {
     Collection<Resource> resources = loadResources();
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult passingInv =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft inv: self.mass > 0 post: self.OCLisModified");
     assertTrue(passingInv.isSuccess(), "Should succeed: " + passingInv.toDetailedErrorString());
     assertTrue(passingInv.isSatisfied(), "inv must still be evaluated and satisfied");
 
     ConstraintResult failingInv =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft inv: self.mass < 0 post: self.OCLisModified");
     assertTrue(failingInv.isSuccess(), "Should succeed: " + failingInv.toDetailedErrorString());
     assertFalse(failingInv.isSatisfied(), "inv must still be evaluated and reported as violated");
@@ -334,12 +326,12 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     // Every instance must satisfy "OCLisNew implies serialNumber == 'SC-002'" — i.e. OCLisNew is
     // true for exactly the newly created instance and false for the pre-existing Voyager.
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft post: self.OCLisNew implies self.serialNumber =="
                 + " \"SC-002\"",
             transaction);
@@ -360,11 +352,10 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft post: self.OCLisModified", transaction);
+        engine.evaluate("context spaceMission::Spacecraft post: self.OCLisModified", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(
@@ -386,16 +377,16 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     // A wrong (delta/pre-state) implementation would compare against a value the object never
     // had before creation and fail; the aggregate must read the live post-state value (500).
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft post: self.OCLisNew(mass => 500) implies true",
             transaction);
     ConstraintResult wrongValueResult =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft post: not self.OCLisNew(mass => 999)", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
@@ -435,10 +426,10 @@ class VsumTransactionConstraintTest {
     List<EChange<EObject>> transaction = endRecording(recorder);
 
     setupMockVsum(resources);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             "context spaceMission::Spacecraft post: not self.OCLisDeleted", transaction);
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());

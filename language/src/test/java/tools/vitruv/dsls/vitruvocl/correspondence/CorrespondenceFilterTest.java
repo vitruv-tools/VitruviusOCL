@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -102,7 +102,7 @@ class CorrespondenceFilterTest {
   // ================================================================
 
   private ConstraintResult eval(String constraint) {
-    return VitruvOCL.evaluateConstraint(constraint, ECORES, MODELS);
+    return VitruvOclEngine.forFiles(ECORES, MODELS).evaluate(constraint);
   }
 
   // ================================================================
@@ -1182,7 +1182,7 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep3_trivialConstraint() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context family::Member inv: true", ECORES, MODELS);
+        VitruvOclEngine.forFiles(ECORES, MODELS).evaluate("context family::Member inv: true");
     assertTrue(
         result.isSuccess(), "Trivial constraint should compile: " + result.getWarningsSummary());
     assertTrue(result.isSatisfied(), "Trivial 'true' constraint must be satisfied");
@@ -1191,13 +1191,12 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep4_oldSelectTildeNoFilter() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(ECORES, MODELS)
+            .evaluate(
+                """
             context family::Member inv:
               persons::Person.allInstances().select(~).size() >= 0
-            """,
-            ECORES,
-            MODELS);
+            """);
     // select(~) with tilde is expected to fail at parse/type-check level, not produce a crash
     assertNotNull(result, "Result must not be null even for invalid select(~)");
   }
@@ -1205,7 +1204,7 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep_trivialTrue() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context family::Member inv: true", ECORES, MODELS);
+        VitruvOclEngine.forFiles(ECORES, MODELS).evaluate("context family::Member inv: true");
     assertTrue(
         result.isSuccess(), "Trivial constraint must compile: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "Trivial 'true' constraint must be satisfied");

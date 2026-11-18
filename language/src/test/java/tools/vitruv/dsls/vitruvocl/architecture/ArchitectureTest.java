@@ -40,7 +40,7 @@ import tools.vitruv.dsls.vitruvocl.symboltable.AbstractPhaseVisitor;
  * rules are not reduced to the cycle rule alone.
  *
  * <p>The layers follow the target picture of the architecture plan as far as its packages exist;
- * the facade and the integrations still share the top layer.
+ * the integrations (CLI and Vitruv checker) form the top layer above the instance API.
  */
 class ArchitectureTest {
 
@@ -67,7 +67,7 @@ class ArchitectureTest {
           new Layer("Incremental", "incremental.."),
           new Layer("Adapter", "adapter.."),
           new Layer("Api", "api"),
-          new Layer("Top", "pipeline", "cli", "vitruv"));
+          new Layer("Top", "cli", "vitruv"));
 
   private static JavaClasses productionClasses;
 

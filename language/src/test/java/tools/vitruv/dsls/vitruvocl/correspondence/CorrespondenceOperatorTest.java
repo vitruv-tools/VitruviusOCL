@@ -24,7 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -87,7 +87,7 @@ class CorrespondenceOperatorTest {
   }
 
   private static ConstraintResult eval(String c, Path... instances) {
-    return VitruvOCL.evaluateConstraint(c, ECORES, instances);
+    return VitruvOclEngine.forFiles(ECORES, instances).evaluate(c);
   }
 
   // ── Parameterized: satisfied constraints ─────────────────────────────────
@@ -95,7 +95,7 @@ class CorrespondenceOperatorTest {
   @ParameterizedTest
   @MethodSource("satisfiedConstraints")
   void testConstraintSatisfied(String c, Path[] instances) {
-    ConstraintResult r = VitruvOCL.evaluateConstraint(c, ECORES, instances);
+    ConstraintResult r = VitruvOclEngine.forFiles(ECORES, instances).evaluate(c);
     assertTrue(r.isSuccess(), "Evaluation should succeed");
     assertTrue(r.isSatisfied());
   }
@@ -217,7 +217,7 @@ class CorrespondenceOperatorTest {
   @ParameterizedTest
   @MethodSource("successOnlyConstraints")
   void testConstraintSuccess(String c, Path[] instances) {
-    ConstraintResult r = VitruvOCL.evaluateConstraint(c, ECORES, instances);
+    ConstraintResult r = VitruvOclEngine.forFiles(ECORES, instances).evaluate(c);
     assertTrue(r.isSuccess(), "Evaluation should succeed");
   }
 

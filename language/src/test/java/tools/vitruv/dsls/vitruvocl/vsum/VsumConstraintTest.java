@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
@@ -34,7 +35,6 @@ import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.change.correspondence.Correspondence;
 import tools.vitruv.change.correspondence.view.EditableCorrespondenceModelView;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.framework.views.ViewSource;
@@ -85,11 +85,6 @@ class VsumConstraintTest {
   @BeforeEach
   void setUp() {
     mockVsum = mock(InternalVirtualModel.class, withSettings().extraInterfaces(ViewSource.class));
-  }
-
-  @AfterEach
-  void tearDown() {
-    VitruvOCL.clearVSUM();
   }
 
   // ---------------------------------------------------------------------------
@@ -279,54 +274,25 @@ class VsumConstraintTest {
   }
 
   // ---------------------------------------------------------------------------
-  // registerVSUM / clearVSUM / hasRegisteredVSUM
+  // VitruvOclEngine.forVsum
   // ---------------------------------------------------------------------------
 
   @Test
-  void testRegisterVSUM() {
-    Collection<Resource> resources = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
-    setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-
-    assertFalse(VitruvOCL.hasRegisteredVSUM(), "No VSUM registered initially");
-    VitruvOCL.registerVSUM(mockVsum);
-    assertTrue(VitruvOCL.hasRegisteredVSUM(), "VSUM should be registered");
-  }
-
-  @Test
-  void testClearVSUM() {
-    Collection<Resource> resources = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
-    setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-
-    VitruvOCL.registerVSUM(mockVsum);
-    assertTrue(VitruvOCL.hasRegisteredVSUM());
-    VitruvOCL.clearVSUM();
-    assertFalse(VitruvOCL.hasRegisteredVSUM(), "VSUM should be cleared");
-  }
-
-  @Test
-  void testRegisterVsumNull() {
-    assertThrows(IllegalArgumentException.class, () -> VitruvOCL.registerVSUM(null));
-  }
-
-  @Test
-  void testEvaluateWithoutRegisteredVsumThrows() {
-    assertThrows(
-        IllegalStateException.class,
-        () -> VitruvOCL.evaluateConstraint("context spaceMission::Spacecraft inv: true"));
+  void testForVsumRejectsNull() {
+    assertThrows(NullPointerException.class, () -> VitruvOclEngine.forVsum(null));
   }
 
   // ---------------------------------------------------------------------------
-  // evaluateConstraint(String) against VSUM
+  // VitruvOclEngine#evaluate(String) against a VSUM
   // ---------------------------------------------------------------------------
 
   @Test
   void testSimpleConstraintAgainstVSUM() {
     Collection<Resource> resources = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
     setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
-    ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context spaceMission::Spacecraft inv: true");
+    ConstraintResult result = engine.evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "Simple true constraint should be satisfied");
@@ -336,10 +302,9 @@ class VsumConstraintTest {
   void testConstraintViolationAgainstVSUM() {
     Collection<Resource> resources = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
     setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
-    ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context spaceMission::Spacecraft inv: false");
+    ConstraintResult result = engine.evaluate("context spaceMission::Spacecraft inv: false");
 
     assertTrue(result.isSuccess(), "Evaluation should succeed");
     assertFalse(result.isSatisfied(), "false constraint should be violated");
@@ -349,10 +314,10 @@ class VsumConstraintTest {
   void testAttributeConstraintAgainstVSUM() {
     Collection<Resource> resources = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
     setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context spaceMission::Spacecraft inv: self.mass > 0");
+        engine.evaluate("context spaceMission::Spacecraft inv: self.mass > 0");
 
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "Spacecraft mass should be > 0");
@@ -363,10 +328,10 @@ class VsumConstraintTest {
     Collection<Resource> resources =
         loadResources(SPACEMISSION_ECORE, SATELLITE_ECORE, SPACECRAFT_VOYAGER, SATELLITE_VOYAGER);
     setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             """
             context spaceMission::Spacecraft inv:
               satelliteSystem::Satellite.allInstances().exists(sat |
@@ -379,16 +344,16 @@ class VsumConstraintTest {
   }
 
   // ---------------------------------------------------------------------------
-  // evaluateConstraints(Path) against VSUM
+  // VitruvOclEngine#evaluateFile(Path) against a VSUM
   // ---------------------------------------------------------------------------
 
   @Test
-  void testEvaluateConstraintsFromFileAgainstVSUM() {
+  void testEvaluateConstraintsFromFileAgainstVSUM() throws IOException {
     Collection<Resource> resources = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
     setupMockVsum(resources, mockCorrespondenceModel(List.of()));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
-    BatchValidationResult results = VitruvOCL.evaluateConstraints(CONSTRAINTS_FILE);
+    BatchValidationResult results = engine.evaluateFile(CONSTRAINTS_FILE);
 
     assertNotNull(results);
     assertFalse(results.getResults().isEmpty(), "Should have evaluated at least one constraint");
@@ -398,7 +363,7 @@ class VsumConstraintTest {
   // Correspondence operator ~ against VSUM
   // ---------------------------------------------------------------------------
 
-  private void setupCorrespondenceVsum() {
+  private VitruvOclEngine correspondenceEngine() {
     Collection<Resource> modelResources =
         loadResources(
             SPACEMISSION_ECORE,
@@ -412,14 +377,13 @@ class VsumConstraintTest {
             .filter(r -> r.getURI().toString().endsWith(".correspondence"))
             .toList();
     setupMockVsum(modelResources, mockCorrespondenceModel(corrResources));
-    VitruvOCL.registerVSUM(mockVsum);
+    return VitruvOclEngine.forVsum(mockVsum);
   }
 
   @ParameterizedTest
   @MethodSource("correspondenceSatisfiedConstraints")
   void testCorrespondenceConstraintSatisfied(String constraint) {
-    setupCorrespondenceVsum();
-    ConstraintResult result = VitruvOCL.evaluateConstraint(constraint);
+    ConstraintResult result = correspondenceEngine().evaluate(constraint);
     assertTrue(result.isSuccess(), "Should succeed: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied());
   }
@@ -464,10 +428,10 @@ class VsumConstraintTest {
             SPACECRAFT_VOYAGER, SATELLITE_VOYAGER);
 
     setupMockVsum(modelResources, mockCorrespondenceModel(List.of()));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             """
             context spaceMission::Spacecraft inv:
               satelliteSystem::Satellite.allInstances().select(~).isEmpty()
@@ -498,11 +462,11 @@ class VsumConstraintTest {
             .toList();
 
     setupMockVsum(modelResources, mockCorrespondenceModel(corrResources));
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine engine = VitruvOclEngine.forVsum(mockVsum);
 
     // exists(~, Tag="voyager-match") → true
     ConstraintResult resultTrue =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             """
             context spaceMission::Spacecraft inv:
               satelliteSystem::Satellite.allInstances()
@@ -514,7 +478,7 @@ class VsumConstraintTest {
 
     // exists(~, Tag="no-such-tag") → false, daher not(...) true
     ConstraintResult resultFalse =
-        VitruvOCL.evaluateConstraint(
+        engine.evaluate(
             """
             context spaceMission::Spacecraft inv:
               not satelliteSystem::Satellite.allInstances()
@@ -526,11 +490,11 @@ class VsumConstraintTest {
   }
 
   // ---------------------------------------------------------------------------
-  // Re-registration
+  // Engines over different VSUMs
   // ---------------------------------------------------------------------------
 
   @Test
-  void testReRegisterVSUM() {
+  void testEnginesForDifferentVsumsAreIndependent() {
     Collection<Resource> resources1 = loadResources(SPACEMISSION_ECORE, SPACECRAFT_VOYAGER);
     Collection<Resource> resources2 = loadResources(SATELLITE_ECORE, SATELLITE_VOYAGER);
 
@@ -542,16 +506,20 @@ class VsumConstraintTest {
         mockCorrespondenceModel(List.of());
 
     setupMockVsum(resources1, corrModel1);
-    VitruvOCL.registerVSUM(mockVsum);
+    VitruvOclEngine first = VitruvOclEngine.forVsum(mockVsum);
 
     when(((ViewSource) mockVsum2).getViewSourceModels()).thenReturn(resources2);
     when(mockVsum2.getCorrespondenceModel()).thenReturn(corrModel2);
-    VitruvOCL.registerVSUM(mockVsum2);
+    VitruvOclEngine second = VitruvOclEngine.forVsum(mockVsum2);
 
-    ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context satelliteSystem::Satellite inv: true");
+    ConstraintResult result = second.evaluate("context satelliteSystem::Satellite inv: true");
+    ConstraintResult firstResult = first.evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(
-        result.isSuccess(), "Should succeed with new VSUM: " + result.toDetailedErrorString());
+        result.isSuccess(),
+        "Should succeed with the second VSUM: " + result.toDetailedErrorString());
+    assertTrue(
+        firstResult.isSuccess(),
+        "The first engine still uses its VSUM: " + firstResult.toDetailedErrorString());
   }
 }

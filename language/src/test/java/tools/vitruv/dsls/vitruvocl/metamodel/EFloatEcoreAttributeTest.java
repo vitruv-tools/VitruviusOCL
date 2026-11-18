@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -60,7 +60,7 @@ class EFloatEcoreAttributeTest {
   }
 
   private static ConstraintResult evalCad(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {CAD_ECORE}, new Path[] {CAD_INST});
+    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INST}).evaluate(c);
   }
 
   @ParameterizedTest
@@ -137,10 +137,8 @@ class EFloatEcoreAttributeTest {
   @Test
   void testSphereRadiusComparisonNegativeFails() {
     ConstraintResult r =
-        VitruvOCL.evaluateConstraint(
-            "context cad::Sphere inv:\n  self.radius < 0",
-            new Path[] {CAD_ECORE},
-            new Path[] {Path.of("Intersecting.cad")});
+        VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {Path.of("Intersecting.cad")})
+            .evaluate("context cad::Sphere inv:\n  self.radius < 0");
     assertTrue(r.isSuccess(), r.toDetailedErrorString());
     assertFalse(r.isSatisfied(), "No sphere should have negative radius");
   }

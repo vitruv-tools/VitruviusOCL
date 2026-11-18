@@ -33,11 +33,11 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.eclipse.emf.ecore.EPackage;
 import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.compiler.DependencyAnalyzer;
 import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.result.FileError;
 import tools.vitruv.dsls.vitruvocl.result.Violation;
 import tools.vitruv.dsls.vitruvocl.vitruv.OclInvariantParser.ParsedInvariant;
@@ -55,20 +55,19 @@ import tools.vitruv.framework.vsum.constraints.UnknownConstraintException;
 
 /**
  * A Vitruv {@link ConstraintChecker} for VitruvOCL constraints. Register it at a virtual model via
- * {@link
- * tools.vitruv.framework.vsum.VirtualModelBuilder#withConstraintChecker(ConstraintChecker)}.
+ * {@link tools.vitruv.framework.vsum.VirtualModelBuilder#withConstraintChecker(ConstraintChecker)}.
  *
- * <p>Each invariant is a constraint. Its id is the context type and the invariant name, e.g.
- * {@code shop::Item::nonNegativePrice}, so invariant names only need to be unique per context, as
- * in OCL. Unnamed invariants are numbered per context in declaration order ({@code
- * shop::Item#1}); name invariants to get ids that do not change when constraints are added.
+ * <p>Each invariant is a constraint. Its id is the context type and the invariant name, e.g. {@code
+ * shop::Item::nonNegativePrice}, so invariant names only need to be unique per context, as in OCL.
+ * Unnamed invariants are numbered per context in declaration order ({@code shop::Item#1}); name
+ * invariants to get ids that do not change when constraints are added.
  *
- * <p>Constraints can be created, updated and deleted while the virtual model is running, see
- * {@link EditableConstraintChecker}. Such constraints must be named, so their ids are stable.
+ * <p>Constraints can be created, updated and deleted while the virtual model is running, see {@link
+ * EditableConstraintChecker}. Such constraints must be named, so their ids are stable.
  *
- * <p>Unlike {@link VitruvOCL#registerVSUM}, the checker does not register a VSUM globally.
- * Metamodels are still resolved by the name of their package, both from the global {@link
- * org.eclipse.emf.ecore.EPackage.Registry} and from the models of the checked virtual model.
+ * <p>The checker does not register a VSUM globally. Metamodels are still resolved by the name of
+ * their package, both from the global {@link org.eclipse.emf.ecore.EPackage.Registry} and from the
+ * models of the checked virtual model.
  */
 public final class VitruvOclConstraintChecker implements EditableConstraintChecker {
 
@@ -336,8 +335,8 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    */
   private static void typeCheck(String source) {
     tools.vitruv.dsls.vitruvocl.result.ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            OclInvariantParser.withoutImports(source), new VsumWrapper(EmptyCheckContext.INSTANCE));
+        VitruvOclEngine.forModel(new VsumWrapper(EmptyCheckContext.INSTANCE))
+            .evaluate(OclInvariantParser.withoutImports(source));
     if (!result.getCompilerErrors().isEmpty()) {
       List<ConstraintDiagnostic> diagnostics = new ArrayList<>();
       for (CompileError error : result.getCompilerErrors()) {
@@ -418,7 +417,7 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
     try {
       tools.vitruv.dsls.vitruvocl.result.ConstraintResult oclResult =
           compiled == null
-              ? VitruvOCL.evaluateConstraint(descriptor.source(), wrapper)
+              ? VitruvOclEngine.forModel(wrapper).evaluate(descriptor.source())
               : ConstraintEvaluations.render(
                   descriptor.source(),
                   wrapper,

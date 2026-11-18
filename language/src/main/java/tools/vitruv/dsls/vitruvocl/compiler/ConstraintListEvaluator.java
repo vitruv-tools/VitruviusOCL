@@ -29,8 +29,8 @@ import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
  * thread pool, while preserving the caller-visible ordering of results.
  *
  * <p>Each constraint is handed to {@code perConstraintEvaluator} exactly once, on some pool thread;
- * {@code VitruvOCL}'s production callback creates a fresh {@link VitruvOCLCompiler} — and therefore
- * a fresh {@link tools.vitruv.dsls.vitruvocl.common.ErrorCollector} — per invocation, so no
+ * the engine's production callback compiles each constraint into its own {@link PreparedConstraint}
+ * — with a fresh {@link tools.vitruv.dsls.vitruvocl.common.ErrorCollector} — per invocation, so no
  * compiler-level mutable state is ever shared between tasks. The one piece of state genuinely
  * shared across tasks is the {@link ModelAccess} passed into every compiler; see {@code
  * MetamodelWrapper#getAllInstances} and {@code VsumWrapper#getAllInstances} for how their internal

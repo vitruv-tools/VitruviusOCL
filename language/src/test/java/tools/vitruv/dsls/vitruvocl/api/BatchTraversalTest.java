@@ -11,7 +11,7 @@
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
 
-package tools.vitruv.dsls.vitruvocl.pipeline;
+package tools.vitruv.dsls.vitruvocl.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
@@ -38,11 +37,6 @@ class BatchTraversalTest {
 
   @TempDir Path dir;
 
-  @AfterEach
-  void unregister() {
-    VitruvOCL.clearVSUM();
-  }
-
   private static long modelReads(LiveModel live) {
     return Mockito.mockingDetails(live.vsum()).getInvocations().stream()
         .filter(i -> i.getMethod().getName().equals("getViewSourceModels"))
@@ -52,7 +46,6 @@ class BatchTraversalTest {
   @Test
   void batchOverSeveralTypesReadsTheModelsOnce() throws IOException {
     LiveModel live = EdgeFixture.create().model();
-    VitruvOCL.registerDirectWrapper(live.wrapper());
     Path constraints = dir.resolve("c.ocl");
     Files.writeString(
         constraints,
@@ -66,7 +59,8 @@ class BatchTraversalTest {
     long before = modelReads(live);
     long preparationsBefore = PreparedConstraint.preparations();
 
-    BatchValidationResult result = VitruvOCL.evaluateConstraints(constraints, 1);
+    BatchValidationResult result =
+        VitruvOclEngine.forModel(live.wrapper()).withThreadPoolSize(1).evaluateFile(constraints);
 
     assertEquals(
         5,

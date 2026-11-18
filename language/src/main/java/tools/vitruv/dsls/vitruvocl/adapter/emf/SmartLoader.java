@@ -107,7 +107,7 @@ public class SmartLoader {
    * <p>Runs {@link DependencyAnalyzer#analyzeConstraint} over every constraint in {@code
    * constraints} and loads the <b>union</b> of all referenced metamodel packages (and their
    * matching instances) into a single wrapper — rather than only the first constraint's
-   * dependencies. This is what {@code VitruvOCL#evaluateConstraints} uses so that a batch whose
+   * dependencies. This is what {@code VitruvOclEngine#evaluateAll} uses so that a batch whose
    * constraints reference different metamodel packages resolves correctly for every constraint, not
    * just the first one; see {@code ConstraintListEvaluator} for how the resulting wrapper is then
    * shared (read-mostly) across the parallel per-constraint evaluation tasks.

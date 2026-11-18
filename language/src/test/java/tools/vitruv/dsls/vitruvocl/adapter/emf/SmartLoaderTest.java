@@ -24,10 +24,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link SmartLoader#loadForConstraints}, which replaced first-constraint-only
- * dependency analysis with a union across the whole constraint list (see {@code
+ * Tests for {@link SmartLoader#loadForConstraints}, which replaced first-constraint-only dependency
+ * analysis with a union across the whole constraint list (see {@code
  * ParallelBatchEvaluationTest#evaluateConstraintsLoadsUnionOfDependenciesAcrossTheWholeBatch} for
- * the end-to-end regression test through {@code VitruvOCL.evaluateConstraints}).
+ * the end-to-end regression test through {@code VitruvOclEngine.evaluateAll}).
  */
 class SmartLoaderTest {
 

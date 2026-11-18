@@ -25,7 +25,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -65,7 +65,7 @@ class CrossMetamodelConstraintTest {
   @ParameterizedTest
   @MethodSource("satisfiedConstraints")
   void testConstraintSatisfied(String c, Path[] instances) {
-    ConstraintResult result = VitruvOCL.evaluateConstraint(c, SM_SAT_ECORES, instances);
+    ConstraintResult result = VitruvOclEngine.forFiles(SM_SAT_ECORES, instances).evaluate(c);
     assertTrue(result.isSuccess(), "Evaluation should succeed");
     assertTrue(result.isSatisfied());
   }
@@ -305,7 +305,7 @@ class CrossMetamodelConstraintTest {
   @ParameterizedTest
   @MethodSource("successOnlyConstraints")
   void testConstraintSuccess(String c, Path[] instances) {
-    ConstraintResult result = VitruvOCL.evaluateConstraint(c, SM_SAT_ECORES, instances);
+    ConstraintResult result = VitruvOclEngine.forFiles(SM_SAT_ECORES, instances).evaluate(c);
     assertTrue(result.isSuccess(), "Evaluation should succeed");
   }
 
@@ -524,10 +524,9 @@ class CrossMetamodelConstraintTest {
           ).size() > 0
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            SAT_ONLY_ECORES,
-            new Path[] {SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE});
+        VitruvOclEngine.forFiles(
+                SAT_ONLY_ECORES, new Path[] {SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE})
+            .evaluate(constraint);
     if (!result.isSuccess()) {
       fail("Compilation failed: " + result.toDetailedErrorString());
     }
@@ -545,10 +544,9 @@ class CrossMetamodelConstraintTest {
           )
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            SAT_ONLY_ECORES,
-            new Path[] {SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE});
+        VitruvOclEngine.forFiles(
+                SAT_ONLY_ECORES, new Path[] {SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE})
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
   }
 
@@ -563,10 +561,12 @@ class CrossMetamodelConstraintTest {
           )
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            SM_SAT_ECORES,
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE});
+        VitruvOclEngine.forFiles(
+                SM_SAT_ECORES,
+                new Path[] {
+                  SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE
+                })
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
   }
 
@@ -581,10 +581,9 @@ class CrossMetamodelConstraintTest {
           ).size() > 0
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            SM_SAT_ECORES,
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS});
+        VitruvOclEngine.forFiles(
+                SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS})
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
   }
 
@@ -601,8 +600,8 @@ class CrossMetamodelConstraintTest {
           )
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint, SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_HUBBLE});
+        VitruvOclEngine.forFiles(SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_HUBBLE})
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
     assertFalse(result.isSatisfied(), "Spacecraft SC-001 should NOT match Satellite SAT-099");
   }
@@ -618,8 +617,8 @@ class CrossMetamodelConstraintTest {
           ).exists(sat | sat.active)
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint, SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER});
+        VitruvOclEngine.forFiles(SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER})
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
     assertFalse(result.isSatisfied(), "exists on empty collection should be false");
   }
@@ -635,8 +634,8 @@ class CrossMetamodelConstraintTest {
           )
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint, SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER});
+        VitruvOclEngine.forFiles(SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER})
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
     assertFalse(result.isSatisfied(), "All satellites having negative mass should be false");
   }
@@ -652,10 +651,9 @@ class CrossMetamodelConstraintTest {
           )
         """;
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            SM_SAT_ECORES,
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS});
+        VitruvOclEngine.forFiles(
+                SM_SAT_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS})
+            .evaluate(constraint);
     assertTrue(result.isSuccess());
     assertFalse(result.isSatisfied(), "Should not find impossible serial number");
   }

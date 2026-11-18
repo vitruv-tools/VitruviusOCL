@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /** Type Matrix: allInstances() on metaclass receiver → Set{T}. */
@@ -31,16 +31,17 @@ class AllInstancesMetamodelTest {
   }
 
   private static ConstraintResult eval(String c) {
-    return VitruvOCL.evaluateConstraint(
-        c, new Path[] {BS_ECORE, CAD_ECORE}, new Path[] {BS_INST, CAD_INST});
+    return VitruvOclEngine.forFiles(
+            new Path[] {BS_ECORE, CAD_ECORE}, new Path[] {BS_INST, CAD_INST})
+        .evaluate(c);
   }
 
   private static ConstraintResult evalCad(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {CAD_ECORE}, new Path[] {CAD_INST});
+    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INST}).evaluate(c);
   }
 
   private static ConstraintResult evalBrake(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {BS_ECORE}, new Path[] {BS_INST});
+    return VitruvOclEngine.forFiles(new Path[] {BS_ECORE}, new Path[] {BS_INST}).evaluate(c);
   }
 
   // ── cad metaclass receivers: satisfied ──────────────────────────

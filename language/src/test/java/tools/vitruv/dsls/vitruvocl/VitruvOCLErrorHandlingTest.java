@@ -25,7 +25,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.result.FileError;
@@ -69,10 +70,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testMissingEcoreFile() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {Path.of("nonexistent.ecore")},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {Path.of("nonexistent.ecore")}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertFalse(result.isSuccess(), "Should fail with missing ecore");
     assertFalse(result.getFileErrors().isEmpty(), "Should have file errors");
@@ -86,10 +85,9 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testMissingXmiFile() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {Path.of("nonexistent.xmi")});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE}, new Path[] {Path.of("nonexistent.xmi")})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertFalse(result.isSuccess());
     assertTrue(
@@ -103,10 +101,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testMissingMetamodelPackage() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context unknownPackage::Class inv: true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context unknownPackage::Class inv: true");
 
     assertFalse(result.isSuccess());
     assertTrue(
@@ -120,10 +116,10 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testMultipleFileErrors() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {Path.of("missing1.ecore"), Path.of("missing2.ecore")},
-            new Path[] {Path.of("missing.xmi")});
+        VitruvOclEngine.forFiles(
+                new Path[] {Path.of("missing1.ecore"), Path.of("missing2.ecore")},
+                new Path[] {Path.of("missing.xmi")})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertFalse(result.isSuccess());
     assertTrue(result.getFileErrors().size() >= 2, "Should report all missing files at once");
@@ -135,10 +131,10 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testDuplicateMetamodelWarning() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE, SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(result.isSuccess(), "Should succeed despite duplicate");
     assertFalse(
@@ -151,10 +147,9 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testUnusedMetamodelWarning() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(result.isSuccess());
     assertFalse(
@@ -167,10 +162,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testUnusedModelWarning() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(result.isSuccess());
     assertTrue(
@@ -188,10 +181,9 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testAllInstancesSatisfied() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_ACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_ACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv: self.operational");
 
     assertTrue(result.isSuccess());
     assertTrue(result.isSatisfied(), "All instances satisfy constraint");
@@ -207,10 +199,10 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testPartialViolation() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv: self.operational");
 
     assertTrue(result.isSuccess(), "Compilation succeeds");
     assertFalse(result.isSatisfied(), "Not all instances satisfy");
@@ -237,10 +229,10 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testAllInstancesViolated() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_INACTIVE, SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_INACTIVE, SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv: self.operational");
 
     assertTrue(result.isSuccess());
     assertFalse(result.isSatisfied());
@@ -257,10 +249,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSingleInstanceViolation() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv: self.operational");
 
     assertTrue(result.isSuccess());
     assertFalse(result.isSatisfied());
@@ -272,10 +262,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSyntaxError1() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: $$$ invalid @@@",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: $$$ invalid @@@");
 
     assertFalse(result.isSuccess());
     assertFalse(result.getCompilerErrors().isEmpty(), "Should have syntax errors");
@@ -285,10 +273,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testUnknownAttribute() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.nonExistentAttribute == 5",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: self.nonExistentAttribute == 5");
 
     assertFalse(result.isSuccess());
     assertFalse(result.getCompilerErrors().isEmpty());
@@ -298,10 +284,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testTypeError() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.name + 5",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: self.name + 5");
 
     assertFalse(result.isSuccess());
     assertFalse(result.getCompilerErrors().isEmpty(), "Should have type error");
@@ -316,10 +300,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testFileErrorStopsCompilation() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: SYNTAX ERROR HERE",
-            new Path[] {Path.of("missing.ecore")},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {Path.of("missing.ecore")}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: SYNTAX ERROR HERE");
 
     assertFalse(result.isSuccess());
     assertFalse(result.getFileErrors().isEmpty(), "File errors take precedence");
@@ -331,10 +313,9 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testWarningsWithSuccessfulEvaluation() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(result.isSuccess());
     assertTrue(result.isSatisfied());
@@ -347,10 +328,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testDetailedErrorOutput() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context unknownPackage::Class inv: true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context unknownPackage::Class inv: true");
 
     String errorString = result.toDetailedErrorString();
     assertTrue(errorString.contains("FILE ERRORS"), "Should have clear section headers");
@@ -361,10 +340,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSuccessOutput() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     String output = result.toString();
     assertTrue(output.contains("SATISFIED"), "Should indicate satisfaction");
@@ -374,10 +351,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testViolationOutput() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: false",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv: false");
 
     String output = result.toString();
     assertTrue(output.contains("VIOLATED"), "Should indicate violation");
@@ -389,7 +364,7 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testEmptyConstraint() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("", new Path[] {SPACEMISSION_ECORE}, new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {}).evaluate("");
 
     assertFalse(result.isSuccess(), "Empty constraint should fail");
   }
@@ -398,8 +373,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testNoMetamodels() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true", new Path[] {}, new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertFalse(result.isSuccess());
     assertFalse(result.getFileErrors().isEmpty());
@@ -412,10 +387,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testNoModels() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: true");
 
     assertTrue(result.isSuccess(), "Should succeed with no models");
     assertTrue(result.isSatisfied(), "Vacuously true with no instances");
@@ -430,8 +403,8 @@ class VitruvOCLErrorHandlingTest {
             "context spaceMission::Spacecraft inv: false");
 
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(
-            constraints, new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluateAll(constraints);
 
     assertEquals(2, result.getResults().size());
     assertEquals(1, result.getSatisfiedConstraints().size());
@@ -447,8 +420,8 @@ class VitruvOCLErrorHandlingTest {
             "context spaceMission::Spacecraft inv: true");
 
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(
-            constraints, new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluateAll(constraints);
 
     assertTrue(
         result.getResults().get(1).getWarnings().stream()
@@ -465,8 +438,8 @@ class VitruvOCLErrorHandlingTest {
             + "context spaceMission::Spacecraft inv: self.operational");
 
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(
-            tempFile, new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_VOYAGER})
+            .evaluateFile(tempFile);
 
     assertEquals(2, result.getResults().size());
     Files.delete(tempFile);
@@ -477,7 +450,7 @@ class VitruvOCLErrorHandlingTest {
   void testEvaluateProject() throws java.io.IOException {
     Path projectDir = Path.of("src/test/resources/test-project");
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(projectDir);
+    BatchValidationResult result = evaluateProject(projectDir);
 
     assertFalse(result.getResults().isEmpty(), "Should have results");
     assertTrue(result.allSucceeded(), "All constraints should compile");
@@ -508,7 +481,7 @@ class VitruvOCLErrorHandlingTest {
     assertTrue(Files.exists(mainDir.resolve("ecore")));
     assertTrue(Files.exists(mainDir.resolve("instances")));
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(projectDir);
+    BatchValidationResult result = evaluateProject(projectDir);
     assertFalse(result.getResults().isEmpty());
   }
 
@@ -520,7 +493,7 @@ class VitruvOCLErrorHandlingTest {
     assertThrows(
         IOException.class,
         () -> {
-          VitruvOCL.evaluateProject(projectDir);
+          evaluateProject(projectDir);
         });
   }
 
@@ -534,7 +507,7 @@ class VitruvOCLErrorHandlingTest {
         mainDir.resolve("constraints.ocl"), "context spaceMission::Spacecraft inv: true");
     Files.createDirectory(mainDir.resolve("instances"));
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(tempProject);
+    BatchValidationResult result = evaluateProject(tempProject);
 
     assertTrue(result.getFailedConstraints().size() > 0, "Should fail without metamodels");
 
@@ -560,7 +533,7 @@ class VitruvOCLErrorHandlingTest {
     Path ecoreDir = Files.createDirectory(mainDir.resolve("ecore"));
     Files.copy(SPACEMISSION_ECORE, ecoreDir.resolve("spaceMission.ecore"));
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(tempProject);
+    BatchValidationResult result = evaluateProject(tempProject);
 
     assertTrue(result.allSucceeded(), "Should succeed without instances (vacuously true)");
 
@@ -585,7 +558,7 @@ class VitruvOCLErrorHandlingTest {
     Files.createDirectory(mainDir.resolve("ecore"));
     Files.createDirectory(mainDir.resolve("instances"));
 
-    BatchValidationResult result = VitruvOCL.evaluateProject(tempProject);
+    BatchValidationResult result = evaluateProject(tempProject);
 
     assertTrue(result.getResults().isEmpty(), "Empty file should yield no constraints");
 
@@ -612,10 +585,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testViolationReportedOnCorrectInstance() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv operationalCheck: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv operationalCheck: self.operational");
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "Should be violated");
@@ -645,10 +616,10 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testMultipleViolationsOnePerInstance() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv operationalCheck: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_INACTIVE, SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_INACTIVE, SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv operationalCheck: self.operational");
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "Should be violated");
@@ -668,10 +639,10 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testPartialViolationOnlyReportsViolatingInstances() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv operationalCheck: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv operationalCheck: self.operational");
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "Should be violated");
@@ -695,10 +666,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testViolationMessageContainsInstanceAttributes() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv operationalCheck: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv operationalCheck: self.operational");
 
     assertTrue(result.isSuccess(), "Should compile");
 
@@ -723,10 +692,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testViolationMessageContainsSourceFile() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv operationalCheck: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv operationalCheck: self.operational");
 
     assertTrue(result.isSuccess(), "Should compile");
 
@@ -750,10 +717,9 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testNoViolationWarningsWhenSatisfied() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv operationalCheck: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_VOYAGER})
+            .evaluate("context spaceMission::Spacecraft inv operationalCheck: self.operational");
 
     assertTrue(result.isSuccess(), "Should compile");
     assertTrue(result.isSatisfied(), "Should be satisfied");
@@ -792,18 +758,19 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSerialNumberMatchViolationForNonMatchingSpacecraft() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES,
+                new Path[] {
+                  SPACECRAFT_ACTIVE, SPACECRAFT_VOYAGER,
+                  SATELLITE_VOYAGER, SATELLITE_ATLAS
+                })
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv serialNumberMatch:
               satelliteSystem::Satellite.allInstances().exists(sat |
                 sat.serialNumber == self.serialNumber
               )
-            """,
-            BOTH_ECORES,
-            new Path[] {
-              SPACECRAFT_ACTIVE, SPACECRAFT_VOYAGER,
-              SATELLITE_VOYAGER, SATELLITE_ATLAS
-            });
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "SC-008 has no matching satellite");
@@ -828,15 +795,15 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSerialNumberMatchSatisfiedWhenAllMatch() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS})
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv serialNumberMatch:
               satelliteSystem::Satellite.allInstances().exists(sat |
                 sat.serialNumber == self.serialNumber
               )
-            """,
-            BOTH_ECORES,
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS});
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     assertTrue(result.isSatisfied(), "SC-001 matches satellite-voyager");
@@ -856,21 +823,22 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSerialInclusionViolationPerInstance() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES,
+                new Path[] {
+                  SPACECRAFT_ACTIVE,
+                  SPACECRAFT_INACTIVE,
+                  SPACECRAFT_VOYAGER,
+                  SATELLITE_VOYAGER,
+                  SATELLITE_ATLAS
+                })
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv serialInclusion:
               satelliteSystem::Satellite.allInstances().collect(sat |
                 sat.serialNumber
               ).includes(self.serialNumber)
-            """,
-            BOTH_ECORES,
-            new Path[] {
-              SPACECRAFT_ACTIVE,
-              SPACECRAFT_INACTIVE,
-              SPACECRAFT_VOYAGER,
-              SATELLITE_VOYAGER,
-              SATELLITE_ATLAS
-            });
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "SC-008 and SC-009 have no matching satellites");
@@ -905,18 +873,19 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testAndLogicViolatesWhenNotOperational() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES,
+                new Path[] {
+                  SPACECRAFT_INACTIVE, SPACECRAFT_VOYAGER,
+                  SATELLITE_VOYAGER, SATELLITE_ATLAS
+                })
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv andLogic:
               satelliteSystem::Satellite.allInstances().exists(sat |
                 sat.serialNumber == self.serialNumber
               ) and self.operational
-            """,
-            BOTH_ECORES,
-            new Path[] {
-              SPACECRAFT_INACTIVE, SPACECRAFT_VOYAGER,
-              SATELLITE_VOYAGER, SATELLITE_ATLAS
-            });
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "Inactive has no match AND is not operational");
@@ -944,19 +913,20 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testConditionalViolatesInactiveWhenManySatellites() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES,
+                new Path[] {
+                  SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE, SPACECRAFT_VOYAGER,
+                  SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE
+                })
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv conditional:
               if satelliteSystem::Satellite.allInstances().size() > 2
               then self.operational
               else self.mass > 0
               endif
-            """,
-            BOTH_ECORES,
-            new Path[] {
-              SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE, SPACECRAFT_VOYAGER,
-              SATELLITE_VOYAGER, SATELLITE_ATLAS, SATELLITE_HUBBLE
-            });
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     assertFalse(result.isSatisfied(), "Inactive spacecraft is not operational");
@@ -984,19 +954,20 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testConditionalSatisfiedWhenFewSatellites() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES,
+                new Path[] {
+                  SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE,
+                  SATELLITE_VOYAGER, SATELLITE_ATLAS
+                })
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv conditional:
               if satelliteSystem::Satellite.allInstances().size() > 2
               then self.operational
               else self.mass > 0
               endif
-            """,
-            BOTH_ECORES,
-            new Path[] {
-              SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE,
-              SATELLITE_VOYAGER, SATELLITE_ATLAS
-            });
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     // 2 satellites → else-branch: mass > 0
@@ -1019,15 +990,15 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testMassConsistencySatisfied() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(
+                BOTH_ECORES, new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS})
+            .evaluate(
+                """
             context spaceMission::Spacecraft inv massConsistency:
               satelliteSystem::Satellite.allInstances().forAll(sat |
                 sat.massKg == self.mass implies sat.active == self.operational
               )
-            """,
-            BOTH_ECORES,
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER, SATELLITE_ATLAS});
+            """);
 
     assertTrue(result.isSuccess(), "Should compile");
     assertTrue(
@@ -1049,7 +1020,8 @@ class VitruvOCLErrorHandlingTest {
    */
   private void assertUnknownOp(String constraint, String opName) {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(constraint, new Path[] {SPACEMISSION_ECORE}, new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(constraint);
     assertFalse(result.isSuccess(), "Should fail — unknown operation '" + opName + "' used");
     String errors = result.toDetailedErrorString();
     assertTrue(
@@ -1130,10 +1102,8 @@ class VitruvOCLErrorHandlingTest {
 
   private void assertSuggests(String typo, String expected) {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self." + typo + "() == true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self." + typo + "() == true");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertTrue(
@@ -1185,10 +1155,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testFarName_saysDoesNotExist() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.foobar() == true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self.foobar() == true");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertTrue(
@@ -1204,10 +1172,8 @@ class VitruvOCLErrorHandlingTest {
   private void assertOpSuggests(String typo, String expected) {
     // Build a constraint with the typo as a binary operator
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: true " + typo + " true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: true " + typo + " true");
     assertFalse(result.isSuccess(), "Should fail: '" + typo + "' is not a valid operator");
     String errors = result.toDetailedErrorString();
     assertTrue(
@@ -1220,14 +1186,13 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testExistsMissingBody_noImpliesCascade() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances().exists(A)
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: exists(A) is missing the '| body' part");
     String errors = result.toDetailedErrorString();
     // Must NOT cascade to the implies error
@@ -1241,14 +1206,13 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testForAllMissingBody_noImpliesCascade() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances().forAll(A)
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: forAll(A) is missing the '| body' part");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1259,16 +1223,15 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testRejectCorrFilterExtraArg_noImpliesCascade() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances()
                 .reject(~, e, Type = spaceMission::Spacecraft)
                 .size() == 3
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: 'e' is not a valid correspondence filter arg");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1279,14 +1242,13 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testAllInstancesWithArg_noImpliesCascade() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances(B).size() == 3
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: allInstances() takes no arguments");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1300,14 +1262,13 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSizeWithArg_noImpliesCascade() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances().size(42) == 3
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: size() takes no arguments");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1323,14 +1284,13 @@ class VitruvOCLErrorHandlingTest {
     // ANTLR silently recovers from ", )" — the best we can do is point the
     // error at the right-side expression (line 3), NOT at 'self' (line 2).
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances( , ).size() == 3
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     // allInstances( , ) is detected as a syntax error — the constraint must simply fail,
     // and the error must NOT cascade to the 'self' line (line 2).
     assertFalse(result.isSuccess(), "Should fail: allInstances( , ) is invalid");
@@ -1342,16 +1302,15 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testRejectEmptyCommaArgs_errorOnRejectCall() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances()
                 .reject(~, , , Type = spaceMission::Spacecraft)
                 .size() == 3
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     // reject(~, , , ...) either produces a syntax error or a targeted TypeChecker error —
     // either way it must NOT cascade to the 'implies' level.
     assertFalse(result.isSuccess(), "Should fail: extra commas in reject(~, , , ...)");
@@ -1366,10 +1325,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSingleEquals_suggestsDoubleEquals() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.serialNumber = \"SN-001\"",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self.serialNumber = \"SN-001\"");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertTrue(errors.contains("=="), "Error should mention '=='");
@@ -1381,10 +1338,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testTripleEquals_suggestsDoubleEquals() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.serialNumber === \"SN-001\"",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self.serialNumber === \"SN-001\"");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertTrue(errors.contains("===") || errors.contains("=="), "Error should mention ===");
@@ -1396,10 +1351,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testManyEquals_suggestsDoubleEquals() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.serialNumber ======= \"SN-001\"",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self.serialNumber ======= \"SN-001\"");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1413,13 +1366,12 @@ class VitruvOCLErrorHandlingTest {
   void testMissingRightOperandOfEquals_errorOnOperator() {
     // self.firstName == implies ... — right side of == is missing
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.serialNumber == implies self.operational == true
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1434,14 +1386,13 @@ class VitruvOCLErrorHandlingTest {
   void testMissingOperator_qualifiedName() {
     // "Marge" persons::Person... — forgotten implies/and/or
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational == true
             spaceMission::Spacecraft.allInstances().exists(~, Type = spaceMission::Spacecraft)
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: missing operator between expressions");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1456,10 +1407,8 @@ class VitruvOCLErrorHandlingTest {
   void testMissingOperator_selfRef() {
     // self.a self.b — forgotten and/or
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self.operational self.operational");
     assertFalse(result.isSuccess(), "Should fail: missing operator between self expressions");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1470,14 +1419,13 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testNotEmptyMissingParens_errorOnOperation() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances().select(sc | sc.operational).notEmpty
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: notEmpty without ()");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1491,14 +1439,13 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSelectMissingParens_errorOnOperation() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate(
+                """
         context spaceMission::Spacecraft inv:
           self.operational implies
             spaceMission::Spacecraft.allInstances().select.notEmpty()
-        """,
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        """);
     assertFalse(result.isSuccess(), "Should fail: select without ()");
     String errors = result.toDetailedErrorString();
     assertFalse(
@@ -1512,10 +1459,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSelf_typo_slef_suggests_self() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: slef.operational == true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: slef.operational == true");
     assertFalse(result.isSuccess(), "Should fail: 'slef' is undefined");
     String errors = result.toDetailedErrorString();
     assertTrue(
@@ -1529,10 +1474,8 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testSelf_typo_sel_suggests_self() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: sel.operational == true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: sel.operational == true");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertTrue(errors.contains("self"), "Should suggest 'self' for 'sel', got: " + errors);
@@ -1561,14 +1504,18 @@ class VitruvOCLErrorHandlingTest {
   @Test
   void testFarName_ssssss_noDidYouMean() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.ssssss() == true",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {});
+        VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {})
+            .evaluate("context spaceMission::Spacecraft inv: self.ssssss() == true");
     assertFalse(result.isSuccess());
     String errors = result.toDetailedErrorString();
     assertFalse(
         errors.contains("did you mean"),
         "'ssssss' is too far from any operation — should not suggest, got: " + errors);
+  }
+
+  /** Evaluates a project's constraints file against its metamodels and instances. */
+  private static BatchValidationResult evaluateProject(Path projectDir) throws IOException {
+    return VitruvOclEngine.forProject(projectDir)
+        .evaluateFile(ConstraintFiles.projectConstraints(projectDir));
   }
 }

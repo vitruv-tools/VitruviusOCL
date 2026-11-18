@@ -22,7 +22,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -54,8 +54,9 @@ class PrePostTypeCheckTest {
   }
 
   private ConstraintResult eval(String constraint) {
-    return VitruvOCL.evaluateConstraint(
-        constraint, new Path[] {BRAKESYSTEM_ECORE}, new Path[] {BRAKESYSTEM_INSTANCE});
+    return VitruvOclEngine.forFiles(
+            new Path[] {BRAKESYSTEM_ECORE}, new Path[] {BRAKESYSTEM_INSTANCE})
+        .evaluate(constraint);
   }
 
   // ==================== Cardinality ====================

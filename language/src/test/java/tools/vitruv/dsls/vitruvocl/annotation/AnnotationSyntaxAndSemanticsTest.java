@@ -36,9 +36,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -87,7 +87,7 @@ class AnnotationSyntaxAndSemanticsTest {
 
   /** Runs the full three-pass pipeline and returns a {@link ConstraintResult}. */
   private static ConstraintResult eval(String constraint) {
-    return VitruvOCL.evaluateConstraint(constraint, new Path[] {ECORE}, new Path[] {XMI});
+    return VitruvOclEngine.forFiles(new Path[] {ECORE}, new Path[] {XMI}).evaluate(constraint);
   }
 
   /**

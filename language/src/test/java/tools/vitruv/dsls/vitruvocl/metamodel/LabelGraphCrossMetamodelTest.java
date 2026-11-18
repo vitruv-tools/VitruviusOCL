@@ -25,7 +25,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -65,7 +65,7 @@ import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
  * objects each. Every name from LG1 appears exactly once in LG2 with the same label, so all four
  * constraints are satisfied on the base models.
  *
- * @see dsls.vitruvOCLInterface#evaluateConstraint(String, Path[], Path[])
+ * @see tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine#forFiles(Path[], Path[])
  */
 @Tag("slow")
 class LabelGraphCrossMetamodelTest {
@@ -116,10 +116,10 @@ class LabelGraphCrossMetamodelTest {
   @MethodSource("satisfiedCorrespondenceConstraints")
   void testCorrespondenceConstraintSatisfied(String constraint, String message) {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE},
-            new Path[] {BASE_LABELGRAPH1, BASE_LABELGRAPH2});
+        VitruvOclEngine.forFiles(
+                new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE},
+                new Path[] {BASE_LABELGRAPH1, BASE_LABELGRAPH2})
+            .evaluate(constraint);
 
     assertTrue(result.isSuccess(), "Compilation and evaluation should succeed");
     assertTrue(result.isSatisfied(), message);
@@ -190,10 +190,9 @@ class LabelGraphCrossMetamodelTest {
 
     // Load only LG1 instance — LG2 allInstances() is empty
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE},
-            new Path[] {BASE_LABELGRAPH1});
+        VitruvOclEngine.forFiles(
+                new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE}, new Path[] {BASE_LABELGRAPH1})
+            .evaluate(constraint);
 
     assertTrue(result.isSuccess(), "Compilation and evaluation should succeed");
     assertTrue(
@@ -224,10 +223,9 @@ class LabelGraphCrossMetamodelTest {
 
     // Load only LG1 instance — LG2 allInstances() returns empty collection
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE},
-            new Path[] {BASE_LABELGRAPH1});
+        VitruvOclEngine.forFiles(
+                new Path[] {LABELGRAPH1_ECORE, LABELGRAPH2_ECORE}, new Path[] {BASE_LABELGRAPH1})
+            .evaluate(constraint);
 
     assertTrue(result.isSuccess(), "Compilation and evaluation should succeed");
     assertFalse(

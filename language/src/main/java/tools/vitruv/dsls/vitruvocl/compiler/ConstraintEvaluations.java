@@ -29,14 +29,13 @@ import tools.vitruv.dsls.vitruvocl.result.Warning;
 
 /**
  * The two halves of evaluating a single constraint text: {@link #evaluateFresh} (compile and
- * evaluate from scratch, exactly as every batch/single-constraint entry point of {@code VitruvOCL}
- * does) and {@link #render} (turn the raw {@link EvaluationOutcome} into the user-facing {@link
- * ConstraintResult}).
+ * evaluate from scratch, exactly as {@code VitruvOclEngine#evaluate} does) and {@link #render}
+ * (turn the raw {@link EvaluationOutcome} into the user-facing {@link ConstraintResult}).
  *
- * <p>Split out of {@code VitruvOCL#compileAndEvaluate} without behavioural change, so that the
- * incremental evaluator ({@code tools.vitruv.dsls.vitruvocl.incremental}) can render outcomes it
- * assembled itself in exactly the same format, and its oracle can compare against a from-scratch
- * evaluation at the level of instance identities.
+ * <p>Split out of the former static facade's {@code compileAndEvaluate} without behavioural change,
+ * so that the incremental evaluator ({@code tools.vitruv.dsls.vitruvocl.incremental}) can render
+ * outcomes it assembled itself in exactly the same format, and its oracle can compare against a
+ * from-scratch evaluation at the level of instance identities.
  */
 public final class ConstraintEvaluations {
 

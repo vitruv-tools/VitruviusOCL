@@ -23,7 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
@@ -56,7 +56,8 @@ class SingleMetamodelConstraintTest {
   // ── helpers ──────────────────────────────────────────────────────────────────
 
   private static ConstraintResult eval(String c, Path instance) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {SPACEMISSION_ECORE}, new Path[] {instance});
+    return VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {instance})
+        .evaluate(c);
   }
 
   // ── Satisfied constraints (isSuccess + isSatisfied both true) ─────────────
@@ -211,10 +212,10 @@ class SingleMetamodelConstraintTest {
   @Test
   void testMultipleInstances() {
     ConstraintResult r =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE})
+            .evaluate("context spaceMission::Spacecraft inv: self.operational");
     assertTrue(r.isSuccess());
   }
 
