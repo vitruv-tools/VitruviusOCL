@@ -99,10 +99,12 @@ public class TypeResolver {
    * Resolves the result type of a binary operation.
    *
    * <p>Unwraps singleton {@code !T!} and optional {@code ?T?} receivers before resolution.
-   * Multi-valued collections (Set, Bag etc.) on either side cause an error unless the operator is
-   * {@code ==} or {@code !=} on two collections.
+   * Multi-valued collections (Set, Bag etc.) on either side cause an error. Comparison operators
+   * are not handled here: the type checker applies its own comparability rules to them.
    *
-   * @param operator "+", "-", "*", "/", "==", etc.
+   * @param operator an arithmetic ({@code +}, {@code -}, {@code *}, {@code /}) or logical ({@code
+   *     and}, {@code or}, {@code xor}, {@code implies}) operator; the type checker currently passes
+   *     the arithmetic ones and {@code and}/{@code or}/{@code xor}
    * @param leftType type of the left operand
    * @param rightType type of the right operand
    * @return the result type, or {@link Type#ERROR} on type mismatch
@@ -118,26 +120,8 @@ public class TypeResolver {
         case "+", "-", "*" -> Type.INTEGER;
         case "/" -> Type.DOUBLE;
         case "and", "or", "xor", OP_IMPLIES -> Type.BOOLEAN;
-        case "<", "<=", ">", ">=", "==", "!=" -> Type.BOOLEAN;
         default -> Type.ERROR;
       };
-    }
-
-    // Collection == / != : compare element-wise without unwrapping
-    if ((operator.equals("==") || operator.equals("!="))
-        && leftType.isCollection()
-        && rightType.isCollection()
-        && !leftType.isSingleton()
-        && !rightType.isSingleton()) {
-      Type leftElem = leftType.getElementType();
-      Type rightElem = rightType.getElementType();
-      if (leftElem.isConformantTo(rightElem)
-          || rightElem.isConformantTo(leftElem)
-          || leftElem == Type.ANY
-          || rightElem == Type.ANY) {
-        return Type.BOOLEAN;
-      }
-      return Type.ERROR;
     }
 
     // Unwrap singleton !T! and optional ?T? to their scalar member types
@@ -155,7 +139,6 @@ public class TypeResolver {
         case "+", "-", "*" -> Type.INTEGER;
         case "/" -> Type.DOUBLE;
         case "and", "or", "xor", OP_IMPLIES -> Type.BOOLEAN;
-        case "<", "<=", ">", ">=", "==", "!=" -> Type.BOOLEAN;
         default -> Type.ERROR;
       };
     }
@@ -190,47 +173,6 @@ public class TypeResolver {
     }
     if (operator.equals(OP_IMPLIES)) {
       if (leftType == Type.BOOLEAN && rightType == Type.BOOLEAN) {
-        return Type.BOOLEAN;
-      }
-      return Type.ERROR;
-    }
-
-    // Equality (scalars)
-    if (operator.equals("==") || operator.equals("!=")) {
-      if (isNumeric(leftType) && isNumeric(rightType)) {
-        return Type.BOOLEAN;
-      }
-      if (leftType == Type.BOOLEAN && rightType == Type.BOOLEAN) {
-        return Type.BOOLEAN;
-      }
-      if (leftType == Type.STRING && rightType == Type.STRING) {
-        return Type.BOOLEAN;
-      }
-      if (leftType == Type.STRING || rightType == Type.STRING) {
-        return Type.BOOLEAN;
-      }
-      if (leftType.isMetaclassType() && rightType.isMetaclassType()) {
-        return Type.BOOLEAN;
-      }
-      // null-comparison: ?T? compared to anything
-      if (leftType.isOptional() || rightType.isOptional()) {
-        return Type.BOOLEAN;
-      }
-      if (leftType == Type.ANY || rightType == Type.ANY) {
-        return Type.BOOLEAN;
-      }
-      return Type.ERROR;
-    }
-
-    // Ordering
-    if (operator.equals("<")
-        || operator.equals(">")
-        || operator.equals(">=")
-        || operator.equals("<=")) {
-      if (isNumeric(leftType) && isNumeric(rightType)) {
-        return Type.BOOLEAN;
-      }
-      if (leftType == Type.STRING && rightType == Type.STRING) {
         return Type.BOOLEAN;
       }
       return Type.ERROR;

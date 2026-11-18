@@ -754,16 +754,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
   // ==================== Comparison Operations ====================
 
-  /**
-   * Type checks equality comparison (==).
-   *
-   * <p>Validates that operands are comparable (same type or one conforms to the other).
-   *
-   * <p><b>Example:</b> {@code 5 == 10} → Boolean
-   *
-   * @param ctx The equality comparison operation node
-   * @return Type.BOOLEAN if operands are comparable, Type.ERROR otherwise
-   */
   /* Reports a type error spanning the full binary expression [left..right]. */
   private void addBinaryTypeError(
       org.antlr.v4.runtime.ParserRuleContext left,
@@ -808,70 +798,58 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     return false;
   }
 
+  /**
+   * Type checks equality comparison ({@code ==}); see {@link #typeEquality}.
+   *
+   * @param ctx The equality comparison node
+   * @return {@code Type.BOOLEAN}, or {@code Type.ERROR} if the operands cannot be compared
+   */
   @Override
   public Type visitEqualityComparison(VitruvOCLParser.EqualityComparisonContext ctx) {
-    if (!checkBinaryOperands(ctx.left, ctx.op, ctx.right)) {
-      return Type.ERROR;
-    }
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
-    Type resultType = Type.BOOLEAN;
-
-    if (isMultiValued(leftType) || isMultiValued(rightType)) {
-      // the evaluator compares single values only and fails at runtime for collections
-      addBinaryTypeError(
-          ctx.left,
-          ctx.right,
-          "Equality requires single values, not collections: "
-              + leftType
-              + AND_SEPARATOR
-              + rightType);
-      resultType = Type.ERROR;
-    } else if (!areComparable(leftType, rightType)) {
-      addBinaryTypeError(
-          ctx.left,
-          ctx.right,
-          "Cannot compare incompatible types: " + leftType + AND_SEPARATOR + rightType);
-      resultType = Type.ERROR;
-    }
-
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return typeEquality(ctx, ctx.left, ctx.op, ctx.right);
   }
 
   /**
-   * Type checks inequality comparison (!=).
+   * Type checks inequality comparison ({@code !=}); see {@link #typeEquality}.
    *
-   * <p>Validates that operands are comparable (same type or one conforms to the other).
-   *
-   * <p><b>Example:</b> {@code "hello" != "world"} → Boolean
-   *
-   * @param ctx The inequality comparison operation node
-   * @return Type.BOOLEAN if operands are comparable, Type.ERROR otherwise
+   * @param ctx The inequality comparison node
+   * @return {@code Type.BOOLEAN}, or {@code Type.ERROR} if the operands cannot be compared
    */
   @Override
   public Type visitInequalityComparison(VitruvOCLParser.InequalityComparisonContext ctx) {
-    if (!checkBinaryOperands(ctx.left, ctx.op, ctx.right)) {
+    return typeEquality(ctx, ctx.left, ctx.op, ctx.right);
+  }
+
+  /**
+   * Shared type check of {@code ==} and {@code !=}: both operands must be single values (the
+   * evaluator compares single values only and fails at runtime for collections) of comparable types
+   * (see {@link ComparabilityRules#areComparable}).
+   */
+  private Type typeEquality(
+      VitruvOCLParser.InfixedExpCSContext ctx,
+      VitruvOCLParser.InfixedExpCSContext left,
+      org.antlr.v4.runtime.Token op,
+      VitruvOCLParser.InfixedExpCSContext right) {
+    if (!checkBinaryOperands(left, op, right)) {
       return Type.ERROR;
     }
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
+    Type leftType = visit(left);
+    Type rightType = visit(right);
     Type resultType = Type.BOOLEAN;
 
-    if (isMultiValued(leftType) || isMultiValued(rightType)) {
-      // the evaluator compares single values only and fails at runtime for collections
+    if (ComparabilityRules.isMultiValued(leftType) || ComparabilityRules.isMultiValued(rightType)) {
       addBinaryTypeError(
-          ctx.left,
-          ctx.right,
+          left,
+          right,
           "Equality requires single values, not collections: "
               + leftType
               + AND_SEPARATOR
               + rightType);
       resultType = Type.ERROR;
-    } else if (!areComparable(leftType, rightType)) {
+    } else if (!ComparabilityRules.areComparable(leftType, rightType)) {
       addBinaryTypeError(
-          ctx.left,
-          ctx.right,
+          left,
+          right,
           "Cannot compare incompatible types: " + leftType + AND_SEPARATOR + rightType);
       resultType = Type.ERROR;
     }
@@ -957,174 +935,72 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     return Type.ERROR;
   }
 
-  private boolean areOrderable(Type t1, Type t2) {
-    // Unwrap ¡T! and ¿T? for ordering checks
-    Type e1 = (t1.isSingleton() || t1.isOptional()) ? t1.getElementType() : t1;
-    Type e2 = (t2.isSingleton() || t2.isOptional()) ? t2.getElementType() : t2;
-    if (e1 == Type.ERROR || e2 == Type.ERROR) {
-      return true;
-    }
-    if (e1 == Type.ANY || e2 == Type.ANY) {
-      return true;
-    }
-    return TypeResolver.isNumeric(e1) && TypeResolver.isNumeric(e2);
-  }
-
   /**
-   * Type checks less-than comparison (&lt;).
+   * Type checks less-than comparison ({@code &lt;}); see {@link #typeOrdering}.
    *
-   * <p>Validates that operands are comparable (same type or one conforms to the other).
-   *
-   * <p><b>Example:</b> {@code 5 &lt; 10} → Boolean
-   *
-   * @param ctx The less-than comparison operation node
-   * @return Type.BOOLEAN if operands are comparable, Type.ERROR otherwise
+   * @param ctx The less-than comparison node
+   * @return {@code Type.BOOLEAN}, or {@code Type.ERROR} if the operands cannot be ordered
    */
   @Override
   public Type visitLessThanComparison(VitruvOCLParser.LessThanComparisonContext ctx) {
-    if (!checkBinaryOperands(ctx.left, ctx.op, ctx.right)) {
-      return Type.ERROR;
-    }
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
-    Type resultType = Type.BOOLEAN;
-    if (!areOrderable(leftType, rightType)) {
-      addBinaryTypeError(
-          ctx.left, ctx.right, ERR_ORDERING_TYPES + leftType + AND_SEPARATOR + rightType);
-      resultType = Type.ERROR;
-    }
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return typeOrdering(ctx, ctx.left, ctx.op, ctx.right);
   }
 
   /**
-   * Type checks less-than-or-equal comparison (&lt;=).
+   * Type checks less-than-or-equal comparison ({@code &lt;=}); see {@link #typeOrdering}.
    *
-   * <p>Validates that operands are comparable (same type or one conforms to the other).
-   *
-   * <p><b>Example:</b> {@code 5 &lt;= 10} → Boolean
-   *
-   * @param ctx The less-than-or-equal comparison operation node
-   * @return Type.BOOLEAN if operands are comparable, Type.ERROR otherwise
+   * @param ctx The less-than-or-equal comparison node
+   * @return {@code Type.BOOLEAN}, or {@code Type.ERROR} if the operands cannot be ordered
    */
   @Override
   public Type visitLessThanOrEqualComparison(VitruvOCLParser.LessThanOrEqualComparisonContext ctx) {
-    if (!checkBinaryOperands(ctx.left, ctx.op, ctx.right)) {
-      return Type.ERROR;
-    }
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
-    Type resultType = Type.BOOLEAN;
-    if (!areOrderable(leftType, rightType)) {
-      addBinaryTypeError(
-          ctx.left, ctx.right, ERR_ORDERING_TYPES + leftType + AND_SEPARATOR + rightType);
-      resultType = Type.ERROR;
-    }
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return typeOrdering(ctx, ctx.left, ctx.op, ctx.right);
   }
 
   /**
-   * Type checks greater-than comparison (>).
+   * Type checks greater-than comparison ({@code &gt;}); see {@link #typeOrdering}.
    *
-   * <p>Validates that operands are comparable (same type or one conforms to the other).
-   *
-   * <p><b>Example:</b> {@code 10 > 5} → Boolean
-   *
-   * @param ctx The greater-than comparison operation node
-   * @return Type.BOOLEAN if operands are comparable, Type.ERROR otherwise
+   * @param ctx The greater-than comparison node
+   * @return {@code Type.BOOLEAN}, or {@code Type.ERROR} if the operands cannot be ordered
    */
   @Override
   public Type visitGreaterThanComparison(VitruvOCLParser.GreaterThanComparisonContext ctx) {
-    if (!checkBinaryOperands(ctx.left, ctx.op, ctx.right)) {
-      return Type.ERROR;
-    }
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
-    Type resultType = Type.BOOLEAN;
-    if (!areOrderable(leftType, rightType)) {
-      addBinaryTypeError(
-          ctx.left, ctx.right, ERR_ORDERING_TYPES + leftType + AND_SEPARATOR + rightType);
-      resultType = Type.ERROR;
-    }
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return typeOrdering(ctx, ctx.left, ctx.op, ctx.right);
   }
 
   /**
-   * Type checks greater-than-or-equal comparison (>=).
+   * Type checks greater-than-or-equal comparison ({@code &gt;=}); see {@link #typeOrdering}.
    *
-   * <p>Validates that operands are comparable (same type or one conforms to the other).
-   *
-   * <p><b>Example:</b> {@code 10 >= 5} → Boolean
-   *
-   * @param ctx The greater-than-or-equal comparison operation node
-   * @return Type.BOOLEAN if operands are comparable, Type.ERROR otherwise
+   * @param ctx The greater-than-or-equal comparison node
+   * @return {@code Type.BOOLEAN}, or {@code Type.ERROR} if the operands cannot be ordered
    */
   @Override
   public Type visitGreaterThanOrEqualComparison(
       VitruvOCLParser.GreaterThanOrEqualComparisonContext ctx) {
-    if (!checkBinaryOperands(ctx.left, ctx.op, ctx.right)) {
+    return typeOrdering(ctx, ctx.left, ctx.op, ctx.right);
+  }
+
+  /**
+   * Shared type check of the ordering comparisons {@code <}, {@code <=}, {@code >} and {@code >=}:
+   * the operands must be orderable (see {@link ComparabilityRules#areOrderable}).
+   */
+  private Type typeOrdering(
+      VitruvOCLParser.InfixedExpCSContext ctx,
+      VitruvOCLParser.InfixedExpCSContext left,
+      org.antlr.v4.runtime.Token op,
+      VitruvOCLParser.InfixedExpCSContext right) {
+    if (!checkBinaryOperands(left, op, right)) {
       return Type.ERROR;
     }
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
+    Type leftType = visit(left);
+    Type rightType = visit(right);
     Type resultType = Type.BOOLEAN;
-    if (!areOrderable(leftType, rightType)) {
-      addBinaryTypeError(
-          ctx.left, ctx.right, ERR_ORDERING_TYPES + leftType + AND_SEPARATOR + rightType);
+    if (!ComparabilityRules.areOrderable(leftType, rightType)) {
+      addBinaryTypeError(left, right, ERR_ORDERING_TYPES + leftType + AND_SEPARATOR + rightType);
       resultType = Type.ERROR;
     }
     nodeTypes.put(ctx, resultType);
     return resultType;
-  }
-
-  /** Whether {@code type} is a collection that may hold more than one element. */
-  private static boolean isMultiValued(Type type) {
-    return type.isCollection() && type.getUpperBound() != 1;
-  }
-
-  /**
-   * Checks if two types are comparable.
-   *
-   * <p>Types are comparable if:
-   *
-   * <ul>
-   *   <li>Either is Type.ERROR (error already reported)
-   *   <li>They are equal
-   *   <li>One conforms to the other (subtype relationship)
-   * </ul>
-   *
-   * @param t1 First type
-   * @param t2 Second type
-   * @return true if types are comparable
-   */
-  @SuppressWarnings("java:S3776")
-  private boolean areComparable(Type t1, Type t2) {
-    if (t1 == Type.ERROR || t2 == Type.ERROR) {
-      return true;
-    }
-    if (t1.equals(t2)) {
-      return true;
-    }
-    if (t1.isConformantTo(t2) || t2.isConformantTo(t1)) {
-      return true;
-    }
-
-    // Optional ANY (?Any?) is comparable to anything — represents null
-    if ((t1.isOptional() && t1.getElementType() == Type.ANY)
-        || (t2.isOptional() && t2.getElementType() == Type.ANY)) {
-      return true;
-    }
-
-    // Unwrap singletons and optionals for comparison (¡T! and ¿T? both unwrap to T)
-    Type e1 = (t1.isSingleton() || t1.isOptional() || t1.isCollection()) ? t1.getElementType() : t1;
-    Type e2 = (t2.isSingleton() || t2.isOptional() || t2.isCollection()) ? t2.getElementType() : t2;
-    if (!e1.equals(t1) || !e2.equals(t2)) {
-      return areComparable(e1, e2);
-    }
-
-    return false;
   }
 
   // ==================== Arithmetic Operations ====================

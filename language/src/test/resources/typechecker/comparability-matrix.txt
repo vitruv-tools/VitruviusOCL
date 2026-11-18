@@ -1,0 +1,1014 @@
+Integer == Integer => ok
+Integer == Real => ok
+Integer == String => Cannot compare incompatible types: Integer and String @1:24-1:32
+Integer == Boolean => Cannot compare incompatible types: Integer and Boolean @1:24-1:33
+Integer == IntegerAttribute => ok
+Integer == StringAttribute => Cannot compare incompatible types: Integer and !String! @1:24-1:38
+Integer == SubA => Cannot compare incompatible types: Integer and edge::SubA @1:24-1:33
+Integer == OptionalItem => Cannot compare incompatible types: Integer and ?edge::Item? @1:24-1:38
+Integer == Other => Cannot compare incompatible types: Integer and !edge::Other! @1:24-1:63
+Integer == OclAny => ok
+Integer == SetOfInteger => Equality requires single values, not collections: Integer and {Integer} @1:24-1:35
+Integer == SequenceOfString => Equality requires single values, not collections: Integer and [String] @1:24-1:42
+Integer == BagOfInteger => Equality requires single values, not collections: Integer and {{Integer}} @1:24-1:35
+Real == Integer => ok
+Real == Real => ok
+Real == String => Cannot compare incompatible types: Double and String @1:24-1:34
+Real == Boolean => Cannot compare incompatible types: Double and Boolean @1:24-1:35
+Real == IntegerAttribute => ok
+Real == StringAttribute => Cannot compare incompatible types: Double and !String! @1:24-1:40
+Real == SubA => Cannot compare incompatible types: Double and edge::SubA @1:24-1:35
+Real == OptionalItem => Cannot compare incompatible types: Double and ?edge::Item? @1:24-1:40
+Real == Other => Cannot compare incompatible types: Double and !edge::Other! @1:24-1:65
+Real == OclAny => ok
+Real == SetOfInteger => Equality requires single values, not collections: Double and {Integer} @1:24-1:37
+Real == SequenceOfString => Equality requires single values, not collections: Double and [String] @1:24-1:44
+Real == BagOfInteger => Equality requires single values, not collections: Double and {{Integer}} @1:24-1:37
+String == Integer => Cannot compare incompatible types: String and Integer @1:24-1:32
+String == Real => Cannot compare incompatible types: String and Double @1:24-1:34
+String == String => ok
+String == Boolean => Cannot compare incompatible types: String and Boolean @1:24-1:35
+String == IntegerAttribute => Cannot compare incompatible types: String and !Integer! @1:24-1:41
+String == StringAttribute => ok
+String == SubA => Cannot compare incompatible types: String and edge::SubA @1:24-1:35
+String == OptionalItem => Cannot compare incompatible types: String and ?edge::Item? @1:24-1:40
+String == Other => Cannot compare incompatible types: String and !edge::Other! @1:24-1:65
+String == OclAny => ok
+String == SetOfInteger => Equality requires single values, not collections: String and {Integer} @1:24-1:37
+String == SequenceOfString => Equality requires single values, not collections: String and [String] @1:24-1:44
+String == BagOfInteger => Equality requires single values, not collections: String and {{Integer}} @1:24-1:37
+Boolean == Integer => Cannot compare incompatible types: Boolean and Integer @1:24-1:33
+Boolean == Real => Cannot compare incompatible types: Boolean and Double @1:24-1:35
+Boolean == String => Cannot compare incompatible types: Boolean and String @1:24-1:35
+Boolean == Boolean => ok
+Boolean == IntegerAttribute => Cannot compare incompatible types: Boolean and !Integer! @1:24-1:42
+Boolean == StringAttribute => Cannot compare incompatible types: Boolean and !String! @1:24-1:41
+Boolean == SubA => Cannot compare incompatible types: Boolean and edge::SubA @1:24-1:36
+Boolean == OptionalItem => Cannot compare incompatible types: Boolean and ?edge::Item? @1:24-1:41
+Boolean == Other => Cannot compare incompatible types: Boolean and !edge::Other! @1:24-1:66
+Boolean == OclAny => ok
+Boolean == SetOfInteger => Equality requires single values, not collections: Boolean and {Integer} @1:24-1:38
+Boolean == SequenceOfString => Equality requires single values, not collections: Boolean and [String] @1:24-1:45
+Boolean == BagOfInteger => Equality requires single values, not collections: Boolean and {{Integer}} @1:24-1:38
+IntegerAttribute == Integer => ok
+IntegerAttribute == Real => ok
+IntegerAttribute == String => Cannot compare incompatible types: !Integer! and String @1:24-1:41
+IntegerAttribute == Boolean => Cannot compare incompatible types: !Integer! and Boolean @1:24-1:42
+IntegerAttribute == IntegerAttribute => ok
+IntegerAttribute == StringAttribute => Cannot compare incompatible types: !Integer! and !String! @1:24-1:47
+IntegerAttribute == SubA => Cannot compare incompatible types: !Integer! and edge::SubA @1:24-1:42
+IntegerAttribute == OptionalItem => Cannot compare incompatible types: !Integer! and ?edge::Item? @1:24-1:47
+IntegerAttribute == Other => Cannot compare incompatible types: !Integer! and !edge::Other! @1:24-1:72
+IntegerAttribute == OclAny => ok
+IntegerAttribute == SetOfInteger => Equality requires single values, not collections: !Integer! and {Integer} @1:24-1:44
+IntegerAttribute == SequenceOfString => Equality requires single values, not collections: !Integer! and [String] @1:24-1:51
+IntegerAttribute == BagOfInteger => Equality requires single values, not collections: !Integer! and {{Integer}} @1:24-1:44
+StringAttribute == Integer => Cannot compare incompatible types: !String! and Integer @1:24-1:38
+StringAttribute == Real => Cannot compare incompatible types: !String! and Double @1:24-1:40
+StringAttribute == String => ok
+StringAttribute == Boolean => Cannot compare incompatible types: !String! and Boolean @1:24-1:41
+StringAttribute == IntegerAttribute => Cannot compare incompatible types: !String! and !Integer! @1:24-1:47
+StringAttribute == StringAttribute => ok
+StringAttribute == SubA => Cannot compare incompatible types: !String! and edge::SubA @1:24-1:41
+StringAttribute == OptionalItem => Cannot compare incompatible types: !String! and ?edge::Item? @1:24-1:46
+StringAttribute == Other => Cannot compare incompatible types: !String! and !edge::Other! @1:24-1:71
+StringAttribute == OclAny => ok
+StringAttribute == SetOfInteger => Equality requires single values, not collections: !String! and {Integer} @1:24-1:43
+StringAttribute == SequenceOfString => Equality requires single values, not collections: !String! and [String] @1:24-1:50
+StringAttribute == BagOfInteger => Equality requires single values, not collections: !String! and {{Integer}} @1:24-1:43
+SubA == Integer => Cannot compare incompatible types: edge::SubA and Integer @1:24-1:33
+SubA == Real => Cannot compare incompatible types: edge::SubA and Double @1:24-1:35
+SubA == String => Cannot compare incompatible types: edge::SubA and String @1:24-1:35
+SubA == Boolean => Cannot compare incompatible types: edge::SubA and Boolean @1:24-1:36
+SubA == IntegerAttribute => Cannot compare incompatible types: edge::SubA and !Integer! @1:24-1:42
+SubA == StringAttribute => Cannot compare incompatible types: edge::SubA and !String! @1:24-1:41
+SubA == SubA => ok
+SubA == OptionalItem => ok
+SubA == Other => Cannot compare incompatible types: edge::SubA and !edge::Other! @1:24-1:66
+SubA == OclAny => ok
+SubA == SetOfInteger => Equality requires single values, not collections: edge::SubA and {Integer} @1:24-1:38
+SubA == SequenceOfString => Equality requires single values, not collections: edge::SubA and [String] @1:24-1:45
+SubA == BagOfInteger => Equality requires single values, not collections: edge::SubA and {{Integer}} @1:24-1:38
+OptionalItem == Integer => Cannot compare incompatible types: ?edge::Item? and Integer @1:24-1:38
+OptionalItem == Real => Cannot compare incompatible types: ?edge::Item? and Double @1:24-1:40
+OptionalItem == String => Cannot compare incompatible types: ?edge::Item? and String @1:24-1:40
+OptionalItem == Boolean => Cannot compare incompatible types: ?edge::Item? and Boolean @1:24-1:41
+OptionalItem == IntegerAttribute => Cannot compare incompatible types: ?edge::Item? and !Integer! @1:24-1:47
+OptionalItem == StringAttribute => Cannot compare incompatible types: ?edge::Item? and !String! @1:24-1:46
+OptionalItem == SubA => ok
+OptionalItem == OptionalItem => ok
+OptionalItem == Other => Cannot compare incompatible types: ?edge::Item? and !edge::Other! @1:24-1:71
+OptionalItem == OclAny => ok
+OptionalItem == SetOfInteger => Equality requires single values, not collections: ?edge::Item? and {Integer} @1:24-1:43
+OptionalItem == SequenceOfString => Equality requires single values, not collections: ?edge::Item? and [String] @1:24-1:50
+OptionalItem == BagOfInteger => Equality requires single values, not collections: ?edge::Item? and {{Integer}} @1:24-1:43
+Other == Integer => Cannot compare incompatible types: !edge::Other! and Integer @1:24-1:63
+Other == Real => Cannot compare incompatible types: !edge::Other! and Double @1:24-1:65
+Other == String => Cannot compare incompatible types: !edge::Other! and String @1:24-1:65
+Other == Boolean => Cannot compare incompatible types: !edge::Other! and Boolean @1:24-1:66
+Other == IntegerAttribute => Cannot compare incompatible types: !edge::Other! and !Integer! @1:24-1:72
+Other == StringAttribute => Cannot compare incompatible types: !edge::Other! and !String! @1:24-1:71
+Other == SubA => Cannot compare incompatible types: !edge::Other! and edge::SubA @1:24-1:66
+Other == OptionalItem => Cannot compare incompatible types: !edge::Other! and ?edge::Item? @1:24-1:71
+Other == Other => ok
+Other == OclAny => ok
+Other == SetOfInteger => Equality requires single values, not collections: !edge::Other! and {Integer} @1:24-1:68
+Other == SequenceOfString => Equality requires single values, not collections: !edge::Other! and [String] @1:24-1:75
+Other == BagOfInteger => Equality requires single values, not collections: !edge::Other! and {{Integer}} @1:24-1:68
+OclAny == Integer => ok
+OclAny == Real => ok
+OclAny == String => ok
+OclAny == Boolean => ok
+OclAny == IntegerAttribute => ok
+OclAny == StringAttribute => ok
+OclAny == SubA => ok
+OclAny == OptionalItem => ok
+OclAny == Other => ok
+OclAny == OclAny => ok
+OclAny == SetOfInteger => Equality requires single values, not collections: !Any! and {Integer} @1:24-1:56
+OclAny == SequenceOfString => Equality requires single values, not collections: !Any! and [String] @1:24-1:63
+OclAny == BagOfInteger => Equality requires single values, not collections: !Any! and {{Integer}} @1:24-1:56
+SetOfInteger == Integer => Equality requires single values, not collections: {Integer} and Integer @1:24-1:35
+SetOfInteger == Real => Equality requires single values, not collections: {Integer} and Double @1:24-1:37
+SetOfInteger == String => Equality requires single values, not collections: {Integer} and String @1:24-1:37
+SetOfInteger == Boolean => Equality requires single values, not collections: {Integer} and Boolean @1:24-1:38
+SetOfInteger == IntegerAttribute => Equality requires single values, not collections: {Integer} and !Integer! @1:24-1:44
+SetOfInteger == StringAttribute => Equality requires single values, not collections: {Integer} and !String! @1:24-1:43
+SetOfInteger == SubA => Equality requires single values, not collections: {Integer} and edge::SubA @1:24-1:38
+SetOfInteger == OptionalItem => Equality requires single values, not collections: {Integer} and ?edge::Item? @1:24-1:43
+SetOfInteger == Other => Equality requires single values, not collections: {Integer} and !edge::Other! @1:24-1:68
+SetOfInteger == OclAny => Equality requires single values, not collections: {Integer} and !Any! @1:24-1:56
+SetOfInteger == SetOfInteger => Equality requires single values, not collections: {Integer} and {Integer} @1:24-1:40
+SetOfInteger == SequenceOfString => Equality requires single values, not collections: {Integer} and [String] @1:24-1:47
+SetOfInteger == BagOfInteger => Equality requires single values, not collections: {Integer} and {{Integer}} @1:24-1:40
+SequenceOfString == Integer => Equality requires single values, not collections: [String] and Integer @1:24-1:42
+SequenceOfString == Real => Equality requires single values, not collections: [String] and Double @1:24-1:44
+SequenceOfString == String => Equality requires single values, not collections: [String] and String @1:24-1:44
+SequenceOfString == Boolean => Equality requires single values, not collections: [String] and Boolean @1:24-1:45
+SequenceOfString == IntegerAttribute => Equality requires single values, not collections: [String] and !Integer! @1:24-1:51
+SequenceOfString == StringAttribute => Equality requires single values, not collections: [String] and !String! @1:24-1:50
+SequenceOfString == SubA => Equality requires single values, not collections: [String] and edge::SubA @1:24-1:45
+SequenceOfString == OptionalItem => Equality requires single values, not collections: [String] and ?edge::Item? @1:24-1:50
+SequenceOfString == Other => Equality requires single values, not collections: [String] and !edge::Other! @1:24-1:75
+SequenceOfString == OclAny => Equality requires single values, not collections: [String] and !Any! @1:24-1:63
+SequenceOfString == SetOfInteger => Equality requires single values, not collections: [String] and {Integer} @1:24-1:47
+SequenceOfString == SequenceOfString => Equality requires single values, not collections: [String] and [String] @1:24-1:54
+SequenceOfString == BagOfInteger => Equality requires single values, not collections: [String] and {{Integer}} @1:24-1:47
+BagOfInteger == Integer => Equality requires single values, not collections: {{Integer}} and Integer @1:24-1:35
+BagOfInteger == Real => Equality requires single values, not collections: {{Integer}} and Double @1:24-1:37
+BagOfInteger == String => Equality requires single values, not collections: {{Integer}} and String @1:24-1:37
+BagOfInteger == Boolean => Equality requires single values, not collections: {{Integer}} and Boolean @1:24-1:38
+BagOfInteger == IntegerAttribute => Equality requires single values, not collections: {{Integer}} and !Integer! @1:24-1:44
+BagOfInteger == StringAttribute => Equality requires single values, not collections: {{Integer}} and !String! @1:24-1:43
+BagOfInteger == SubA => Equality requires single values, not collections: {{Integer}} and edge::SubA @1:24-1:38
+BagOfInteger == OptionalItem => Equality requires single values, not collections: {{Integer}} and ?edge::Item? @1:24-1:43
+BagOfInteger == Other => Equality requires single values, not collections: {{Integer}} and !edge::Other! @1:24-1:68
+BagOfInteger == OclAny => Equality requires single values, not collections: {{Integer}} and !Any! @1:24-1:56
+BagOfInteger == SetOfInteger => Equality requires single values, not collections: {{Integer}} and {Integer} @1:24-1:40
+BagOfInteger == SequenceOfString => Equality requires single values, not collections: {{Integer}} and [String] @1:24-1:47
+BagOfInteger == BagOfInteger => Equality requires single values, not collections: {{Integer}} and {{Integer}} @1:24-1:40
+Integer != Integer => ok
+Integer != Real => ok
+Integer != String => Cannot compare incompatible types: Integer and String @1:24-1:32
+Integer != Boolean => Cannot compare incompatible types: Integer and Boolean @1:24-1:33
+Integer != IntegerAttribute => ok
+Integer != StringAttribute => Cannot compare incompatible types: Integer and !String! @1:24-1:38
+Integer != SubA => Cannot compare incompatible types: Integer and edge::SubA @1:24-1:33
+Integer != OptionalItem => Cannot compare incompatible types: Integer and ?edge::Item? @1:24-1:38
+Integer != Other => Cannot compare incompatible types: Integer and !edge::Other! @1:24-1:63
+Integer != OclAny => ok
+Integer != SetOfInteger => Equality requires single values, not collections: Integer and {Integer} @1:24-1:35
+Integer != SequenceOfString => Equality requires single values, not collections: Integer and [String] @1:24-1:42
+Integer != BagOfInteger => Equality requires single values, not collections: Integer and {{Integer}} @1:24-1:35
+Real != Integer => ok
+Real != Real => ok
+Real != String => Cannot compare incompatible types: Double and String @1:24-1:34
+Real != Boolean => Cannot compare incompatible types: Double and Boolean @1:24-1:35
+Real != IntegerAttribute => ok
+Real != StringAttribute => Cannot compare incompatible types: Double and !String! @1:24-1:40
+Real != SubA => Cannot compare incompatible types: Double and edge::SubA @1:24-1:35
+Real != OptionalItem => Cannot compare incompatible types: Double and ?edge::Item? @1:24-1:40
+Real != Other => Cannot compare incompatible types: Double and !edge::Other! @1:24-1:65
+Real != OclAny => ok
+Real != SetOfInteger => Equality requires single values, not collections: Double and {Integer} @1:24-1:37
+Real != SequenceOfString => Equality requires single values, not collections: Double and [String] @1:24-1:44
+Real != BagOfInteger => Equality requires single values, not collections: Double and {{Integer}} @1:24-1:37
+String != Integer => Cannot compare incompatible types: String and Integer @1:24-1:32
+String != Real => Cannot compare incompatible types: String and Double @1:24-1:34
+String != String => ok
+String != Boolean => Cannot compare incompatible types: String and Boolean @1:24-1:35
+String != IntegerAttribute => Cannot compare incompatible types: String and !Integer! @1:24-1:41
+String != StringAttribute => ok
+String != SubA => Cannot compare incompatible types: String and edge::SubA @1:24-1:35
+String != OptionalItem => Cannot compare incompatible types: String and ?edge::Item? @1:24-1:40
+String != Other => Cannot compare incompatible types: String and !edge::Other! @1:24-1:65
+String != OclAny => ok
+String != SetOfInteger => Equality requires single values, not collections: String and {Integer} @1:24-1:37
+String != SequenceOfString => Equality requires single values, not collections: String and [String] @1:24-1:44
+String != BagOfInteger => Equality requires single values, not collections: String and {{Integer}} @1:24-1:37
+Boolean != Integer => Cannot compare incompatible types: Boolean and Integer @1:24-1:33
+Boolean != Real => Cannot compare incompatible types: Boolean and Double @1:24-1:35
+Boolean != String => Cannot compare incompatible types: Boolean and String @1:24-1:35
+Boolean != Boolean => ok
+Boolean != IntegerAttribute => Cannot compare incompatible types: Boolean and !Integer! @1:24-1:42
+Boolean != StringAttribute => Cannot compare incompatible types: Boolean and !String! @1:24-1:41
+Boolean != SubA => Cannot compare incompatible types: Boolean and edge::SubA @1:24-1:36
+Boolean != OptionalItem => Cannot compare incompatible types: Boolean and ?edge::Item? @1:24-1:41
+Boolean != Other => Cannot compare incompatible types: Boolean and !edge::Other! @1:24-1:66
+Boolean != OclAny => ok
+Boolean != SetOfInteger => Equality requires single values, not collections: Boolean and {Integer} @1:24-1:38
+Boolean != SequenceOfString => Equality requires single values, not collections: Boolean and [String] @1:24-1:45
+Boolean != BagOfInteger => Equality requires single values, not collections: Boolean and {{Integer}} @1:24-1:38
+IntegerAttribute != Integer => ok
+IntegerAttribute != Real => ok
+IntegerAttribute != String => Cannot compare incompatible types: !Integer! and String @1:24-1:41
+IntegerAttribute != Boolean => Cannot compare incompatible types: !Integer! and Boolean @1:24-1:42
+IntegerAttribute != IntegerAttribute => ok
+IntegerAttribute != StringAttribute => Cannot compare incompatible types: !Integer! and !String! @1:24-1:47
+IntegerAttribute != SubA => Cannot compare incompatible types: !Integer! and edge::SubA @1:24-1:42
+IntegerAttribute != OptionalItem => Cannot compare incompatible types: !Integer! and ?edge::Item? @1:24-1:47
+IntegerAttribute != Other => Cannot compare incompatible types: !Integer! and !edge::Other! @1:24-1:72
+IntegerAttribute != OclAny => ok
+IntegerAttribute != SetOfInteger => Equality requires single values, not collections: !Integer! and {Integer} @1:24-1:44
+IntegerAttribute != SequenceOfString => Equality requires single values, not collections: !Integer! and [String] @1:24-1:51
+IntegerAttribute != BagOfInteger => Equality requires single values, not collections: !Integer! and {{Integer}} @1:24-1:44
+StringAttribute != Integer => Cannot compare incompatible types: !String! and Integer @1:24-1:38
+StringAttribute != Real => Cannot compare incompatible types: !String! and Double @1:24-1:40
+StringAttribute != String => ok
+StringAttribute != Boolean => Cannot compare incompatible types: !String! and Boolean @1:24-1:41
+StringAttribute != IntegerAttribute => Cannot compare incompatible types: !String! and !Integer! @1:24-1:47
+StringAttribute != StringAttribute => ok
+StringAttribute != SubA => Cannot compare incompatible types: !String! and edge::SubA @1:24-1:41
+StringAttribute != OptionalItem => Cannot compare incompatible types: !String! and ?edge::Item? @1:24-1:46
+StringAttribute != Other => Cannot compare incompatible types: !String! and !edge::Other! @1:24-1:71
+StringAttribute != OclAny => ok
+StringAttribute != SetOfInteger => Equality requires single values, not collections: !String! and {Integer} @1:24-1:43
+StringAttribute != SequenceOfString => Equality requires single values, not collections: !String! and [String] @1:24-1:50
+StringAttribute != BagOfInteger => Equality requires single values, not collections: !String! and {{Integer}} @1:24-1:43
+SubA != Integer => Cannot compare incompatible types: edge::SubA and Integer @1:24-1:33
+SubA != Real => Cannot compare incompatible types: edge::SubA and Double @1:24-1:35
+SubA != String => Cannot compare incompatible types: edge::SubA and String @1:24-1:35
+SubA != Boolean => Cannot compare incompatible types: edge::SubA and Boolean @1:24-1:36
+SubA != IntegerAttribute => Cannot compare incompatible types: edge::SubA and !Integer! @1:24-1:42
+SubA != StringAttribute => Cannot compare incompatible types: edge::SubA and !String! @1:24-1:41
+SubA != SubA => ok
+SubA != OptionalItem => ok
+SubA != Other => Cannot compare incompatible types: edge::SubA and !edge::Other! @1:24-1:66
+SubA != OclAny => ok
+SubA != SetOfInteger => Equality requires single values, not collections: edge::SubA and {Integer} @1:24-1:38
+SubA != SequenceOfString => Equality requires single values, not collections: edge::SubA and [String] @1:24-1:45
+SubA != BagOfInteger => Equality requires single values, not collections: edge::SubA and {{Integer}} @1:24-1:38
+OptionalItem != Integer => Cannot compare incompatible types: ?edge::Item? and Integer @1:24-1:38
+OptionalItem != Real => Cannot compare incompatible types: ?edge::Item? and Double @1:24-1:40
+OptionalItem != String => Cannot compare incompatible types: ?edge::Item? and String @1:24-1:40
+OptionalItem != Boolean => Cannot compare incompatible types: ?edge::Item? and Boolean @1:24-1:41
+OptionalItem != IntegerAttribute => Cannot compare incompatible types: ?edge::Item? and !Integer! @1:24-1:47
+OptionalItem != StringAttribute => Cannot compare incompatible types: ?edge::Item? and !String! @1:24-1:46
+OptionalItem != SubA => ok
+OptionalItem != OptionalItem => ok
+OptionalItem != Other => Cannot compare incompatible types: ?edge::Item? and !edge::Other! @1:24-1:71
+OptionalItem != OclAny => ok
+OptionalItem != SetOfInteger => Equality requires single values, not collections: ?edge::Item? and {Integer} @1:24-1:43
+OptionalItem != SequenceOfString => Equality requires single values, not collections: ?edge::Item? and [String] @1:24-1:50
+OptionalItem != BagOfInteger => Equality requires single values, not collections: ?edge::Item? and {{Integer}} @1:24-1:43
+Other != Integer => Cannot compare incompatible types: !edge::Other! and Integer @1:24-1:63
+Other != Real => Cannot compare incompatible types: !edge::Other! and Double @1:24-1:65
+Other != String => Cannot compare incompatible types: !edge::Other! and String @1:24-1:65
+Other != Boolean => Cannot compare incompatible types: !edge::Other! and Boolean @1:24-1:66
+Other != IntegerAttribute => Cannot compare incompatible types: !edge::Other! and !Integer! @1:24-1:72
+Other != StringAttribute => Cannot compare incompatible types: !edge::Other! and !String! @1:24-1:71
+Other != SubA => Cannot compare incompatible types: !edge::Other! and edge::SubA @1:24-1:66
+Other != OptionalItem => Cannot compare incompatible types: !edge::Other! and ?edge::Item? @1:24-1:71
+Other != Other => ok
+Other != OclAny => ok
+Other != SetOfInteger => Equality requires single values, not collections: !edge::Other! and {Integer} @1:24-1:68
+Other != SequenceOfString => Equality requires single values, not collections: !edge::Other! and [String] @1:24-1:75
+Other != BagOfInteger => Equality requires single values, not collections: !edge::Other! and {{Integer}} @1:24-1:68
+OclAny != Integer => ok
+OclAny != Real => ok
+OclAny != String => ok
+OclAny != Boolean => ok
+OclAny != IntegerAttribute => ok
+OclAny != StringAttribute => ok
+OclAny != SubA => ok
+OclAny != OptionalItem => ok
+OclAny != Other => ok
+OclAny != OclAny => ok
+OclAny != SetOfInteger => Equality requires single values, not collections: !Any! and {Integer} @1:24-1:56
+OclAny != SequenceOfString => Equality requires single values, not collections: !Any! and [String] @1:24-1:63
+OclAny != BagOfInteger => Equality requires single values, not collections: !Any! and {{Integer}} @1:24-1:56
+SetOfInteger != Integer => Equality requires single values, not collections: {Integer} and Integer @1:24-1:35
+SetOfInteger != Real => Equality requires single values, not collections: {Integer} and Double @1:24-1:37
+SetOfInteger != String => Equality requires single values, not collections: {Integer} and String @1:24-1:37
+SetOfInteger != Boolean => Equality requires single values, not collections: {Integer} and Boolean @1:24-1:38
+SetOfInteger != IntegerAttribute => Equality requires single values, not collections: {Integer} and !Integer! @1:24-1:44
+SetOfInteger != StringAttribute => Equality requires single values, not collections: {Integer} and !String! @1:24-1:43
+SetOfInteger != SubA => Equality requires single values, not collections: {Integer} and edge::SubA @1:24-1:38
+SetOfInteger != OptionalItem => Equality requires single values, not collections: {Integer} and ?edge::Item? @1:24-1:43
+SetOfInteger != Other => Equality requires single values, not collections: {Integer} and !edge::Other! @1:24-1:68
+SetOfInteger != OclAny => Equality requires single values, not collections: {Integer} and !Any! @1:24-1:56
+SetOfInteger != SetOfInteger => Equality requires single values, not collections: {Integer} and {Integer} @1:24-1:40
+SetOfInteger != SequenceOfString => Equality requires single values, not collections: {Integer} and [String] @1:24-1:47
+SetOfInteger != BagOfInteger => Equality requires single values, not collections: {Integer} and {{Integer}} @1:24-1:40
+SequenceOfString != Integer => Equality requires single values, not collections: [String] and Integer @1:24-1:42
+SequenceOfString != Real => Equality requires single values, not collections: [String] and Double @1:24-1:44
+SequenceOfString != String => Equality requires single values, not collections: [String] and String @1:24-1:44
+SequenceOfString != Boolean => Equality requires single values, not collections: [String] and Boolean @1:24-1:45
+SequenceOfString != IntegerAttribute => Equality requires single values, not collections: [String] and !Integer! @1:24-1:51
+SequenceOfString != StringAttribute => Equality requires single values, not collections: [String] and !String! @1:24-1:50
+SequenceOfString != SubA => Equality requires single values, not collections: [String] and edge::SubA @1:24-1:45
+SequenceOfString != OptionalItem => Equality requires single values, not collections: [String] and ?edge::Item? @1:24-1:50
+SequenceOfString != Other => Equality requires single values, not collections: [String] and !edge::Other! @1:24-1:75
+SequenceOfString != OclAny => Equality requires single values, not collections: [String] and !Any! @1:24-1:63
+SequenceOfString != SetOfInteger => Equality requires single values, not collections: [String] and {Integer} @1:24-1:47
+SequenceOfString != SequenceOfString => Equality requires single values, not collections: [String] and [String] @1:24-1:54
+SequenceOfString != BagOfInteger => Equality requires single values, not collections: [String] and {{Integer}} @1:24-1:47
+BagOfInteger != Integer => Equality requires single values, not collections: {{Integer}} and Integer @1:24-1:35
+BagOfInteger != Real => Equality requires single values, not collections: {{Integer}} and Double @1:24-1:37
+BagOfInteger != String => Equality requires single values, not collections: {{Integer}} and String @1:24-1:37
+BagOfInteger != Boolean => Equality requires single values, not collections: {{Integer}} and Boolean @1:24-1:38
+BagOfInteger != IntegerAttribute => Equality requires single values, not collections: {{Integer}} and !Integer! @1:24-1:44
+BagOfInteger != StringAttribute => Equality requires single values, not collections: {{Integer}} and !String! @1:24-1:43
+BagOfInteger != SubA => Equality requires single values, not collections: {{Integer}} and edge::SubA @1:24-1:38
+BagOfInteger != OptionalItem => Equality requires single values, not collections: {{Integer}} and ?edge::Item? @1:24-1:43
+BagOfInteger != Other => Equality requires single values, not collections: {{Integer}} and !edge::Other! @1:24-1:68
+BagOfInteger != OclAny => Equality requires single values, not collections: {{Integer}} and !Any! @1:24-1:56
+BagOfInteger != SetOfInteger => Equality requires single values, not collections: {{Integer}} and {Integer} @1:24-1:40
+BagOfInteger != SequenceOfString => Equality requires single values, not collections: {{Integer}} and [String] @1:24-1:47
+BagOfInteger != BagOfInteger => Equality requires single values, not collections: {{Integer}} and {{Integer}} @1:24-1:40
+Integer < Integer => ok
+Integer < Real => ok
+Integer < String => Ordering comparison requires numeric or String types, got: Integer and String @1:24-1:31
+Integer < Boolean => Ordering comparison requires numeric or String types, got: Integer and Boolean @1:24-1:32
+Integer < IntegerAttribute => ok
+Integer < StringAttribute => Ordering comparison requires numeric or String types, got: Integer and !String! @1:24-1:37
+Integer < SubA => Ordering comparison requires numeric or String types, got: Integer and edge::SubA @1:24-1:32
+Integer < OptionalItem => Ordering comparison requires numeric or String types, got: Integer and ?edge::Item? @1:24-1:37
+Integer < Other => Ordering comparison requires numeric or String types, got: Integer and !edge::Other! @1:24-1:62
+Integer < OclAny => ok
+Integer < SetOfInteger => Ordering comparison requires numeric or String types, got: Integer and {Integer} @1:24-1:34
+Integer < SequenceOfString => Ordering comparison requires numeric or String types, got: Integer and [String] @1:24-1:41
+Integer < BagOfInteger => Ordering comparison requires numeric or String types, got: Integer and {{Integer}} @1:24-1:34
+Real < Integer => ok
+Real < Real => ok
+Real < String => Ordering comparison requires numeric or String types, got: Double and String @1:24-1:33
+Real < Boolean => Ordering comparison requires numeric or String types, got: Double and Boolean @1:24-1:34
+Real < IntegerAttribute => ok
+Real < StringAttribute => Ordering comparison requires numeric or String types, got: Double and !String! @1:24-1:39
+Real < SubA => Ordering comparison requires numeric or String types, got: Double and edge::SubA @1:24-1:34
+Real < OptionalItem => Ordering comparison requires numeric or String types, got: Double and ?edge::Item? @1:24-1:39
+Real < Other => Ordering comparison requires numeric or String types, got: Double and !edge::Other! @1:24-1:64
+Real < OclAny => ok
+Real < SetOfInteger => Ordering comparison requires numeric or String types, got: Double and {Integer} @1:24-1:36
+Real < SequenceOfString => Ordering comparison requires numeric or String types, got: Double and [String] @1:24-1:43
+Real < BagOfInteger => Ordering comparison requires numeric or String types, got: Double and {{Integer}} @1:24-1:36
+String < Integer => Ordering comparison requires numeric or String types, got: String and Integer @1:24-1:31
+String < Real => Ordering comparison requires numeric or String types, got: String and Double @1:24-1:33
+String < String => Ordering comparison requires numeric or String types, got: String and String @1:24-1:33
+String < Boolean => Ordering comparison requires numeric or String types, got: String and Boolean @1:24-1:34
+String < IntegerAttribute => Ordering comparison requires numeric or String types, got: String and !Integer! @1:24-1:40
+String < StringAttribute => Ordering comparison requires numeric or String types, got: String and !String! @1:24-1:39
+String < SubA => Ordering comparison requires numeric or String types, got: String and edge::SubA @1:24-1:34
+String < OptionalItem => Ordering comparison requires numeric or String types, got: String and ?edge::Item? @1:24-1:39
+String < Other => Ordering comparison requires numeric or String types, got: String and !edge::Other! @1:24-1:64
+String < OclAny => ok
+String < SetOfInteger => Ordering comparison requires numeric or String types, got: String and {Integer} @1:24-1:36
+String < SequenceOfString => Ordering comparison requires numeric or String types, got: String and [String] @1:24-1:43
+String < BagOfInteger => Ordering comparison requires numeric or String types, got: String and {{Integer}} @1:24-1:36
+Boolean < Integer => Ordering comparison requires numeric or String types, got: Boolean and Integer @1:24-1:32
+Boolean < Real => Ordering comparison requires numeric or String types, got: Boolean and Double @1:24-1:34
+Boolean < String => Ordering comparison requires numeric or String types, got: Boolean and String @1:24-1:34
+Boolean < Boolean => Ordering comparison requires numeric or String types, got: Boolean and Boolean @1:24-1:35
+Boolean < IntegerAttribute => Ordering comparison requires numeric or String types, got: Boolean and !Integer! @1:24-1:41
+Boolean < StringAttribute => Ordering comparison requires numeric or String types, got: Boolean and !String! @1:24-1:40
+Boolean < SubA => Ordering comparison requires numeric or String types, got: Boolean and edge::SubA @1:24-1:35
+Boolean < OptionalItem => Ordering comparison requires numeric or String types, got: Boolean and ?edge::Item? @1:24-1:40
+Boolean < Other => Ordering comparison requires numeric or String types, got: Boolean and !edge::Other! @1:24-1:65
+Boolean < OclAny => ok
+Boolean < SetOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {Integer} @1:24-1:37
+Boolean < SequenceOfString => Ordering comparison requires numeric or String types, got: Boolean and [String] @1:24-1:44
+Boolean < BagOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {{Integer}} @1:24-1:37
+IntegerAttribute < Integer => ok
+IntegerAttribute < Real => ok
+IntegerAttribute < String => Ordering comparison requires numeric or String types, got: !Integer! and String @1:24-1:40
+IntegerAttribute < Boolean => Ordering comparison requires numeric or String types, got: !Integer! and Boolean @1:24-1:41
+IntegerAttribute < IntegerAttribute => ok
+IntegerAttribute < StringAttribute => Ordering comparison requires numeric or String types, got: !Integer! and !String! @1:24-1:46
+IntegerAttribute < SubA => Ordering comparison requires numeric or String types, got: !Integer! and edge::SubA @1:24-1:41
+IntegerAttribute < OptionalItem => Ordering comparison requires numeric or String types, got: !Integer! and ?edge::Item? @1:24-1:46
+IntegerAttribute < Other => Ordering comparison requires numeric or String types, got: !Integer! and !edge::Other! @1:24-1:71
+IntegerAttribute < OclAny => ok
+IntegerAttribute < SetOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {Integer} @1:24-1:43
+IntegerAttribute < SequenceOfString => Ordering comparison requires numeric or String types, got: !Integer! and [String] @1:24-1:50
+IntegerAttribute < BagOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {{Integer}} @1:24-1:43
+StringAttribute < Integer => Ordering comparison requires numeric or String types, got: !String! and Integer @1:24-1:37
+StringAttribute < Real => Ordering comparison requires numeric or String types, got: !String! and Double @1:24-1:39
+StringAttribute < String => Ordering comparison requires numeric or String types, got: !String! and String @1:24-1:39
+StringAttribute < Boolean => Ordering comparison requires numeric or String types, got: !String! and Boolean @1:24-1:40
+StringAttribute < IntegerAttribute => Ordering comparison requires numeric or String types, got: !String! and !Integer! @1:24-1:46
+StringAttribute < StringAttribute => Ordering comparison requires numeric or String types, got: !String! and !String! @1:24-1:45
+StringAttribute < SubA => Ordering comparison requires numeric or String types, got: !String! and edge::SubA @1:24-1:40
+StringAttribute < OptionalItem => Ordering comparison requires numeric or String types, got: !String! and ?edge::Item? @1:24-1:45
+StringAttribute < Other => Ordering comparison requires numeric or String types, got: !String! and !edge::Other! @1:24-1:70
+StringAttribute < OclAny => ok
+StringAttribute < SetOfInteger => Ordering comparison requires numeric or String types, got: !String! and {Integer} @1:24-1:42
+StringAttribute < SequenceOfString => Ordering comparison requires numeric or String types, got: !String! and [String] @1:24-1:49
+StringAttribute < BagOfInteger => Ordering comparison requires numeric or String types, got: !String! and {{Integer}} @1:24-1:42
+SubA < Integer => Ordering comparison requires numeric or String types, got: edge::SubA and Integer @1:24-1:32
+SubA < Real => Ordering comparison requires numeric or String types, got: edge::SubA and Double @1:24-1:34
+SubA < String => Ordering comparison requires numeric or String types, got: edge::SubA and String @1:24-1:34
+SubA < Boolean => Ordering comparison requires numeric or String types, got: edge::SubA and Boolean @1:24-1:35
+SubA < IntegerAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !Integer! @1:24-1:41
+SubA < StringAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !String! @1:24-1:40
+SubA < SubA => Ordering comparison requires numeric or String types, got: edge::SubA and edge::SubA @1:24-1:35
+SubA < OptionalItem => Ordering comparison requires numeric or String types, got: edge::SubA and ?edge::Item? @1:24-1:40
+SubA < Other => Ordering comparison requires numeric or String types, got: edge::SubA and !edge::Other! @1:24-1:65
+SubA < OclAny => ok
+SubA < SetOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {Integer} @1:24-1:37
+SubA < SequenceOfString => Ordering comparison requires numeric or String types, got: edge::SubA and [String] @1:24-1:44
+SubA < BagOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {{Integer}} @1:24-1:37
+OptionalItem < Integer => Ordering comparison requires numeric or String types, got: ?edge::Item? and Integer @1:24-1:37
+OptionalItem < Real => Ordering comparison requires numeric or String types, got: ?edge::Item? and Double @1:24-1:39
+OptionalItem < String => Ordering comparison requires numeric or String types, got: ?edge::Item? and String @1:24-1:39
+OptionalItem < Boolean => Ordering comparison requires numeric or String types, got: ?edge::Item? and Boolean @1:24-1:40
+OptionalItem < IntegerAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !Integer! @1:24-1:46
+OptionalItem < StringAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !String! @1:24-1:45
+OptionalItem < SubA => Ordering comparison requires numeric or String types, got: ?edge::Item? and edge::SubA @1:24-1:40
+OptionalItem < OptionalItem => Ordering comparison requires numeric or String types, got: ?edge::Item? and ?edge::Item? @1:24-1:45
+OptionalItem < Other => Ordering comparison requires numeric or String types, got: ?edge::Item? and !edge::Other! @1:24-1:70
+OptionalItem < OclAny => ok
+OptionalItem < SetOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {Integer} @1:24-1:42
+OptionalItem < SequenceOfString => Ordering comparison requires numeric or String types, got: ?edge::Item? and [String] @1:24-1:49
+OptionalItem < BagOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {{Integer}} @1:24-1:42
+Other < Integer => Ordering comparison requires numeric or String types, got: !edge::Other! and Integer @1:24-1:62
+Other < Real => Ordering comparison requires numeric or String types, got: !edge::Other! and Double @1:24-1:64
+Other < String => Ordering comparison requires numeric or String types, got: !edge::Other! and String @1:24-1:64
+Other < Boolean => Ordering comparison requires numeric or String types, got: !edge::Other! and Boolean @1:24-1:65
+Other < IntegerAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !Integer! @1:24-1:71
+Other < StringAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !String! @1:24-1:70
+Other < SubA => Ordering comparison requires numeric or String types, got: !edge::Other! and edge::SubA @1:24-1:65
+Other < OptionalItem => Ordering comparison requires numeric or String types, got: !edge::Other! and ?edge::Item? @1:24-1:70
+Other < Other => Ordering comparison requires numeric or String types, got: !edge::Other! and !edge::Other! @1:24-1:95
+Other < OclAny => ok
+Other < SetOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {Integer} @1:24-1:67
+Other < SequenceOfString => Ordering comparison requires numeric or String types, got: !edge::Other! and [String] @1:24-1:74
+Other < BagOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {{Integer}} @1:24-1:67
+OclAny < Integer => ok
+OclAny < Real => ok
+OclAny < String => ok
+OclAny < Boolean => ok
+OclAny < IntegerAttribute => ok
+OclAny < StringAttribute => ok
+OclAny < SubA => ok
+OclAny < OptionalItem => ok
+OclAny < Other => ok
+OclAny < OclAny => ok
+OclAny < SetOfInteger => ok
+OclAny < SequenceOfString => ok
+OclAny < BagOfInteger => ok
+SetOfInteger < Integer => Ordering comparison requires numeric or String types, got: {Integer} and Integer @1:24-1:34
+SetOfInteger < Real => Ordering comparison requires numeric or String types, got: {Integer} and Double @1:24-1:36
+SetOfInteger < String => Ordering comparison requires numeric or String types, got: {Integer} and String @1:24-1:36
+SetOfInteger < Boolean => Ordering comparison requires numeric or String types, got: {Integer} and Boolean @1:24-1:37
+SetOfInteger < IntegerAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !Integer! @1:24-1:43
+SetOfInteger < StringAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !String! @1:24-1:42
+SetOfInteger < SubA => Ordering comparison requires numeric or String types, got: {Integer} and edge::SubA @1:24-1:37
+SetOfInteger < OptionalItem => Ordering comparison requires numeric or String types, got: {Integer} and ?edge::Item? @1:24-1:42
+SetOfInteger < Other => Ordering comparison requires numeric or String types, got: {Integer} and !edge::Other! @1:24-1:67
+SetOfInteger < OclAny => ok
+SetOfInteger < SetOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {Integer} @1:24-1:39
+SetOfInteger < SequenceOfString => Ordering comparison requires numeric or String types, got: {Integer} and [String] @1:24-1:46
+SetOfInteger < BagOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {{Integer}} @1:24-1:39
+SequenceOfString < Integer => Ordering comparison requires numeric or String types, got: [String] and Integer @1:24-1:41
+SequenceOfString < Real => Ordering comparison requires numeric or String types, got: [String] and Double @1:24-1:43
+SequenceOfString < String => Ordering comparison requires numeric or String types, got: [String] and String @1:24-1:43
+SequenceOfString < Boolean => Ordering comparison requires numeric or String types, got: [String] and Boolean @1:24-1:44
+SequenceOfString < IntegerAttribute => Ordering comparison requires numeric or String types, got: [String] and !Integer! @1:24-1:50
+SequenceOfString < StringAttribute => Ordering comparison requires numeric or String types, got: [String] and !String! @1:24-1:49
+SequenceOfString < SubA => Ordering comparison requires numeric or String types, got: [String] and edge::SubA @1:24-1:44
+SequenceOfString < OptionalItem => Ordering comparison requires numeric or String types, got: [String] and ?edge::Item? @1:24-1:49
+SequenceOfString < Other => Ordering comparison requires numeric or String types, got: [String] and !edge::Other! @1:24-1:74
+SequenceOfString < OclAny => ok
+SequenceOfString < SetOfInteger => Ordering comparison requires numeric or String types, got: [String] and {Integer} @1:24-1:46
+SequenceOfString < SequenceOfString => Ordering comparison requires numeric or String types, got: [String] and [String] @1:24-1:53
+SequenceOfString < BagOfInteger => Ordering comparison requires numeric or String types, got: [String] and {{Integer}} @1:24-1:46
+BagOfInteger < Integer => Ordering comparison requires numeric or String types, got: {{Integer}} and Integer @1:24-1:34
+BagOfInteger < Real => Ordering comparison requires numeric or String types, got: {{Integer}} and Double @1:24-1:36
+BagOfInteger < String => Ordering comparison requires numeric or String types, got: {{Integer}} and String @1:24-1:36
+BagOfInteger < Boolean => Ordering comparison requires numeric or String types, got: {{Integer}} and Boolean @1:24-1:37
+BagOfInteger < IntegerAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !Integer! @1:24-1:43
+BagOfInteger < StringAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !String! @1:24-1:42
+BagOfInteger < SubA => Ordering comparison requires numeric or String types, got: {{Integer}} and edge::SubA @1:24-1:37
+BagOfInteger < OptionalItem => Ordering comparison requires numeric or String types, got: {{Integer}} and ?edge::Item? @1:24-1:42
+BagOfInteger < Other => Ordering comparison requires numeric or String types, got: {{Integer}} and !edge::Other! @1:24-1:67
+BagOfInteger < OclAny => ok
+BagOfInteger < SetOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {Integer} @1:24-1:39
+BagOfInteger < SequenceOfString => Ordering comparison requires numeric or String types, got: {{Integer}} and [String] @1:24-1:46
+BagOfInteger < BagOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {{Integer}} @1:24-1:39
+Integer <= Integer => ok
+Integer <= Real => ok
+Integer <= String => Ordering comparison requires numeric or String types, got: Integer and String @1:24-1:32
+Integer <= Boolean => Ordering comparison requires numeric or String types, got: Integer and Boolean @1:24-1:33
+Integer <= IntegerAttribute => ok
+Integer <= StringAttribute => Ordering comparison requires numeric or String types, got: Integer and !String! @1:24-1:38
+Integer <= SubA => Ordering comparison requires numeric or String types, got: Integer and edge::SubA @1:24-1:33
+Integer <= OptionalItem => Ordering comparison requires numeric or String types, got: Integer and ?edge::Item? @1:24-1:38
+Integer <= Other => Ordering comparison requires numeric or String types, got: Integer and !edge::Other! @1:24-1:63
+Integer <= OclAny => ok
+Integer <= SetOfInteger => Ordering comparison requires numeric or String types, got: Integer and {Integer} @1:24-1:35
+Integer <= SequenceOfString => Ordering comparison requires numeric or String types, got: Integer and [String] @1:24-1:42
+Integer <= BagOfInteger => Ordering comparison requires numeric or String types, got: Integer and {{Integer}} @1:24-1:35
+Real <= Integer => ok
+Real <= Real => ok
+Real <= String => Ordering comparison requires numeric or String types, got: Double and String @1:24-1:34
+Real <= Boolean => Ordering comparison requires numeric or String types, got: Double and Boolean @1:24-1:35
+Real <= IntegerAttribute => ok
+Real <= StringAttribute => Ordering comparison requires numeric or String types, got: Double and !String! @1:24-1:40
+Real <= SubA => Ordering comparison requires numeric or String types, got: Double and edge::SubA @1:24-1:35
+Real <= OptionalItem => Ordering comparison requires numeric or String types, got: Double and ?edge::Item? @1:24-1:40
+Real <= Other => Ordering comparison requires numeric or String types, got: Double and !edge::Other! @1:24-1:65
+Real <= OclAny => ok
+Real <= SetOfInteger => Ordering comparison requires numeric or String types, got: Double and {Integer} @1:24-1:37
+Real <= SequenceOfString => Ordering comparison requires numeric or String types, got: Double and [String] @1:24-1:44
+Real <= BagOfInteger => Ordering comparison requires numeric or String types, got: Double and {{Integer}} @1:24-1:37
+String <= Integer => Ordering comparison requires numeric or String types, got: String and Integer @1:24-1:32
+String <= Real => Ordering comparison requires numeric or String types, got: String and Double @1:24-1:34
+String <= String => Ordering comparison requires numeric or String types, got: String and String @1:24-1:34
+String <= Boolean => Ordering comparison requires numeric or String types, got: String and Boolean @1:24-1:35
+String <= IntegerAttribute => Ordering comparison requires numeric or String types, got: String and !Integer! @1:24-1:41
+String <= StringAttribute => Ordering comparison requires numeric or String types, got: String and !String! @1:24-1:40
+String <= SubA => Ordering comparison requires numeric or String types, got: String and edge::SubA @1:24-1:35
+String <= OptionalItem => Ordering comparison requires numeric or String types, got: String and ?edge::Item? @1:24-1:40
+String <= Other => Ordering comparison requires numeric or String types, got: String and !edge::Other! @1:24-1:65
+String <= OclAny => ok
+String <= SetOfInteger => Ordering comparison requires numeric or String types, got: String and {Integer} @1:24-1:37
+String <= SequenceOfString => Ordering comparison requires numeric or String types, got: String and [String] @1:24-1:44
+String <= BagOfInteger => Ordering comparison requires numeric or String types, got: String and {{Integer}} @1:24-1:37
+Boolean <= Integer => Ordering comparison requires numeric or String types, got: Boolean and Integer @1:24-1:33
+Boolean <= Real => Ordering comparison requires numeric or String types, got: Boolean and Double @1:24-1:35
+Boolean <= String => Ordering comparison requires numeric or String types, got: Boolean and String @1:24-1:35
+Boolean <= Boolean => Ordering comparison requires numeric or String types, got: Boolean and Boolean @1:24-1:36
+Boolean <= IntegerAttribute => Ordering comparison requires numeric or String types, got: Boolean and !Integer! @1:24-1:42
+Boolean <= StringAttribute => Ordering comparison requires numeric or String types, got: Boolean and !String! @1:24-1:41
+Boolean <= SubA => Ordering comparison requires numeric or String types, got: Boolean and edge::SubA @1:24-1:36
+Boolean <= OptionalItem => Ordering comparison requires numeric or String types, got: Boolean and ?edge::Item? @1:24-1:41
+Boolean <= Other => Ordering comparison requires numeric or String types, got: Boolean and !edge::Other! @1:24-1:66
+Boolean <= OclAny => ok
+Boolean <= SetOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {Integer} @1:24-1:38
+Boolean <= SequenceOfString => Ordering comparison requires numeric or String types, got: Boolean and [String] @1:24-1:45
+Boolean <= BagOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {{Integer}} @1:24-1:38
+IntegerAttribute <= Integer => ok
+IntegerAttribute <= Real => ok
+IntegerAttribute <= String => Ordering comparison requires numeric or String types, got: !Integer! and String @1:24-1:41
+IntegerAttribute <= Boolean => Ordering comparison requires numeric or String types, got: !Integer! and Boolean @1:24-1:42
+IntegerAttribute <= IntegerAttribute => ok
+IntegerAttribute <= StringAttribute => Ordering comparison requires numeric or String types, got: !Integer! and !String! @1:24-1:47
+IntegerAttribute <= SubA => Ordering comparison requires numeric or String types, got: !Integer! and edge::SubA @1:24-1:42
+IntegerAttribute <= OptionalItem => Ordering comparison requires numeric or String types, got: !Integer! and ?edge::Item? @1:24-1:47
+IntegerAttribute <= Other => Ordering comparison requires numeric or String types, got: !Integer! and !edge::Other! @1:24-1:72
+IntegerAttribute <= OclAny => ok
+IntegerAttribute <= SetOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {Integer} @1:24-1:44
+IntegerAttribute <= SequenceOfString => Ordering comparison requires numeric or String types, got: !Integer! and [String] @1:24-1:51
+IntegerAttribute <= BagOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {{Integer}} @1:24-1:44
+StringAttribute <= Integer => Ordering comparison requires numeric or String types, got: !String! and Integer @1:24-1:38
+StringAttribute <= Real => Ordering comparison requires numeric or String types, got: !String! and Double @1:24-1:40
+StringAttribute <= String => Ordering comparison requires numeric or String types, got: !String! and String @1:24-1:40
+StringAttribute <= Boolean => Ordering comparison requires numeric or String types, got: !String! and Boolean @1:24-1:41
+StringAttribute <= IntegerAttribute => Ordering comparison requires numeric or String types, got: !String! and !Integer! @1:24-1:47
+StringAttribute <= StringAttribute => Ordering comparison requires numeric or String types, got: !String! and !String! @1:24-1:46
+StringAttribute <= SubA => Ordering comparison requires numeric or String types, got: !String! and edge::SubA @1:24-1:41
+StringAttribute <= OptionalItem => Ordering comparison requires numeric or String types, got: !String! and ?edge::Item? @1:24-1:46
+StringAttribute <= Other => Ordering comparison requires numeric or String types, got: !String! and !edge::Other! @1:24-1:71
+StringAttribute <= OclAny => ok
+StringAttribute <= SetOfInteger => Ordering comparison requires numeric or String types, got: !String! and {Integer} @1:24-1:43
+StringAttribute <= SequenceOfString => Ordering comparison requires numeric or String types, got: !String! and [String] @1:24-1:50
+StringAttribute <= BagOfInteger => Ordering comparison requires numeric or String types, got: !String! and {{Integer}} @1:24-1:43
+SubA <= Integer => Ordering comparison requires numeric or String types, got: edge::SubA and Integer @1:24-1:33
+SubA <= Real => Ordering comparison requires numeric or String types, got: edge::SubA and Double @1:24-1:35
+SubA <= String => Ordering comparison requires numeric or String types, got: edge::SubA and String @1:24-1:35
+SubA <= Boolean => Ordering comparison requires numeric or String types, got: edge::SubA and Boolean @1:24-1:36
+SubA <= IntegerAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !Integer! @1:24-1:42
+SubA <= StringAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !String! @1:24-1:41
+SubA <= SubA => Ordering comparison requires numeric or String types, got: edge::SubA and edge::SubA @1:24-1:36
+SubA <= OptionalItem => Ordering comparison requires numeric or String types, got: edge::SubA and ?edge::Item? @1:24-1:41
+SubA <= Other => Ordering comparison requires numeric or String types, got: edge::SubA and !edge::Other! @1:24-1:66
+SubA <= OclAny => ok
+SubA <= SetOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {Integer} @1:24-1:38
+SubA <= SequenceOfString => Ordering comparison requires numeric or String types, got: edge::SubA and [String] @1:24-1:45
+SubA <= BagOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {{Integer}} @1:24-1:38
+OptionalItem <= Integer => Ordering comparison requires numeric or String types, got: ?edge::Item? and Integer @1:24-1:38
+OptionalItem <= Real => Ordering comparison requires numeric or String types, got: ?edge::Item? and Double @1:24-1:40
+OptionalItem <= String => Ordering comparison requires numeric or String types, got: ?edge::Item? and String @1:24-1:40
+OptionalItem <= Boolean => Ordering comparison requires numeric or String types, got: ?edge::Item? and Boolean @1:24-1:41
+OptionalItem <= IntegerAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !Integer! @1:24-1:47
+OptionalItem <= StringAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !String! @1:24-1:46
+OptionalItem <= SubA => Ordering comparison requires numeric or String types, got: ?edge::Item? and edge::SubA @1:24-1:41
+OptionalItem <= OptionalItem => Ordering comparison requires numeric or String types, got: ?edge::Item? and ?edge::Item? @1:24-1:46
+OptionalItem <= Other => Ordering comparison requires numeric or String types, got: ?edge::Item? and !edge::Other! @1:24-1:71
+OptionalItem <= OclAny => ok
+OptionalItem <= SetOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {Integer} @1:24-1:43
+OptionalItem <= SequenceOfString => Ordering comparison requires numeric or String types, got: ?edge::Item? and [String] @1:24-1:50
+OptionalItem <= BagOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {{Integer}} @1:24-1:43
+Other <= Integer => Ordering comparison requires numeric or String types, got: !edge::Other! and Integer @1:24-1:63
+Other <= Real => Ordering comparison requires numeric or String types, got: !edge::Other! and Double @1:24-1:65
+Other <= String => Ordering comparison requires numeric or String types, got: !edge::Other! and String @1:24-1:65
+Other <= Boolean => Ordering comparison requires numeric or String types, got: !edge::Other! and Boolean @1:24-1:66
+Other <= IntegerAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !Integer! @1:24-1:72
+Other <= StringAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !String! @1:24-1:71
+Other <= SubA => Ordering comparison requires numeric or String types, got: !edge::Other! and edge::SubA @1:24-1:66
+Other <= OptionalItem => Ordering comparison requires numeric or String types, got: !edge::Other! and ?edge::Item? @1:24-1:71
+Other <= Other => Ordering comparison requires numeric or String types, got: !edge::Other! and !edge::Other! @1:24-1:96
+Other <= OclAny => ok
+Other <= SetOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {Integer} @1:24-1:68
+Other <= SequenceOfString => Ordering comparison requires numeric or String types, got: !edge::Other! and [String] @1:24-1:75
+Other <= BagOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {{Integer}} @1:24-1:68
+OclAny <= Integer => ok
+OclAny <= Real => ok
+OclAny <= String => ok
+OclAny <= Boolean => ok
+OclAny <= IntegerAttribute => ok
+OclAny <= StringAttribute => ok
+OclAny <= SubA => ok
+OclAny <= OptionalItem => ok
+OclAny <= Other => ok
+OclAny <= OclAny => ok
+OclAny <= SetOfInteger => ok
+OclAny <= SequenceOfString => ok
+OclAny <= BagOfInteger => ok
+SetOfInteger <= Integer => Ordering comparison requires numeric or String types, got: {Integer} and Integer @1:24-1:35
+SetOfInteger <= Real => Ordering comparison requires numeric or String types, got: {Integer} and Double @1:24-1:37
+SetOfInteger <= String => Ordering comparison requires numeric or String types, got: {Integer} and String @1:24-1:37
+SetOfInteger <= Boolean => Ordering comparison requires numeric or String types, got: {Integer} and Boolean @1:24-1:38
+SetOfInteger <= IntegerAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !Integer! @1:24-1:44
+SetOfInteger <= StringAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !String! @1:24-1:43
+SetOfInteger <= SubA => Ordering comparison requires numeric or String types, got: {Integer} and edge::SubA @1:24-1:38
+SetOfInteger <= OptionalItem => Ordering comparison requires numeric or String types, got: {Integer} and ?edge::Item? @1:24-1:43
+SetOfInteger <= Other => Ordering comparison requires numeric or String types, got: {Integer} and !edge::Other! @1:24-1:68
+SetOfInteger <= OclAny => ok
+SetOfInteger <= SetOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {Integer} @1:24-1:40
+SetOfInteger <= SequenceOfString => Ordering comparison requires numeric or String types, got: {Integer} and [String] @1:24-1:47
+SetOfInteger <= BagOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {{Integer}} @1:24-1:40
+SequenceOfString <= Integer => Ordering comparison requires numeric or String types, got: [String] and Integer @1:24-1:42
+SequenceOfString <= Real => Ordering comparison requires numeric or String types, got: [String] and Double @1:24-1:44
+SequenceOfString <= String => Ordering comparison requires numeric or String types, got: [String] and String @1:24-1:44
+SequenceOfString <= Boolean => Ordering comparison requires numeric or String types, got: [String] and Boolean @1:24-1:45
+SequenceOfString <= IntegerAttribute => Ordering comparison requires numeric or String types, got: [String] and !Integer! @1:24-1:51
+SequenceOfString <= StringAttribute => Ordering comparison requires numeric or String types, got: [String] and !String! @1:24-1:50
+SequenceOfString <= SubA => Ordering comparison requires numeric or String types, got: [String] and edge::SubA @1:24-1:45
+SequenceOfString <= OptionalItem => Ordering comparison requires numeric or String types, got: [String] and ?edge::Item? @1:24-1:50
+SequenceOfString <= Other => Ordering comparison requires numeric or String types, got: [String] and !edge::Other! @1:24-1:75
+SequenceOfString <= OclAny => ok
+SequenceOfString <= SetOfInteger => Ordering comparison requires numeric or String types, got: [String] and {Integer} @1:24-1:47
+SequenceOfString <= SequenceOfString => Ordering comparison requires numeric or String types, got: [String] and [String] @1:24-1:54
+SequenceOfString <= BagOfInteger => Ordering comparison requires numeric or String types, got: [String] and {{Integer}} @1:24-1:47
+BagOfInteger <= Integer => Ordering comparison requires numeric or String types, got: {{Integer}} and Integer @1:24-1:35
+BagOfInteger <= Real => Ordering comparison requires numeric or String types, got: {{Integer}} and Double @1:24-1:37
+BagOfInteger <= String => Ordering comparison requires numeric or String types, got: {{Integer}} and String @1:24-1:37
+BagOfInteger <= Boolean => Ordering comparison requires numeric or String types, got: {{Integer}} and Boolean @1:24-1:38
+BagOfInteger <= IntegerAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !Integer! @1:24-1:44
+BagOfInteger <= StringAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !String! @1:24-1:43
+BagOfInteger <= SubA => Ordering comparison requires numeric or String types, got: {{Integer}} and edge::SubA @1:24-1:38
+BagOfInteger <= OptionalItem => Ordering comparison requires numeric or String types, got: {{Integer}} and ?edge::Item? @1:24-1:43
+BagOfInteger <= Other => Ordering comparison requires numeric or String types, got: {{Integer}} and !edge::Other! @1:24-1:68
+BagOfInteger <= OclAny => ok
+BagOfInteger <= SetOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {Integer} @1:24-1:40
+BagOfInteger <= SequenceOfString => Ordering comparison requires numeric or String types, got: {{Integer}} and [String] @1:24-1:47
+BagOfInteger <= BagOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {{Integer}} @1:24-1:40
+Integer > Integer => ok
+Integer > Real => ok
+Integer > String => Ordering comparison requires numeric or String types, got: Integer and String @1:24-1:31
+Integer > Boolean => Ordering comparison requires numeric or String types, got: Integer and Boolean @1:24-1:32
+Integer > IntegerAttribute => ok
+Integer > StringAttribute => Ordering comparison requires numeric or String types, got: Integer and !String! @1:24-1:37
+Integer > SubA => Ordering comparison requires numeric or String types, got: Integer and edge::SubA @1:24-1:32
+Integer > OptionalItem => Ordering comparison requires numeric or String types, got: Integer and ?edge::Item? @1:24-1:37
+Integer > Other => Ordering comparison requires numeric or String types, got: Integer and !edge::Other! @1:24-1:62
+Integer > OclAny => ok
+Integer > SetOfInteger => Ordering comparison requires numeric or String types, got: Integer and {Integer} @1:24-1:34
+Integer > SequenceOfString => Ordering comparison requires numeric or String types, got: Integer and [String] @1:24-1:41
+Integer > BagOfInteger => Ordering comparison requires numeric or String types, got: Integer and {{Integer}} @1:24-1:34
+Real > Integer => ok
+Real > Real => ok
+Real > String => Ordering comparison requires numeric or String types, got: Double and String @1:24-1:33
+Real > Boolean => Ordering comparison requires numeric or String types, got: Double and Boolean @1:24-1:34
+Real > IntegerAttribute => ok
+Real > StringAttribute => Ordering comparison requires numeric or String types, got: Double and !String! @1:24-1:39
+Real > SubA => Ordering comparison requires numeric or String types, got: Double and edge::SubA @1:24-1:34
+Real > OptionalItem => Ordering comparison requires numeric or String types, got: Double and ?edge::Item? @1:24-1:39
+Real > Other => Ordering comparison requires numeric or String types, got: Double and !edge::Other! @1:24-1:64
+Real > OclAny => ok
+Real > SetOfInteger => Ordering comparison requires numeric or String types, got: Double and {Integer} @1:24-1:36
+Real > SequenceOfString => Ordering comparison requires numeric or String types, got: Double and [String] @1:24-1:43
+Real > BagOfInteger => Ordering comparison requires numeric or String types, got: Double and {{Integer}} @1:24-1:36
+String > Integer => Ordering comparison requires numeric or String types, got: String and Integer @1:24-1:31
+String > Real => Ordering comparison requires numeric or String types, got: String and Double @1:24-1:33
+String > String => Ordering comparison requires numeric or String types, got: String and String @1:24-1:33
+String > Boolean => Ordering comparison requires numeric or String types, got: String and Boolean @1:24-1:34
+String > IntegerAttribute => Ordering comparison requires numeric or String types, got: String and !Integer! @1:24-1:40
+String > StringAttribute => Ordering comparison requires numeric or String types, got: String and !String! @1:24-1:39
+String > SubA => Ordering comparison requires numeric or String types, got: String and edge::SubA @1:24-1:34
+String > OptionalItem => Ordering comparison requires numeric or String types, got: String and ?edge::Item? @1:24-1:39
+String > Other => Ordering comparison requires numeric or String types, got: String and !edge::Other! @1:24-1:64
+String > OclAny => ok
+String > SetOfInteger => Ordering comparison requires numeric or String types, got: String and {Integer} @1:24-1:36
+String > SequenceOfString => Ordering comparison requires numeric or String types, got: String and [String] @1:24-1:43
+String > BagOfInteger => Ordering comparison requires numeric or String types, got: String and {{Integer}} @1:24-1:36
+Boolean > Integer => Ordering comparison requires numeric or String types, got: Boolean and Integer @1:24-1:32
+Boolean > Real => Ordering comparison requires numeric or String types, got: Boolean and Double @1:24-1:34
+Boolean > String => Ordering comparison requires numeric or String types, got: Boolean and String @1:24-1:34
+Boolean > Boolean => Ordering comparison requires numeric or String types, got: Boolean and Boolean @1:24-1:35
+Boolean > IntegerAttribute => Ordering comparison requires numeric or String types, got: Boolean and !Integer! @1:24-1:41
+Boolean > StringAttribute => Ordering comparison requires numeric or String types, got: Boolean and !String! @1:24-1:40
+Boolean > SubA => Ordering comparison requires numeric or String types, got: Boolean and edge::SubA @1:24-1:35
+Boolean > OptionalItem => Ordering comparison requires numeric or String types, got: Boolean and ?edge::Item? @1:24-1:40
+Boolean > Other => Ordering comparison requires numeric or String types, got: Boolean and !edge::Other! @1:24-1:65
+Boolean > OclAny => ok
+Boolean > SetOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {Integer} @1:24-1:37
+Boolean > SequenceOfString => Ordering comparison requires numeric or String types, got: Boolean and [String] @1:24-1:44
+Boolean > BagOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {{Integer}} @1:24-1:37
+IntegerAttribute > Integer => ok
+IntegerAttribute > Real => ok
+IntegerAttribute > String => Ordering comparison requires numeric or String types, got: !Integer! and String @1:24-1:40
+IntegerAttribute > Boolean => Ordering comparison requires numeric or String types, got: !Integer! and Boolean @1:24-1:41
+IntegerAttribute > IntegerAttribute => ok
+IntegerAttribute > StringAttribute => Ordering comparison requires numeric or String types, got: !Integer! and !String! @1:24-1:46
+IntegerAttribute > SubA => Ordering comparison requires numeric or String types, got: !Integer! and edge::SubA @1:24-1:41
+IntegerAttribute > OptionalItem => Ordering comparison requires numeric or String types, got: !Integer! and ?edge::Item? @1:24-1:46
+IntegerAttribute > Other => Ordering comparison requires numeric or String types, got: !Integer! and !edge::Other! @1:24-1:71
+IntegerAttribute > OclAny => ok
+IntegerAttribute > SetOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {Integer} @1:24-1:43
+IntegerAttribute > SequenceOfString => Ordering comparison requires numeric or String types, got: !Integer! and [String] @1:24-1:50
+IntegerAttribute > BagOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {{Integer}} @1:24-1:43
+StringAttribute > Integer => Ordering comparison requires numeric or String types, got: !String! and Integer @1:24-1:37
+StringAttribute > Real => Ordering comparison requires numeric or String types, got: !String! and Double @1:24-1:39
+StringAttribute > String => Ordering comparison requires numeric or String types, got: !String! and String @1:24-1:39
+StringAttribute > Boolean => Ordering comparison requires numeric or String types, got: !String! and Boolean @1:24-1:40
+StringAttribute > IntegerAttribute => Ordering comparison requires numeric or String types, got: !String! and !Integer! @1:24-1:46
+StringAttribute > StringAttribute => Ordering comparison requires numeric or String types, got: !String! and !String! @1:24-1:45
+StringAttribute > SubA => Ordering comparison requires numeric or String types, got: !String! and edge::SubA @1:24-1:40
+StringAttribute > OptionalItem => Ordering comparison requires numeric or String types, got: !String! and ?edge::Item? @1:24-1:45
+StringAttribute > Other => Ordering comparison requires numeric or String types, got: !String! and !edge::Other! @1:24-1:70
+StringAttribute > OclAny => ok
+StringAttribute > SetOfInteger => Ordering comparison requires numeric or String types, got: !String! and {Integer} @1:24-1:42
+StringAttribute > SequenceOfString => Ordering comparison requires numeric or String types, got: !String! and [String] @1:24-1:49
+StringAttribute > BagOfInteger => Ordering comparison requires numeric or String types, got: !String! and {{Integer}} @1:24-1:42
+SubA > Integer => Ordering comparison requires numeric or String types, got: edge::SubA and Integer @1:24-1:32
+SubA > Real => Ordering comparison requires numeric or String types, got: edge::SubA and Double @1:24-1:34
+SubA > String => Ordering comparison requires numeric or String types, got: edge::SubA and String @1:24-1:34
+SubA > Boolean => Ordering comparison requires numeric or String types, got: edge::SubA and Boolean @1:24-1:35
+SubA > IntegerAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !Integer! @1:24-1:41
+SubA > StringAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !String! @1:24-1:40
+SubA > SubA => Ordering comparison requires numeric or String types, got: edge::SubA and edge::SubA @1:24-1:35
+SubA > OptionalItem => Ordering comparison requires numeric or String types, got: edge::SubA and ?edge::Item? @1:24-1:40
+SubA > Other => Ordering comparison requires numeric or String types, got: edge::SubA and !edge::Other! @1:24-1:65
+SubA > OclAny => ok
+SubA > SetOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {Integer} @1:24-1:37
+SubA > SequenceOfString => Ordering comparison requires numeric or String types, got: edge::SubA and [String] @1:24-1:44
+SubA > BagOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {{Integer}} @1:24-1:37
+OptionalItem > Integer => Ordering comparison requires numeric or String types, got: ?edge::Item? and Integer @1:24-1:37
+OptionalItem > Real => Ordering comparison requires numeric or String types, got: ?edge::Item? and Double @1:24-1:39
+OptionalItem > String => Ordering comparison requires numeric or String types, got: ?edge::Item? and String @1:24-1:39
+OptionalItem > Boolean => Ordering comparison requires numeric or String types, got: ?edge::Item? and Boolean @1:24-1:40
+OptionalItem > IntegerAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !Integer! @1:24-1:46
+OptionalItem > StringAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !String! @1:24-1:45
+OptionalItem > SubA => Ordering comparison requires numeric or String types, got: ?edge::Item? and edge::SubA @1:24-1:40
+OptionalItem > OptionalItem => Ordering comparison requires numeric or String types, got: ?edge::Item? and ?edge::Item? @1:24-1:45
+OptionalItem > Other => Ordering comparison requires numeric or String types, got: ?edge::Item? and !edge::Other! @1:24-1:70
+OptionalItem > OclAny => ok
+OptionalItem > SetOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {Integer} @1:24-1:42
+OptionalItem > SequenceOfString => Ordering comparison requires numeric or String types, got: ?edge::Item? and [String] @1:24-1:49
+OptionalItem > BagOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {{Integer}} @1:24-1:42
+Other > Integer => Ordering comparison requires numeric or String types, got: !edge::Other! and Integer @1:24-1:62
+Other > Real => Ordering comparison requires numeric or String types, got: !edge::Other! and Double @1:24-1:64
+Other > String => Ordering comparison requires numeric or String types, got: !edge::Other! and String @1:24-1:64
+Other > Boolean => Ordering comparison requires numeric or String types, got: !edge::Other! and Boolean @1:24-1:65
+Other > IntegerAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !Integer! @1:24-1:71
+Other > StringAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !String! @1:24-1:70
+Other > SubA => Ordering comparison requires numeric or String types, got: !edge::Other! and edge::SubA @1:24-1:65
+Other > OptionalItem => Ordering comparison requires numeric or String types, got: !edge::Other! and ?edge::Item? @1:24-1:70
+Other > Other => Ordering comparison requires numeric or String types, got: !edge::Other! and !edge::Other! @1:24-1:95
+Other > OclAny => ok
+Other > SetOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {Integer} @1:24-1:67
+Other > SequenceOfString => Ordering comparison requires numeric or String types, got: !edge::Other! and [String] @1:24-1:74
+Other > BagOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {{Integer}} @1:24-1:67
+OclAny > Integer => ok
+OclAny > Real => ok
+OclAny > String => ok
+OclAny > Boolean => ok
+OclAny > IntegerAttribute => ok
+OclAny > StringAttribute => ok
+OclAny > SubA => ok
+OclAny > OptionalItem => ok
+OclAny > Other => ok
+OclAny > OclAny => ok
+OclAny > SetOfInteger => ok
+OclAny > SequenceOfString => ok
+OclAny > BagOfInteger => ok
+SetOfInteger > Integer => Ordering comparison requires numeric or String types, got: {Integer} and Integer @1:24-1:34
+SetOfInteger > Real => Ordering comparison requires numeric or String types, got: {Integer} and Double @1:24-1:36
+SetOfInteger > String => Ordering comparison requires numeric or String types, got: {Integer} and String @1:24-1:36
+SetOfInteger > Boolean => Ordering comparison requires numeric or String types, got: {Integer} and Boolean @1:24-1:37
+SetOfInteger > IntegerAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !Integer! @1:24-1:43
+SetOfInteger > StringAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !String! @1:24-1:42
+SetOfInteger > SubA => Ordering comparison requires numeric or String types, got: {Integer} and edge::SubA @1:24-1:37
+SetOfInteger > OptionalItem => Ordering comparison requires numeric or String types, got: {Integer} and ?edge::Item? @1:24-1:42
+SetOfInteger > Other => Ordering comparison requires numeric or String types, got: {Integer} and !edge::Other! @1:24-1:67
+SetOfInteger > OclAny => ok
+SetOfInteger > SetOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {Integer} @1:24-1:39
+SetOfInteger > SequenceOfString => Ordering comparison requires numeric or String types, got: {Integer} and [String] @1:24-1:46
+SetOfInteger > BagOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {{Integer}} @1:24-1:39
+SequenceOfString > Integer => Ordering comparison requires numeric or String types, got: [String] and Integer @1:24-1:41
+SequenceOfString > Real => Ordering comparison requires numeric or String types, got: [String] and Double @1:24-1:43
+SequenceOfString > String => Ordering comparison requires numeric or String types, got: [String] and String @1:24-1:43
+SequenceOfString > Boolean => Ordering comparison requires numeric or String types, got: [String] and Boolean @1:24-1:44
+SequenceOfString > IntegerAttribute => Ordering comparison requires numeric or String types, got: [String] and !Integer! @1:24-1:50
+SequenceOfString > StringAttribute => Ordering comparison requires numeric or String types, got: [String] and !String! @1:24-1:49
+SequenceOfString > SubA => Ordering comparison requires numeric or String types, got: [String] and edge::SubA @1:24-1:44
+SequenceOfString > OptionalItem => Ordering comparison requires numeric or String types, got: [String] and ?edge::Item? @1:24-1:49
+SequenceOfString > Other => Ordering comparison requires numeric or String types, got: [String] and !edge::Other! @1:24-1:74
+SequenceOfString > OclAny => ok
+SequenceOfString > SetOfInteger => Ordering comparison requires numeric or String types, got: [String] and {Integer} @1:24-1:46
+SequenceOfString > SequenceOfString => Ordering comparison requires numeric or String types, got: [String] and [String] @1:24-1:53
+SequenceOfString > BagOfInteger => Ordering comparison requires numeric or String types, got: [String] and {{Integer}} @1:24-1:46
+BagOfInteger > Integer => Ordering comparison requires numeric or String types, got: {{Integer}} and Integer @1:24-1:34
+BagOfInteger > Real => Ordering comparison requires numeric or String types, got: {{Integer}} and Double @1:24-1:36
+BagOfInteger > String => Ordering comparison requires numeric or String types, got: {{Integer}} and String @1:24-1:36
+BagOfInteger > Boolean => Ordering comparison requires numeric or String types, got: {{Integer}} and Boolean @1:24-1:37
+BagOfInteger > IntegerAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !Integer! @1:24-1:43
+BagOfInteger > StringAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !String! @1:24-1:42
+BagOfInteger > SubA => Ordering comparison requires numeric or String types, got: {{Integer}} and edge::SubA @1:24-1:37
+BagOfInteger > OptionalItem => Ordering comparison requires numeric or String types, got: {{Integer}} and ?edge::Item? @1:24-1:42
+BagOfInteger > Other => Ordering comparison requires numeric or String types, got: {{Integer}} and !edge::Other! @1:24-1:67
+BagOfInteger > OclAny => ok
+BagOfInteger > SetOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {Integer} @1:24-1:39
+BagOfInteger > SequenceOfString => Ordering comparison requires numeric or String types, got: {{Integer}} and [String] @1:24-1:46
+BagOfInteger > BagOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {{Integer}} @1:24-1:39
+Integer >= Integer => ok
+Integer >= Real => ok
+Integer >= String => Ordering comparison requires numeric or String types, got: Integer and String @1:24-1:32
+Integer >= Boolean => Ordering comparison requires numeric or String types, got: Integer and Boolean @1:24-1:33
+Integer >= IntegerAttribute => ok
+Integer >= StringAttribute => Ordering comparison requires numeric or String types, got: Integer and !String! @1:24-1:38
+Integer >= SubA => Ordering comparison requires numeric or String types, got: Integer and edge::SubA @1:24-1:33
+Integer >= OptionalItem => Ordering comparison requires numeric or String types, got: Integer and ?edge::Item? @1:24-1:38
+Integer >= Other => Ordering comparison requires numeric or String types, got: Integer and !edge::Other! @1:24-1:63
+Integer >= OclAny => ok
+Integer >= SetOfInteger => Ordering comparison requires numeric or String types, got: Integer and {Integer} @1:24-1:35
+Integer >= SequenceOfString => Ordering comparison requires numeric or String types, got: Integer and [String] @1:24-1:42
+Integer >= BagOfInteger => Ordering comparison requires numeric or String types, got: Integer and {{Integer}} @1:24-1:35
+Real >= Integer => ok
+Real >= Real => ok
+Real >= String => Ordering comparison requires numeric or String types, got: Double and String @1:24-1:34
+Real >= Boolean => Ordering comparison requires numeric or String types, got: Double and Boolean @1:24-1:35
+Real >= IntegerAttribute => ok
+Real >= StringAttribute => Ordering comparison requires numeric or String types, got: Double and !String! @1:24-1:40
+Real >= SubA => Ordering comparison requires numeric or String types, got: Double and edge::SubA @1:24-1:35
+Real >= OptionalItem => Ordering comparison requires numeric or String types, got: Double and ?edge::Item? @1:24-1:40
+Real >= Other => Ordering comparison requires numeric or String types, got: Double and !edge::Other! @1:24-1:65
+Real >= OclAny => ok
+Real >= SetOfInteger => Ordering comparison requires numeric or String types, got: Double and {Integer} @1:24-1:37
+Real >= SequenceOfString => Ordering comparison requires numeric or String types, got: Double and [String] @1:24-1:44
+Real >= BagOfInteger => Ordering comparison requires numeric or String types, got: Double and {{Integer}} @1:24-1:37
+String >= Integer => Ordering comparison requires numeric or String types, got: String and Integer @1:24-1:32
+String >= Real => Ordering comparison requires numeric or String types, got: String and Double @1:24-1:34
+String >= String => Ordering comparison requires numeric or String types, got: String and String @1:24-1:34
+String >= Boolean => Ordering comparison requires numeric or String types, got: String and Boolean @1:24-1:35
+String >= IntegerAttribute => Ordering comparison requires numeric or String types, got: String and !Integer! @1:24-1:41
+String >= StringAttribute => Ordering comparison requires numeric or String types, got: String and !String! @1:24-1:40
+String >= SubA => Ordering comparison requires numeric or String types, got: String and edge::SubA @1:24-1:35
+String >= OptionalItem => Ordering comparison requires numeric or String types, got: String and ?edge::Item? @1:24-1:40
+String >= Other => Ordering comparison requires numeric or String types, got: String and !edge::Other! @1:24-1:65
+String >= OclAny => ok
+String >= SetOfInteger => Ordering comparison requires numeric or String types, got: String and {Integer} @1:24-1:37
+String >= SequenceOfString => Ordering comparison requires numeric or String types, got: String and [String] @1:24-1:44
+String >= BagOfInteger => Ordering comparison requires numeric or String types, got: String and {{Integer}} @1:24-1:37
+Boolean >= Integer => Ordering comparison requires numeric or String types, got: Boolean and Integer @1:24-1:33
+Boolean >= Real => Ordering comparison requires numeric or String types, got: Boolean and Double @1:24-1:35
+Boolean >= String => Ordering comparison requires numeric or String types, got: Boolean and String @1:24-1:35
+Boolean >= Boolean => Ordering comparison requires numeric or String types, got: Boolean and Boolean @1:24-1:36
+Boolean >= IntegerAttribute => Ordering comparison requires numeric or String types, got: Boolean and !Integer! @1:24-1:42
+Boolean >= StringAttribute => Ordering comparison requires numeric or String types, got: Boolean and !String! @1:24-1:41
+Boolean >= SubA => Ordering comparison requires numeric or String types, got: Boolean and edge::SubA @1:24-1:36
+Boolean >= OptionalItem => Ordering comparison requires numeric or String types, got: Boolean and ?edge::Item? @1:24-1:41
+Boolean >= Other => Ordering comparison requires numeric or String types, got: Boolean and !edge::Other! @1:24-1:66
+Boolean >= OclAny => ok
+Boolean >= SetOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {Integer} @1:24-1:38
+Boolean >= SequenceOfString => Ordering comparison requires numeric or String types, got: Boolean and [String] @1:24-1:45
+Boolean >= BagOfInteger => Ordering comparison requires numeric or String types, got: Boolean and {{Integer}} @1:24-1:38
+IntegerAttribute >= Integer => ok
+IntegerAttribute >= Real => ok
+IntegerAttribute >= String => Ordering comparison requires numeric or String types, got: !Integer! and String @1:24-1:41
+IntegerAttribute >= Boolean => Ordering comparison requires numeric or String types, got: !Integer! and Boolean @1:24-1:42
+IntegerAttribute >= IntegerAttribute => ok
+IntegerAttribute >= StringAttribute => Ordering comparison requires numeric or String types, got: !Integer! and !String! @1:24-1:47
+IntegerAttribute >= SubA => Ordering comparison requires numeric or String types, got: !Integer! and edge::SubA @1:24-1:42
+IntegerAttribute >= OptionalItem => Ordering comparison requires numeric or String types, got: !Integer! and ?edge::Item? @1:24-1:47
+IntegerAttribute >= Other => Ordering comparison requires numeric or String types, got: !Integer! and !edge::Other! @1:24-1:72
+IntegerAttribute >= OclAny => ok
+IntegerAttribute >= SetOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {Integer} @1:24-1:44
+IntegerAttribute >= SequenceOfString => Ordering comparison requires numeric or String types, got: !Integer! and [String] @1:24-1:51
+IntegerAttribute >= BagOfInteger => Ordering comparison requires numeric or String types, got: !Integer! and {{Integer}} @1:24-1:44
+StringAttribute >= Integer => Ordering comparison requires numeric or String types, got: !String! and Integer @1:24-1:38
+StringAttribute >= Real => Ordering comparison requires numeric or String types, got: !String! and Double @1:24-1:40
+StringAttribute >= String => Ordering comparison requires numeric or String types, got: !String! and String @1:24-1:40
+StringAttribute >= Boolean => Ordering comparison requires numeric or String types, got: !String! and Boolean @1:24-1:41
+StringAttribute >= IntegerAttribute => Ordering comparison requires numeric or String types, got: !String! and !Integer! @1:24-1:47
+StringAttribute >= StringAttribute => Ordering comparison requires numeric or String types, got: !String! and !String! @1:24-1:46
+StringAttribute >= SubA => Ordering comparison requires numeric or String types, got: !String! and edge::SubA @1:24-1:41
+StringAttribute >= OptionalItem => Ordering comparison requires numeric or String types, got: !String! and ?edge::Item? @1:24-1:46
+StringAttribute >= Other => Ordering comparison requires numeric or String types, got: !String! and !edge::Other! @1:24-1:71
+StringAttribute >= OclAny => ok
+StringAttribute >= SetOfInteger => Ordering comparison requires numeric or String types, got: !String! and {Integer} @1:24-1:43
+StringAttribute >= SequenceOfString => Ordering comparison requires numeric or String types, got: !String! and [String] @1:24-1:50
+StringAttribute >= BagOfInteger => Ordering comparison requires numeric or String types, got: !String! and {{Integer}} @1:24-1:43
+SubA >= Integer => Ordering comparison requires numeric or String types, got: edge::SubA and Integer @1:24-1:33
+SubA >= Real => Ordering comparison requires numeric or String types, got: edge::SubA and Double @1:24-1:35
+SubA >= String => Ordering comparison requires numeric or String types, got: edge::SubA and String @1:24-1:35
+SubA >= Boolean => Ordering comparison requires numeric or String types, got: edge::SubA and Boolean @1:24-1:36
+SubA >= IntegerAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !Integer! @1:24-1:42
+SubA >= StringAttribute => Ordering comparison requires numeric or String types, got: edge::SubA and !String! @1:24-1:41
+SubA >= SubA => Ordering comparison requires numeric or String types, got: edge::SubA and edge::SubA @1:24-1:36
+SubA >= OptionalItem => Ordering comparison requires numeric or String types, got: edge::SubA and ?edge::Item? @1:24-1:41
+SubA >= Other => Ordering comparison requires numeric or String types, got: edge::SubA and !edge::Other! @1:24-1:66
+SubA >= OclAny => ok
+SubA >= SetOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {Integer} @1:24-1:38
+SubA >= SequenceOfString => Ordering comparison requires numeric or String types, got: edge::SubA and [String] @1:24-1:45
+SubA >= BagOfInteger => Ordering comparison requires numeric or String types, got: edge::SubA and {{Integer}} @1:24-1:38
+OptionalItem >= Integer => Ordering comparison requires numeric or String types, got: ?edge::Item? and Integer @1:24-1:38
+OptionalItem >= Real => Ordering comparison requires numeric or String types, got: ?edge::Item? and Double @1:24-1:40
+OptionalItem >= String => Ordering comparison requires numeric or String types, got: ?edge::Item? and String @1:24-1:40
+OptionalItem >= Boolean => Ordering comparison requires numeric or String types, got: ?edge::Item? and Boolean @1:24-1:41
+OptionalItem >= IntegerAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !Integer! @1:24-1:47
+OptionalItem >= StringAttribute => Ordering comparison requires numeric or String types, got: ?edge::Item? and !String! @1:24-1:46
+OptionalItem >= SubA => Ordering comparison requires numeric or String types, got: ?edge::Item? and edge::SubA @1:24-1:41
+OptionalItem >= OptionalItem => Ordering comparison requires numeric or String types, got: ?edge::Item? and ?edge::Item? @1:24-1:46
+OptionalItem >= Other => Ordering comparison requires numeric or String types, got: ?edge::Item? and !edge::Other! @1:24-1:71
+OptionalItem >= OclAny => ok
+OptionalItem >= SetOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {Integer} @1:24-1:43
+OptionalItem >= SequenceOfString => Ordering comparison requires numeric or String types, got: ?edge::Item? and [String] @1:24-1:50
+OptionalItem >= BagOfInteger => Ordering comparison requires numeric or String types, got: ?edge::Item? and {{Integer}} @1:24-1:43
+Other >= Integer => Ordering comparison requires numeric or String types, got: !edge::Other! and Integer @1:24-1:63
+Other >= Real => Ordering comparison requires numeric or String types, got: !edge::Other! and Double @1:24-1:65
+Other >= String => Ordering comparison requires numeric or String types, got: !edge::Other! and String @1:24-1:65
+Other >= Boolean => Ordering comparison requires numeric or String types, got: !edge::Other! and Boolean @1:24-1:66
+Other >= IntegerAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !Integer! @1:24-1:72
+Other >= StringAttribute => Ordering comparison requires numeric or String types, got: !edge::Other! and !String! @1:24-1:71
+Other >= SubA => Ordering comparison requires numeric or String types, got: !edge::Other! and edge::SubA @1:24-1:66
+Other >= OptionalItem => Ordering comparison requires numeric or String types, got: !edge::Other! and ?edge::Item? @1:24-1:71
+Other >= Other => Ordering comparison requires numeric or String types, got: !edge::Other! and !edge::Other! @1:24-1:96
+Other >= OclAny => ok
+Other >= SetOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {Integer} @1:24-1:68
+Other >= SequenceOfString => Ordering comparison requires numeric or String types, got: !edge::Other! and [String] @1:24-1:75
+Other >= BagOfInteger => Ordering comparison requires numeric or String types, got: !edge::Other! and {{Integer}} @1:24-1:68
+OclAny >= Integer => ok
+OclAny >= Real => ok
+OclAny >= String => ok
+OclAny >= Boolean => ok
+OclAny >= IntegerAttribute => ok
+OclAny >= StringAttribute => ok
+OclAny >= SubA => ok
+OclAny >= OptionalItem => ok
+OclAny >= Other => ok
+OclAny >= OclAny => ok
+OclAny >= SetOfInteger => ok
+OclAny >= SequenceOfString => ok
+OclAny >= BagOfInteger => ok
+SetOfInteger >= Integer => Ordering comparison requires numeric or String types, got: {Integer} and Integer @1:24-1:35
+SetOfInteger >= Real => Ordering comparison requires numeric or String types, got: {Integer} and Double @1:24-1:37
+SetOfInteger >= String => Ordering comparison requires numeric or String types, got: {Integer} and String @1:24-1:37
+SetOfInteger >= Boolean => Ordering comparison requires numeric or String types, got: {Integer} and Boolean @1:24-1:38
+SetOfInteger >= IntegerAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !Integer! @1:24-1:44
+SetOfInteger >= StringAttribute => Ordering comparison requires numeric or String types, got: {Integer} and !String! @1:24-1:43
+SetOfInteger >= SubA => Ordering comparison requires numeric or String types, got: {Integer} and edge::SubA @1:24-1:38
+SetOfInteger >= OptionalItem => Ordering comparison requires numeric or String types, got: {Integer} and ?edge::Item? @1:24-1:43
+SetOfInteger >= Other => Ordering comparison requires numeric or String types, got: {Integer} and !edge::Other! @1:24-1:68
+SetOfInteger >= OclAny => ok
+SetOfInteger >= SetOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {Integer} @1:24-1:40
+SetOfInteger >= SequenceOfString => Ordering comparison requires numeric or String types, got: {Integer} and [String] @1:24-1:47
+SetOfInteger >= BagOfInteger => Ordering comparison requires numeric or String types, got: {Integer} and {{Integer}} @1:24-1:40
+SequenceOfString >= Integer => Ordering comparison requires numeric or String types, got: [String] and Integer @1:24-1:42
+SequenceOfString >= Real => Ordering comparison requires numeric or String types, got: [String] and Double @1:24-1:44
+SequenceOfString >= String => Ordering comparison requires numeric or String types, got: [String] and String @1:24-1:44
+SequenceOfString >= Boolean => Ordering comparison requires numeric or String types, got: [String] and Boolean @1:24-1:45
+SequenceOfString >= IntegerAttribute => Ordering comparison requires numeric or String types, got: [String] and !Integer! @1:24-1:51
+SequenceOfString >= StringAttribute => Ordering comparison requires numeric or String types, got: [String] and !String! @1:24-1:50
+SequenceOfString >= SubA => Ordering comparison requires numeric or String types, got: [String] and edge::SubA @1:24-1:45
+SequenceOfString >= OptionalItem => Ordering comparison requires numeric or String types, got: [String] and ?edge::Item? @1:24-1:50
+SequenceOfString >= Other => Ordering comparison requires numeric or String types, got: [String] and !edge::Other! @1:24-1:75
+SequenceOfString >= OclAny => ok
+SequenceOfString >= SetOfInteger => Ordering comparison requires numeric or String types, got: [String] and {Integer} @1:24-1:47
+SequenceOfString >= SequenceOfString => Ordering comparison requires numeric or String types, got: [String] and [String] @1:24-1:54
+SequenceOfString >= BagOfInteger => Ordering comparison requires numeric or String types, got: [String] and {{Integer}} @1:24-1:47
+BagOfInteger >= Integer => Ordering comparison requires numeric or String types, got: {{Integer}} and Integer @1:24-1:35
+BagOfInteger >= Real => Ordering comparison requires numeric or String types, got: {{Integer}} and Double @1:24-1:37
+BagOfInteger >= String => Ordering comparison requires numeric or String types, got: {{Integer}} and String @1:24-1:37
+BagOfInteger >= Boolean => Ordering comparison requires numeric or String types, got: {{Integer}} and Boolean @1:24-1:38
+BagOfInteger >= IntegerAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !Integer! @1:24-1:44
+BagOfInteger >= StringAttribute => Ordering comparison requires numeric or String types, got: {{Integer}} and !String! @1:24-1:43
+BagOfInteger >= SubA => Ordering comparison requires numeric or String types, got: {{Integer}} and edge::SubA @1:24-1:38
+BagOfInteger >= OptionalItem => Ordering comparison requires numeric or String types, got: {{Integer}} and ?edge::Item? @1:24-1:43
+BagOfInteger >= Other => Ordering comparison requires numeric or String types, got: {{Integer}} and !edge::Other! @1:24-1:68
+BagOfInteger >= OclAny => ok
+BagOfInteger >= SetOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {Integer} @1:24-1:40
+BagOfInteger >= SequenceOfString => Ordering comparison requires numeric or String types, got: {{Integer}} and [String] @1:24-1:47
+BagOfInteger >= BagOfInteger => Ordering comparison requires numeric or String types, got: {{Integer}} and {{Integer}} @1:24-1:40
