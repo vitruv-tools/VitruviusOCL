@@ -129,7 +129,7 @@
  * <h2>Known divergences this package must not touch</h2>
  *
  * <p>Navigation deduplication for unique combined Ctypes (see {@code
- * EvaluationVisitor#visitPropertyAccessWithReceiver}) and the "no object" propagation for {@code
+ * NavigationEvaluation#property}) and the "no object" propagation for {@code
  * div}/{@code mod}/{@code at}/{@code reverse} are pre-existing, independent semantic fixes. The
  * lazy navigation implementation in this package preserves the former by using {@link
  * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations#dedupe} inline instead of a

@@ -60,7 +60,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *
  * <p>Metamodel: {@code dummy3::Root} has a many-valued {@code EReference children} (to {@code
  * dummy3::Child}, exercising {@code navigateOne()}'s {@code EReference} path across two distinct
- * receiver elements per {@link EvaluationVisitor#visitPropertyAccessWithReceiver}'s outer {@code
+ * receiver elements per {@link NavigationEvaluation#property}'s outer {@code
  * flatMap}); each {@code dummy3::Child} has a many-valued {@code EAttribute liste} (exercising the
  * {@code EAttribute} path, the one actually changed by the streaming fix).
  *

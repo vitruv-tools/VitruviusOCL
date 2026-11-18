@@ -18,25 +18,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Function;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EClass;
-import org.eclipse.emf.ecore.EEnumLiteral;
 import org.eclipse.emf.ecore.EObject;
-import org.eclipse.emf.ecore.EStructuralFeature;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.transaction.TransactionModel;
-import tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElementSource;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.AbstractPhaseVisitor;
@@ -125,9 +119,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   private Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>>
       contextInstanceOverride = null;
 
-  /* Cache for allInstances() results to avoid redundant metamodel queries during evaluation. */
-  private final java.util.Map<EClass, Value> allInstancesCache = new java.util.HashMap<>();
-
   /**
    * Every EClass the current constraint needs the extension of, collected from the type-checked AST
    * before evaluation (static query analysis, Wei &amp; Kolovos, BigMDE 2015, Section 3.2).
@@ -177,12 +168,19 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       new IteratorOperationEvaluation(new EvaluationContext());
 
   /**
-   * The transaction (ordered list of atomic changes between pre-state and the current post-state)
-   * that {@code @pre} and the {@code OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted} lifecycle
-   * predicates are evaluated against. Empty by default — every pre-existing caller that doesn't
-   * supply a transaction gets the safe no-op behavior documented on {@link TransactionModel}.
+   * Runtime semantics of {@code @pre} and the lifecycle predicates against this run's transaction
+   * (empty for callers without one), see {@link TransactionEvaluation}.
    */
-  private final TransactionModel transaction;
+  private final TransactionEvaluation transactions;
+
+  /** Runtime semantics of navigation chains, see {@link NavigationEvaluation}. */
+  private final NavigationEvaluation navigation;
+
+  /**
+   * Runtime semantics of allInstances and the type operations, see {@link
+   * MetamodelOperationEvaluation}.
+   */
+  private final MetamodelOperationEvaluation metamodelOperations;
 
   /**
    * Whether this evaluation run has a real transaction context at all — {@code true} only when
@@ -203,10 +201,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       "vitruvocl.eval.noCorrespondenceFastPaths";
 
   /**
-   * Memoized correspondence checks for every form of {@code ~}; lives as long as this visitor, so
-   * each distinct object is looked up in the correspondence model at most once per evaluation.
+   * Runtime semantics of the correspondence operations, see {@link CorrespondenceEvaluation}; its
+   * memoized {@link CorrespondenceLookup} lives as long as this visitor.
    */
-  private final CorrespondenceLookup correspondences;
+  private final CorrespondenceEvaluation correspondences;
 
   /**
    * Whether the correspondence fast paths are on (see {@link #PROP_NO_CORRESPONDENCE_FAST_PATHS}).
@@ -284,10 +282,18 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     super(st, specification, errors);
     this.nodeTypes = nodeTypes;
     this.errorFreeAnalysis = new ErrorFreeAnalysis(nodeTypes);
-    this.transaction = new TransactionModel(transactionChanges);
     this.transactionSupported = transactionSupported;
     this.correspondenceFastPaths = !Boolean.getBoolean(PROP_NO_CORRESPONDENCE_FAST_PATHS);
-    this.correspondences = new CorrespondenceLookup(specification, correspondenceFastPaths);
+    this.correspondences =
+        new CorrespondenceEvaluation(
+            new EvaluationContext(),
+            new CorrespondenceLookup(specification, correspondenceFastPaths));
+    this.transactions =
+        new TransactionEvaluation(
+            new EvaluationContext(), new TransactionModel(transactionChanges));
+    this.navigation = new NavigationEvaluation(new EvaluationContext(), transactions);
+    this.metamodelOperations =
+        new MetamodelOperationEvaluation(new EvaluationContext(), nodeTypes, this::instancesOf);
   }
 
   /**
@@ -886,80 +892,10 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return iterators.exists(ctx);
   }
 
-  /**
-   * Evaluates the {@code oclAsType()} operation.
-   *
-   * <p>Type cast operation that preserves the multiplicity semantics. The nodeTypes entry for this
-   * node is now ¡targetType! (Singleton) after the TypeCheckVisitor fix — so we must unwrap through
-   * isSingleton() as well as isCollection() to reach the bare MetaclassType.
-   *
-   * <p>Guard against infinite unwrapping: bare types return {@code this} from {@code
-   * getElementType()}, so we stop as soon as the element type is the same object as the current
-   * type.
-   *
-   * @param ctx The oclAsType operation node
-   * @return The receiver elements re-wrapped with the target element type
-   */
+  /** Evaluates {@code oclAsType(T)}. See {@link MetamodelOperationEvaluation#asType}. */
   @Override
-  @SuppressWarnings("java:S3776")
   public Value visitOclAsTypeOp(VitruvOCLParser.OclAsTypeOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Type targetType = nodeTypes.get(ctx);
-
-    if (targetType == null) {
-      return Value.of(receiver.getElements(), receiver.getRuntimeType());
-    }
-
-    // Unwrap to the bare member type: handles both {cad::Box} and !cad::Box!
-    // nodeTypes now stores !cad::Box! for singleton receivers (TypeCheckVisitor
-    // fix).
-    // Guard: bare types return `this` from getElementType() — stop when no
-    // progress.
-    Type targetElemType = targetType;
-    while ((targetElemType.isCollection() || targetElemType.isSingleton())
-        && targetElemType.getElementType() != targetElemType) {
-      targetElemType = targetElemType.getElementType();
-    }
-
-    // Primitive type cast: re-annotate with target element type, preserve
-    // collection kind
-    if (!targetElemType.isMetaclassType()) {
-      Type resultType = Type.preserveCollectionKind(receiver.getRuntimeType(), targetElemType);
-      return Value.of(receiver.getElements(), resultType);
-    }
-
-    // Metaclass cast: validate each element via EMF inheritance
-    EClass targetEClass = targetElemType.getEClass();
-    List<OCLElement> results = new ArrayList<>();
-
-    for (OCLElement elem : receiver.getElements()) {
-      if (elem instanceof OCLElement.MetaclassValue(EObject instance)) {
-        EClass elemEClass = instance.eClass();
-        if (targetEClass.isSuperTypeOf(elemEClass) || elemEClass.equals(targetEClass)) {
-          results.add(new OCLElement.CastedMetaclassValue(instance, targetEClass));
-        }
-        // else: element fails cast — filter it out
-      } else if (elem
-          instanceof OCLElement.CastedMetaclassValue(EObject instance, EClass castedTo)) {
-        // Already casted — re-validate against new target
-        EClass elemEClass = instance.eClass();
-        if (targetEClass.isSuperTypeOf(elemEClass) || elemEClass.equals(targetEClass)) {
-          results.add(new OCLElement.CastedMetaclassValue(instance, targetEClass));
-        }
-        // else: element fails cast — filter it out
-      }
-      // else: non-metaclass element — filter it out
-    }
-
-    // Result type: singleton if receiver was singleton or bare metaclass,
-    // collection otherwise
-    Type resultType;
-    if (receiver.getRuntimeType().isSingleton() || !receiver.getRuntimeType().isCollection()) {
-      resultType = Type.singleton(targetElemType);
-    } else {
-      resultType = Type.preserveCollectionKind(receiver.getRuntimeType(), targetElemType);
-    }
-    return Value.of(results, resultType);
+    return metamodelOperations.asType(ctx);
   }
 
   /**
@@ -1491,10 +1427,8 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.ANY);
     }
 
-    // Process navigation chain. A property-nav step immediately followed by '@pre' is evaluated
-    // specially (reading the transaction's pre-state instead of the live value); the '@pre' step
-    // itself is then skipped since it was consumed by the property access before it.
-    currentValue = navigate(ctx.navigationChainCS(), currentValue);
+    // Process navigation chain (including '@pre', see NavigationEvaluation#navigate)
+    currentValue = navigation.navigate(ctx.navigationChainCS(), currentValue);
 
     return currentValue;
   }
@@ -1569,529 +1503,26 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return Value.of(results, resultType != null ? resultType : Type.BOOLEAN);
   }
 
-  /**
-   * Helper method to evaluate navigation with an explicit receiver value.
-   *
-   * <p>Delegates to either property access or operation call based on the navigation target type.
-   *
-   * @param ctx The navigation chain node
-   * @param receiver The receiver value for the navigation
-   * @return The result of the navigation
-   */
-  /**
-   * Applies a navigation chain to {@code receiver}. A property step immediately followed by
-   * {@code @pre} reads the transaction's pre-state; the {@code @pre} step itself is consumed by it.
-   */
-  private Value navigate(List<VitruvOCLParser.NavigationChainCSContext> navChain, Value receiver) {
-    Value currentValue = receiver;
-    for (int i = 0; i < navChain.size(); i++) {
-      VitruvOCLParser.NavigationChainCSContext nav = navChain.get(i);
-      if (nav.AT_PRE() != null) {
-        continue;
-      }
-      boolean nextIsAtPre = i + 1 < navChain.size() && navChain.get(i + 1).AT_PRE() != null;
-      if (nextIsAtPre
-          && nav.navigationTargetCS() instanceof VitruvOCLParser.PropertyNavContext propNav) {
-        currentValue = visitPropertyAccessWithReceiverPreState(propNav, currentValue);
-      } else {
-        currentValue = visitNavigationWithReceiver(nav, currentValue);
-      }
-    }
-    return currentValue;
-  }
-
-  private Value visitNavigationWithReceiver(
-      VitruvOCLParser.NavigationChainCSContext ctx, Value receiver) {
-
-    // dispatch on the target's alternative directly (no visitor allocated per step and element)
-    VitruvOCLParser.NavigationTargetCSContext target = ctx.navigationTargetCS();
-    if (target instanceof VitruvOCLParser.PropertyNavContext property) {
-      return visitPropertyAccessWithReceiver(property, receiver);
-    }
-    if (target instanceof VitruvOCLParser.OperationNavContext operation) {
-      return visitOperationCallWithReceiver(operation.operationCall(), receiver);
-    }
-    if (target instanceof VitruvOCLParser.LifecycleNavContext lifecycle) {
-      return visitLifecyclePredicateWithReceiver(lifecycle.lifecyclePredicateCS(), receiver);
-    }
-    throw new IllegalStateException("Unexpected navigation step: " + ctx.getText());
-  }
-
-  /**
-   * Pushes {@code receiver} onto {@code receiverStack} before evaluating an {@code
-   * OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted} predicate, mirroring {@link
-   * #visitOperationCallWithReceiver}.
-   */
-  private Value visitLifecyclePredicateWithReceiver(
-      VitruvOCLParser.LifecyclePredicateCSContext ctx, Value receiver) {
-    receiverStack.push(receiver);
-    try {
-      return visit(ctx);
-    } finally {
-      receiverStack.pop();
-    }
-  }
-
-  /**
-   * Helper method to evaluate operation calls with an explicit receiver.
-   *
-   * <p>Pushes the receiver onto {@code receiverStack} before visiting the operation, then pops it
-   * after. This allows operation visitor methods to access their receiver via {@code
-   * receiverStack.peek()}.
-   *
-   * @param ctx The operation call node
-   * @param receiver The receiver value for the operation
-   * @return The result of the operation
-   */
-  private Value visitOperationCallWithReceiver(
-      VitruvOCLParser.OperationCallContext ctx, Value receiver) {
-
-    // Push receiver onto stack for operation to access
-    receiverStack.push(receiver);
-    try {
-      return visitChildren(ctx);
-    } finally {
-      receiverStack.pop();
-    }
-  }
-
   // ==================== Metamodel Operations ====================
 
-  /**
-   * Evaluates the {@code allInstances()} operation.
-   *
-   * <p>Returns all instances of the receiver metaclass from the loaded models. This is the primary
-   * operation for accessing model elements in constraints.
-   *
-   * <p><b>Examples:</b>
-   *
-   * <ul>
-   *   <li>{@code Person.allInstances()} → all Person instances
-   *   <li>{@code spaceMission::Spacecraft.allInstances()} → all Spacecraft instances (qualified
-   *       name)
-   * </ul>
-   *
-   * @param ctx The allInstances operation node
-   * @return A set of all instances of the metaclass
-   */
+  /** Evaluates {@code allInstances()}. See {@link MetamodelOperationEvaluation#allInstances}. */
   @Override
   public Value visitAllInstancesOp(VitruvOCLParser.AllInstancesOpContext ctx) {
-    // Navigate up the parse tree to the receiver's (metaclass) type
-    EClass eClass = AllInstancesTypeScanner.receiverEClass(ctx, nodeTypes);
-    if (eClass == null) {
-      return Value.empty(Type.set(Type.ANY));
-    }
-
-    // Cache lookup
-    if (allInstancesCache.containsKey(eClass)) {
-      return allInstancesCache.get(eClass);
-    }
-
-    List<EObject> instances = instancesOf(eClass);
-    List<OCLElement> elements =
-        instances.stream().map(obj -> (OCLElement) new OCLElement.MetaclassValue(obj)).toList();
-
-    Type resultType = nodeTypes.get(ctx);
-    Value result =
-        Value.of(elements, resultType != null ? resultType : Type.set(Type.metaclassType(eClass)));
-
-    // Cache result
-    allInstancesCache.put(eClass, result);
-    return result;
-  }
-
-  /**
-   * Evaluates property access on metaclass instances.
-   *
-   * <p>Accesses EMF structural features (attributes and references) on model instances. For
-   * multi-valued features, all values are flattened into the result collection.
-   *
-   * <p><b>Examples:</b>
-   *
-   * <ul>
-   *   <li>{@code person.name} → singleton with person's name
-   *   <li>{@code company.employees} → collection of all employees
-   * </ul>
-   *
-   * @param navCtx The property navigation node - the type is looked up under this node because
-   *     {@link tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor#visitPropertyNav} stores
-   *     the combined Ctype keyed by the navigation node, not by the inner {@code propertyAccess()}
-   *     node (looking it up under the inner node always misses and silently falls back to {@code
-   *     Type.set(Type.ANY)}, which is always {@code unique=true} - this used to make {@code
-   *     LazyOperations#dedupe} run unconditionally on every {@code e.p} navigation regardless of
-   *     the feature's real {@code unique} flag, silently dropping genuine duplicates from any
-   *     many-valued, non-unique feature's result).
-   * @param receiver The receiver value (must contain metaclass instances)
-   * @return Collection of property values from all receiver instances
-   */
-  @SuppressWarnings("java:S3776")
-  private Value visitPropertyAccessWithReceiver(
-      VitruvOCLParser.PropertyNavContext navCtx, Value receiver) {
-    VitruvOCLParser.PropertyAccessContext ctx = navCtx.propertyAccess();
-    String propertyName = ctx.propertyName.getText();
-    Type resultType = nodeTypes.get(navCtx);
-    Type finalType = resultType != null ? resultType : Type.set(Type.ANY);
-    Type emptyType = resultType != null ? resultType : Type.optional(Type.ANY);
-
-    // Peek (without materializing the rest) to validate that the receiver contains metaclass
-    // instances at all; a throwaway single-pull iterator keeps this check lazy.
-    Iterator<OCLElement> probe = receiver.elementIterator();
-    if (!probe.hasNext()) {
-      return Value.empty(emptyType);
-    }
-    OCLElement first = probe.next();
-    EObject firstInstance = first.tryGetInstance();
-    if (firstInstance == null) {
-      return Value.empty(emptyType);
-    }
-
-    // A single object navigated along a single-valued feature (self.name, i.flag) yields at most
-    // one value - there is no collection to evaluate lazily (Tisi et al. restrict laziness to
-    // collections), so the value is read directly instead of building a lazy chain for it.
-    // Many-valued features stay lazy below, so early termination on them is preserved.
-    if (receiver.isMaterialized() && receiver.size() == 1) {
-      EStructuralFeature feature = firstInstance.eClass().getEStructuralFeature(propertyName);
-      if (feature != null && !feature.isMany()) {
-        List<OCLElement> values = new ArrayList<>(1);
-        navigateOne(first, propertyName).forEachRemaining(values::add);
-        return Value.of(values, finalType);
-      }
-    }
-
-    // Category 1 (fully lazy): each receiver element expands to zero or more navigated values;
-    // navigation never needs to consume more of the receiver than the outer consumer asks for.
-    Function<OCLElement, Iterator<OCLElement>> expand = elem -> navigateOne(elem, propertyName);
-    OCLElementSource mapped = LazyOperations.flatMap(receiver.asSource(), expand);
-    // A unique result type (Set/OrderedSet) is only guaranteed duplicate-free once explicitly
-    // deduplicated — collecting across multiple receiver elements can otherwise yield the same
-    // feature value more than once even though the combined Ctype (see
-    // TypeCheckVisitor#typeCheckPropertyAccess) says "unique". Deduplicated incrementally (Kern-
-    // anforderung 2) instead of via a post-hoc removeDuplicates() pass over a fully built list.
-    OCLElementSource result =
-        finalType.isUnique() ? LazyOperations.dedupeSemantically(mapped) : mapped;
-    return Value.lazy(result, finalType);
-  }
-
-  /**
-   * Pre-state counterpart of {@link #visitPropertyAccessWithReceiver}: reads each receiver
-   * element's feature value as it existed at transaction start (via {@link TransactionModel}),
-   * instead of the current live value. Used for the {@code self.attr@pre} navigation form.
-   *
-   * <p>Unlike the live path, this eagerly materializes the receiver ({@code
-   * receiver.getElements()}) rather than staying lazy — {@code @pre} is a comparatively rare,
-   * non-hot-path construct, so the added simplicity outweighs the lazy-pipeline benefits that
-   * matter for large collection chains.
-   *
-   * @param navCtx the property navigation node the {@code @pre} step is attached to
-   * @param receiver the receiver value (must contain metaclass instances)
-   * @return collection of pre-state property values from all receiver instances
-   */
-  private Value visitPropertyAccessWithReceiverPreState(
-      VitruvOCLParser.PropertyNavContext navCtx, Value receiver) {
-    VitruvOCLParser.PropertyAccessContext ctx = navCtx.propertyAccess();
-    String propertyName = ctx.propertyName.getText();
-    Type resultType = nodeTypes.get(navCtx);
-    Type finalType = resultType != null ? resultType : Type.set(Type.ANY);
-
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject instance = elem.tryGetInstance();
-      if (instance == null) {
-        continue;
-      }
-      EStructuralFeature feature = instance.eClass().getEStructuralFeature(propertyName);
-      if (feature == null) {
-        continue;
-      }
-      if (feature.isMany()) {
-        List<?> currentList = (List<?>) instance.eGet(feature);
-        List<Object> currentValues = new ArrayList<>(currentList);
-        List<Object> preValues =
-            transaction.getPreStateMultiValue(instance, feature, currentValues);
-        for (Object v : preValues) {
-          if (v != null) {
-            results.add(wrapValue(v));
-          }
-        }
-      } else {
-        Object currentVal = instance.eGet(feature);
-        Object preVal = transaction.getPreStateSingleValue(instance, feature, currentVal);
-        if (preVal != null) {
-          results.add(wrapValue(preVal));
-        }
-      }
-    }
-    return Value.of(results, finalType);
-  }
-
-  /**
-   * Navigates {@code propertyName} on a single receiver element; used by {@link
-   * #visitPropertyAccessWithReceiver}.
-   */
-  private Iterator<OCLElement> navigateOne(OCLElement elem, String propertyName) {
-    EObject instance = elem.tryGetInstance();
-    if (instance == null) {
-      return Collections.emptyIterator();
-    }
-    EStructuralFeature feature = instance.eClass().getEStructuralFeature(propertyName);
-    if (feature == null) {
-      return Collections.emptyIterator();
-    }
-    Object value = instance.eGet(feature);
-    if (feature.isMany()) {
-      // Category 1 (fully lazy): wraps each raw element on demand as the outer consumer (select,
-      // exists, notEmpty, ...) actually pulls, instead of eagerly copying the entire feature
-      // value into a new ArrayList up front (which used to defeat early termination for any
-      // consumer chained onto a single receiver element's many-valued feature - see
-      // NavigationSelectNotEmptyStreamingTest). `list.iterator()` is whatever EList
-      // implementation EMF backs the feature with, which already transparently resolves proxies
-      // on iteration for EReference features exactly as it did before - this only changes *when*
-      // elements are pulled from it, not *how* each one is obtained or wrapped.
-      List<?> list = (List<?>) value;
-      return new SkipNullMappingIterator(list.iterator());
-    }
-    if (value == null) {
-      return Collections.emptyIterator(); // unset optional attribute → ?T? = []
-    }
-    return List.of(wrapValue(value)).iterator();
-  }
-
-  /**
-   * Lazily maps a raw {@code Iterator<?>} (a many-valued EMF feature's backing list iterator) to
-   * {@link OCLElement}s via {@link #wrapValue}, skipping {@code null} entries one at a time instead
-   * of pre-filtering the whole source. Mirrors {@code
-   * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations}'s {@code FilterIterator} lookahead
-   * pattern: {@code hasNext()} is answered from an already-computed pending element, so
-   * constructing/advancing this iterator pulls at most one raw element ahead of what has actually
-   * been yielded downstream.
-   */
-  private final class SkipNullMappingIterator implements Iterator<OCLElement> {
-    private final Iterator<?> upstream;
-    private OCLElement pending;
-    private boolean hasPending;
-
-    SkipNullMappingIterator(Iterator<?> upstream) {
-      this.upstream = upstream;
-      advance();
-    }
-
-    private void advance() {
-      hasPending = false;
-      while (upstream.hasNext()) {
-        Object item = upstream.next();
-        if (item != null) {
-          pending = wrapValue(item);
-          hasPending = true;
-          return;
-        }
-      }
-    }
-
-    @Override
-    public boolean hasNext() {
-      return hasPending;
-    }
-
-    @Override
-    public OCLElement next() {
-      if (!hasPending) {
-        throw new NoSuchElementException();
-      }
-      OCLElement result = pending;
-      advance();
-      return result;
-    }
-  }
-
-  /**
-   * Wraps a raw Java value from EMF's {@code eGet()} into an {@link OCLElement}.
-   *
-   * <p>Type mapping:
-   *
-   * <ul>
-   *   <li>{@link String} → {@link OCLElement.StringValue}
-   *   <li>{@link Integer} → {@link OCLElement.IntValue}
-   *   <li>{@link Boolean} → {@link OCLElement.BoolValue}
-   *   <li>{@link Float} → {@link OCLElement.FloatValue} (EMF {@code EFloat} attributes)
-   *   <li>{@link Double} → {@link OCLElement.DoubleValue}
-   *   <li>{@link EEnumLiteral} → {@link OCLElement.EnumValue}
-   *   <li>{@link EObject} → {@link OCLElement.MetaclassValue}
-   * </ul>
-   *
-   * @param value the raw Java value returned by {@code EObject.eGet(feature)}
-   * @return the corresponding {@link OCLElement}
-   * @throws RuntimeException if the value type is not supported
-   */
-  private OCLElement wrapValue(Object value) {
-    if (value == null) {
-      return new OCLElement.StringValue("");
-    }
-
-    Class<?> clazz = value.getClass();
-
-    if (clazz.equals(String.class)) {
-      return new OCLElement.StringValue((String) value);
-    }
-    if (clazz.equals(Integer.class)) {
-      return new OCLElement.IntValue((Integer) value);
-    }
-    if (clazz.equals(Boolean.class)) {
-      return new OCLElement.BoolValue((Boolean) value);
-    }
-    // EFloat is stored as Java Float — wrap as FloatValue, NOT DoubleValue
-    if (clazz.equals(Float.class)) {
-      return new OCLElement.FloatValue((Float) value);
-    }
-    if (clazz.equals(Double.class)) {
-      return new OCLElement.DoubleValue((Double) value);
-    }
-    // EMF enum literals (EAttribute whose eType is an EEnum)
-    if (value instanceof EEnumLiteral enumLit) {
-      return new OCLElement.EnumValue(enumLit);
-    }
-    // Any other EObject (class instance from a metamodel)
-    if (EObject.class.isAssignableFrom(clazz)) {
-      return new OCLElement.MetaclassValue((EObject) value);
-    }
-
-    return new OCLElement.StringValue(value.toString());
+    return metamodelOperations.allInstances(ctx);
   }
 
   // ==================== Type Checking Operations ====================
 
-  /**
-   * Evaluates the {@code oclIsKindOf()} operation.
-   *
-   * <p>Checks if each element in the receiver is an instance of the specified type or a subtype.
-   * For primitive types, uses Java {@code instanceof} semantics. For metaclasses, uses EMF
-   * inheritance.
-   *
-   * <p><b>Example:</b> {@code person.oclIsKindOf(Person)} → {@code true}
-   *
-   * @param ctx The oclIsKindOf operation node
-   * @return A collection of boolean values, one per receiver element
-   */
+  /** Evaluates {@code oclIsKindOf(T)}. See {@link MetamodelOperationEvaluation#isKindOf}. */
   @Override
   public Value visitOclIsKindOfOp(VitruvOCLParser.OclIsKindOfOpContext ctx) {
-    Value receiver = receiverStack.peek();
-
-    Type targetType = nodeTypes.get(ctx.type);
-
-    if (targetType == null) {
-      return Value.of(List.of(), Type.set(Type.BOOLEAN));
-    }
-
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      boolean isKind = checkIsKindOf(elem, targetType);
-      results.add(new OCLElement.BoolValue(isKind));
-    }
-
-    Type resultType = nodeTypes.get(ctx);
-    return Value.of(results, resultType != null ? resultType : Type.set(Type.BOOLEAN));
+    return metamodelOperations.isKindOf(ctx);
   }
 
-  /**
-   * Evaluates the {@code oclIsTypeOf()} operation.
-   *
-   * <p>Currently implemented identically to {@code oclIsKindOf()}. Proper implementation would
-   * check for exact type match (no subtypes).
-   *
-   * @param ctx The oclIsTypeOf operation node
-   * @return A collection of boolean values, one per receiver element
-   */
+  /** Evaluates {@code oclIsTypeOf(T)}. See {@link MetamodelOperationEvaluation#isTypeOf}. */
   @Override
   public Value visitOclIsTypeOfOp(VitruvOCLParser.OclIsTypeOfOpContext ctx) {
-    Value receiver = receiverStack.peek();
-    Type targetType = nodeTypes.get(ctx.type);
-
-    if (targetType == null) {
-      return Value.of(List.of(), Type.set(Type.BOOLEAN));
-    }
-
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      results.add(new OCLElement.BoolValue(checkIsTypeOf(elem, targetType)));
-    }
-
-    Type resultType = nodeTypes.get(ctx);
-    return Value.of(results, resultType != null ? resultType : Type.set(Type.BOOLEAN));
-  }
-
-  /**
-   * Helper method to check if an element is of a given type.
-   *
-   * <p>Implements type checking for both primitive types (Integer, String, Boolean, Double) and
-   * metaclass types (using EMF inheritance).
-   *
-   * @param elem The element to check
-   * @param targetType The target type
-   * @return true if the element is of the target type (or a subtype)
-   */
-  private boolean checkIsKindOf(OCLElement elem, Type targetType) {
-    if (targetType == Type.ANY) {
-      return true; // OclAny is the supertype of every value
-    }
-    if (targetType == Type.INTEGER) {
-      return elem.tryGetInt() != null;
-    } else if (targetType == Type.STRING) {
-      return elem.tryGetString() != null;
-    } else if (targetType == Type.BOOLEAN) {
-      return elem.tryGetBool() != null;
-    } else if (targetType == Type.DOUBLE) {
-      // Real: Integer and Float values are kinds of Real (OCL: Integer conforms to Real)
-      return elem.tryGetDouble() != null || elem.tryGetFloat() != null || elem.tryGetInt() != null;
-    } else if (targetType == Type.FLOAT) {
-      return elem.tryGetFloat() != null || elem.tryGetDouble() != null || elem.tryGetInt() != null;
-    }
-
-    if (targetType.isMetaclassType()) {
-      EClass targetEClass = targetType.getEClass();
-      EClass elemEClass = elem.getEClass();
-
-      if (elemEClass == null) {
-        return false;
-      }
-
-      return targetEClass.isSuperTypeOf(elemEClass) || elemEClass.equals(targetEClass);
-    }
-
-    return false;
-  }
-
-  /**
-   * Helper method to check if an element is of a given type.
-   *
-   * <p>Implements type checking for both primitive types (Integer, String, Boolean, Double) and
-   * metaclass types (using EMF inheritance).
-   *
-   * @param elem The element to check
-   * @param targetType The target type
-   * @return true if the element is of the exact target type
-   */
-  private boolean checkIsTypeOf(OCLElement elem, Type targetType) {
-    if (targetType == Type.INTEGER) {
-      return elem.tryGetInt() != null;
-    } else if (targetType == Type.STRING) {
-      return elem.tryGetString() != null;
-    } else if (targetType == Type.BOOLEAN) {
-      return elem.tryGetBool() != null;
-    } else if (targetType == Type.DOUBLE) {
-      return elem.tryGetDouble() != null;
-    } else if (targetType == Type.FLOAT) {
-      return elem.tryGetFloat() != null;
-    }
-
-    if (targetType.isMetaclassType()) {
-      EClass targetEClass = targetType.getEClass();
-      EClass elemEClass = elem.getEClass();
-      if (elemEClass == null) {
-        return false;
-      }
-      return elemEClass.equals(targetEClass);
-    }
-
-    return false;
+    return metamodelOperations.isTypeOf(ctx);
   }
 
   // ==================== Cross-Metamodel Support ====================
@@ -2128,7 +1559,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return Value.empty(Type.set(Type.ANY));
     }
 
-    return navigate(ctx.navigationChainCS(), Value.of(List.of(), metaclassType));
+    return navigation.navigate(ctx.navigationChainCS(), Value.of(List.of(), metaclassType));
   }
 
   // ==================== Collection Literals ====================
@@ -2552,50 +1983,12 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   }
 
   /**
-   * Evaluates correspondence operator (~).
-   *
-   * <p>Checks if two objects are related via a Correspondence model instance. Searches through all
-   * loaded Correspondence objects to find a relationship between the left and right operands.
-   *
-   * <p><b>Algorithm:</b>
-   *
-   * <ol>
-   *   <li>Evaluate both operands to get EObject instances
-   *   <li>Get all Correspondence objects from loaded models
-   *   <li>For each Correspondence, check if leftEObjects contains obj1 and rightEObjects contains
-   *       obj2
-   *   <li>Also check reverse: leftEObjects contains obj2 and rightEObjects contains obj1
-   *   <li>Return true if any correspondence found, false otherwise
-   * </ol>
-   *
-   * @param ctx Correspondence expression context
-   * @return Value.of(true) if correspondence exists, Value.of(false) otherwise
+   * Evaluates the correspondence operator {@code obj1 ~ obj2}. See {@link
+   * CorrespondenceEvaluation#operator}.
    */
   @Override
   public Value visitCorrespondence(VitruvOCLParser.CorrespondenceContext ctx) {
-    Value leftValue = visit(ctx.left);
-    Value rightValue = visit(ctx.right);
-
-    // Both sides must be singletons
-    if (leftValue.isEmpty() || rightValue.isEmpty()) {
-      return Value.boolValue(false);
-    }
-    if (leftValue.size() != 1 || rightValue.size() != 1) {
-      return Value.boolValue(false);
-    }
-
-    // Extract EObject instances
-    EObject leftObject = leftValue.getElements().get(0).tryGetInstance();
-    EObject rightObject = rightValue.getElements().get(0).tryGetInstance();
-
-    if (leftObject == null || rightObject == null) {
-      return Value.boolValue(false);
-    }
-
-    // Check if correspondence exists between these two objects
-    boolean corresponds = checkCorrespondence(leftObject, rightObject);
-
-    return Value.boolValue(corresponds);
+    return correspondences.operator(ctx);
   }
 
   // ==================== Correspondence guard short-circuit ====================
@@ -2610,20 +2003,6 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
       return false;
     }
     return Boolean.TRUE.equals(value.getElements().get(0).tryGetBool());
-  }
-
-  /**
-   * Checks if two EObjects are related via a Correspondence.
-   *
-   * <p>The correspondence is bidirectional: obj1 can appear in leftEObjects or rightEObjects.
-   * Lookups are memoized per visitor (see {@link CorrespondenceLookup}).
-   *
-   * @param obj1 First object
-   * @param obj2 Second object
-   * @return true if a Correspondence relates obj1 and obj2, false otherwise
-   */
-  private boolean checkCorrespondence(EObject obj1, EObject obj2) {
-    return correspondences.corresponds(obj1, obj2);
   }
 
   // ==================== Not Yet Implemented Features ====================
@@ -2696,7 +2075,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
    * Error: navigation chain visited without receiver context.
    *
    * <p>This should never be reached - navigation chains should always be visited via {@link
-   * #visitNavigationWithReceiver}.
+   * NavigationEvaluation#navigate}.
    */
   @Override
   public Value visitNavigationChainCS(VitruvOCLParser.NavigationChainCSContext ctx) {
@@ -2710,7 +2089,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /**
    * Error: property access visited without receiver context.
    *
-   * <p>Should be visited via {@link #visitPropertyAccessWithReceiver}.
+   * <p>Should be visited via {@link NavigationEvaluation#navigate}.
    */
   @Override
   public Value visitPropertyNav(VitruvOCLParser.PropertyNavContext ctx) {
@@ -2720,7 +2099,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /**
    * Error: operation call visited without receiver context.
    *
-   * <p>Should be visited via {@link #visitOperationCallWithReceiver}.
+   * <p>Should be visited via {@link NavigationEvaluation#navigate}.
    */
   @Override
   public Value visitOperationNav(VitruvOCLParser.OperationNavContext ctx) {
@@ -2730,7 +2109,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /**
    * Error: property access visited without receiver.
    *
-   * <p>Should be visited via {@link #visitPropertyAccessWithReceiver}.
+   * <p>Should be visited via {@link NavigationEvaluation#navigate}.
    */
   @Override
   public Value visitPropertyAccess(VitruvOCLParser.PropertyAccessContext ctx) {
@@ -2740,7 +2119,7 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
   /**
    * Error: lifecycle predicate visited without receiver context.
    *
-   * <p>Should be visited via {@link #visitLifecyclePredicateWithReceiver}.
+   * <p>Should be visited via {@link NavigationEvaluation#navigate}.
    */
   @Override
   public Value visitLifecycleNav(VitruvOCLParser.LifecycleNavContext ctx) {
@@ -2749,109 +2128,22 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
 
   // ==================== Object-Lifecycle Predicates ====================
 
-  /**
-   * Evaluates {@code OCLisNew} (bare or with a {@code (attr => val, ...)} aggregate) for each
-   * receiver element: {@code true} iff the underlying instance was created in this evaluation's
-   * transaction and, for the aggregate form, its current (post-state) attribute values match.
-   *
-   * @param ctx The OCLisNew predicate node
-   * @return one Boolean per receiver element
-   */
+  /** Evaluates {@code OCLisNew}. See {@link TransactionEvaluation#isNew}. */
   @Override
   public Value visitOclIsNewPred(VitruvOCLParser.OclIsNewPredContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject instance = elem.tryGetInstance();
-      boolean matches =
-          instance != null
-              && transaction.wasCreated(instance)
-              && matchesAggregate(instance, ctx.lifecycleAggregateArgs());
-      results.add(new OCLElement.BoolValue(matches));
-    }
-    Type resultType = nodeTypes.get(ctx);
-    return Value.of(results, resultType != null ? resultType : Type.singleton(Type.BOOLEAN));
+    return transactions.isNew(ctx);
   }
 
-  /**
-   * Evaluates {@code OCLisModified} (bare or with a {@code (attr => val, ...)} aggregate) for each
-   * receiver element: {@code true} iff the underlying instance had any feature changed in this
-   * evaluation's transaction and, for the aggregate form, its current (post-state, i.e.
-   * target-value, not delta) attribute values match.
-   *
-   * @param ctx The OCLisModified predicate node
-   * @return one Boolean per receiver element
-   */
+  /** Evaluates {@code OCLisModified}. See {@link TransactionEvaluation#isModified}. */
   @Override
   public Value visitOclIsModifiedPred(VitruvOCLParser.OclIsModifiedPredContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject instance = elem.tryGetInstance();
-      boolean matches =
-          instance != null
-              && transaction.wasModified(instance)
-              && matchesAggregate(instance, ctx.lifecycleAggregateArgs());
-      results.add(new OCLElement.BoolValue(matches));
-    }
-    Type resultType = nodeTypes.get(ctx);
-    return Value.of(results, resultType != null ? resultType : Type.singleton(Type.BOOLEAN));
+    return transactions.isModified(ctx);
   }
 
-  /**
-   * Evaluates {@code OCLisDeleted} for each receiver element: {@code true} iff the underlying
-   * instance was deleted in this evaluation's transaction. No aggregate form exists.
-   *
-   * <p>Structurally, {@code self.OCLisDeleted} is always {@code false}: {@code
-   * visitClassifierContextCS} only ever iterates currently-live instances, so a deleted object can
-   * never be bound to {@code self}. This only becomes meaningful when navigating to a still-
-   * reachable (e.g. {@code @pre}-recovered) reference to a since-deleted object.
-   *
-   * @param ctx The OCLisDeleted predicate node
-   * @return one Boolean per receiver element
-   */
+  /** Evaluates {@code OCLisDeleted}. See {@link TransactionEvaluation#isDeleted}. */
   @Override
   public Value visitOclIsDeletedPred(VitruvOCLParser.OclIsDeletedPredContext ctx) {
-    Value receiver = receiverStack.peek();
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject instance = elem.tryGetInstance();
-      results.add(new OCLElement.BoolValue(instance != null && transaction.wasDeleted(instance)));
-    }
-    Type resultType = nodeTypes.get(ctx);
-    return Value.of(results, resultType != null ? resultType : Type.singleton(Type.BOOLEAN));
-  }
-
-  /**
-   * Checks a {@code (attr => val, ...)} aggregate's attribute values against {@code instance}'s
-   * <em>current</em> (post-state) values — target-value semantics, not deltas, and not {@code
-   * @pre}-relative (see {@code visitOclIsNewPred}/{@code visitOclIsModifiedPred} docs). Returns
-   * {@code true} (vacuously) for the bare, no-aggregate form.
-   */
-  private boolean matchesAggregate(
-      EObject instance, VitruvOCLParser.LifecycleAggregateArgsContext argsCtx) {
-    if (argsCtx == null) {
-      return true;
-    }
-    for (VitruvOCLParser.LifecycleAggregateArgContext arg : argsCtx.lifecycleAggregateArg()) {
-      String attrName = arg.attr.getText();
-      EStructuralFeature feature = instance.eClass().getEStructuralFeature(attrName);
-      if (feature == null) {
-        return false; // type-checker already rejects unknown attributes; defensive fallback
-      }
-      Value expectedValue = visit(arg.value);
-      if (expectedValue == null || expectedValue.isEmpty()) {
-        return false;
-      }
-      Object actualRaw = instance.eGet(feature);
-      if (actualRaw == null) {
-        return false;
-      }
-      if (!OCLElement.semanticEquals(wrapValue(actualRaw), expectedValue.getElements().get(0))) {
-        return false;
-      }
-    }
-    return true;
+    return transactions.isDeleted(ctx);
   }
 
   // ==================== Miscellaneous ====================
@@ -2960,170 +2252,31 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     return strings.matches(ctx);
   }
 
+  /**
+   * Evaluates {@code select(~)} with optional Type/Tag filters. See {@link
+   * CorrespondenceEvaluation#select}.
+   */
   @Override
   public Value visitSelectCorrespondence(VitruvOCLParser.SelectCorrespondenceContext ctx) {
-
-    Value receiver = receiverStack.peek();
-
-    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-    if (selfSymbol == null) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-    Value selfValue = environment.valueOf(selfSymbol);
-    if (selfValue.isEmpty() || selfValue.size() != 1) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-    EObject selfObject = selfValue.getElements().get(0).tryGetInstance();
-    if (selfObject == null) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-
-    String tagFilter = extractTagFilter(ctx.corrFilter);
-    EClass typeFilter = extractTypeFilter(ctx.corrFilter);
-
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject elemObject = elem.tryGetInstance();
-
-      boolean passes =
-          elemObject != null
-              && passesCorrespondenceFilter(selfObject, elemObject, tagFilter, typeFilter);
-
-      if (passes) {
-        results.add(elem);
-      }
-    }
-
-    return Value.of(results, receiver.getRuntimeType());
-  }
-
-  @Override
-  public Value visitRejectCorrespondence(VitruvOCLParser.RejectCorrespondenceContext ctx) {
-
-    Value receiver = receiverStack.peek();
-
-    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-    if (selfSymbol == null) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-    Value selfValue = environment.valueOf(selfSymbol);
-    if (selfValue.isEmpty() || selfValue.size() != 1) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-    EObject selfObject = selfValue.getElements().get(0).tryGetInstance();
-    if (selfObject == null) {
-      return Value.of(List.of(), receiver.getRuntimeType());
-    }
-
-    String tagFilter = extractTagFilter(ctx.corrFilter);
-    EClass typeFilter = extractTypeFilter(ctx.corrFilter);
-
-    List<OCLElement> results = new ArrayList<>();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject elemObject = elem.tryGetInstance();
-
-      boolean passes =
-          elemObject != null
-              && passesCorrespondenceFilter(selfObject, elemObject, tagFilter, typeFilter);
-
-      if (!passes) {
-        results.add(elem);
-      }
-    }
-
-    return Value.of(results, receiver.getRuntimeType());
-  }
-
-  @Override
-  public Value visitExistsCorrespondence(VitruvOCLParser.ExistsCorrespondenceContext ctx) {
-
-    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-    if (selfSymbol == null) {
-      return Value.boolValue(false);
-    }
-    Value selfValue = environment.valueOf(selfSymbol);
-    if (selfValue.isEmpty() || selfValue.size() != 1) {
-      return Value.boolValue(false);
-    }
-    EObject selfObject = selfValue.getElements().get(0).tryGetInstance();
-    if (selfObject == null) {
-      return Value.boolValue(false);
-    }
-
-    String tagFilter = extractTagFilter(ctx.corrFilter);
-    EClass typeFilter = extractTypeFilter(ctx.corrFilter);
-
-    Value receiver = receiverStack.peek();
-    for (OCLElement elem : receiver.getElements()) {
-      EObject elemObject = elem.tryGetInstance();
-
-      boolean passes =
-          elemObject != null
-              && passesCorrespondenceFilter(selfObject, elemObject, tagFilter, typeFilter);
-
-      if (passes) {
-        return Value.boolValue(true);
-      }
-    }
-
-    return Value.boolValue(false);
-  }
-
-  /** Extracts the Tag filter value from a correspondenceFilterCS, or null if none specified. */
-  private String extractTagFilter(VitruvOCLParser.CorrespondenceFilterCSContext corrFilter) {
-    if (corrFilter.correspondenceOptions() == null) {
-      return null;
-    }
-    for (VitruvOCLParser.CorrespondenceOptionContext opt :
-        corrFilter.correspondenceOptions().correspondenceOption()) {
-      if (opt instanceof VitruvOCLParser.CorrTagFilterContext tagCtx) {
-        Value tagVal = visit(tagCtx.tag);
-        if (tagVal.isEmpty()) {
-          return null;
-        }
-        return tagVal.getElements().get(0).tryGetString();
-      }
-    }
-    return null;
-  }
-
-  /** Extracts the Type filter EClass from a correspondenceFilterCS, or null if none specified. */
-  private EClass extractTypeFilter(VitruvOCLParser.CorrespondenceFilterCSContext corrFilter) {
-    if (corrFilter.correspondenceOptions() == null) {
-      return null;
-    }
-    for (VitruvOCLParser.CorrespondenceOptionContext opt :
-        corrFilter.correspondenceOptions().correspondenceOption()) {
-      if (opt instanceof VitruvOCLParser.CorrTypeFilterContext typeCtx) {
-        // Use the type already resolved by the type checker phase
-        Type resolvedType = nodeTypes.get(typeCtx);
-        if (resolvedType != null && resolvedType.isMetaclassType()) {
-          return resolvedType.getEClass();
-        }
-      }
-    }
-    return null;
+    return correspondences.select(ctx);
   }
 
   /**
-   * Returns true if elemObject passes both the type and tag filter relative to selfObject.
-   *
-   * <p>Type filter is a pure EMF instanceof check (cheap). Tag filter goes through the memoized
-   * {@link CorrespondenceLookup}, like the plain check. When no filter is
-   * set the plain {@code checkCorrespondence} result is returned.
+   * Evaluates {@code reject(~)} with optional Type/Tag filters. See {@link
+   * CorrespondenceEvaluation#reject}.
    */
-  private boolean passesCorrespondenceFilter(
-      EObject selfObject, EObject elemObject, String tagFilter, EClass typeFilter) {
-    // Type filter: elemObject must be an instance of typeFilter
-    if (typeFilter != null && !typeFilter.isInstance(elemObject)) {
-      return false;
-    }
-    // Tag filter: correspondence must carry the required tag
-    if (tagFilter != null) {
-      return correspondences.corresponds(selfObject, elemObject, tagFilter);
-    }
-    // No filter: plain bidirectional correspondence check
-    return checkCorrespondence(selfObject, elemObject);
+  @Override
+  public Value visitRejectCorrespondence(VitruvOCLParser.RejectCorrespondenceContext ctx) {
+    return correspondences.reject(ctx);
+  }
+
+  /**
+   * Evaluates {@code exists(~)} with optional Type/Tag filters. See {@link
+   * CorrespondenceEvaluation#exists}.
+   */
+  @Override
+  public Value visitExistsCorrespondence(VitruvOCLParser.ExistsCorrespondenceContext ctx) {
+    return correspondences.exists(ctx);
   }
 
   /** Exposes this visitor's state to the operation-family evaluators. */
@@ -3136,6 +2289,26 @@ public class EvaluationVisitor extends AbstractPhaseVisitor<Value> {
     @Override
     public Value evaluate(ParserRuleContext expression) {
       return visit(expression);
+    }
+
+    @Override
+    public Value evaluateWithReceiver(Value receiver, ParserRuleContext node) {
+      receiverStack.push(receiver);
+      try {
+        return visit(node);
+      } finally {
+        receiverStack.pop();
+      }
+    }
+
+    @Override
+    public Value evaluateChildrenWithReceiver(Value receiver, ParserRuleContext node) {
+      receiverStack.push(receiver);
+      try {
+        return visitChildren(node);
+      } finally {
+        receiverStack.pop();
+      }
     }
 
     @Override

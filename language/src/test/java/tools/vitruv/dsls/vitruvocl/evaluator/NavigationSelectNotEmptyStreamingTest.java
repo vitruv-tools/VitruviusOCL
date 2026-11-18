@@ -55,15 +55,15 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  * <h2>History (read before trusting the numbers)</h2>
  *
  * <p>This test originally found that navigation ({@code self.liste}) pulled all 10,000 raw elements
- * regardless of match position, because {@link EvaluationVisitor#navigateOne}'s many-valued-feature
+ * regardless of match position, because {@link NavigationEvaluation#navigateOne}'s many-valued-feature
  * branch used to eagerly copy the entire feature value into a fresh {@code ArrayList} before {@code
  * select()}/{@code notEmpty()} ever got a chance to run. That was fixed by replacing the eager copy
- * with {@link EvaluationVisitor.SkipNullMappingIterator}, a lazy, lookahead-based mapping iterator
+ * with {@link NavigationEvaluation.SkipNullMappingIterator}, a lazy, lookahead-based mapping iterator
  * over the feature's own {@code list.iterator()} - see the "early match" test below for the
  * now-genuine early-termination result.
  *
  * <p>A second, independent bug was found and fixed while verifying the above: {@code
- * visitPropertyAccessWithReceiver} used to look up the navigation's Ctype under the wrong parse
+ * NavigationEvaluation#property} used to look up the navigation's Ctype under the wrong parse
  * tree node ({@code nodeTypes.get(ctx)} with the inner {@code PropertyAccessContext}, while {@code
  * TypeCheckVisitor} stores it under the outer {@code PropertyNavContext}), always missing and
  * silently defaulting to {@code Type.set(Type.ANY)} - always {@code unique=true}. That made {@code
@@ -115,7 +115,7 @@ class NavigationSelectNotEmptyStreamingTest {
    * OCLElementSource} directly) - it could not be reused verbatim here because the boundary this
    * test needs to instrument is one layer further down: the raw {@code java.util.List} that {@code
    * EObject.eGet()} returns for a many-valued feature, which is what {@link
-   * EvaluationVisitor#navigateOne} actually touches.
+   * NavigationEvaluation#navigateOne} actually touches.
    */
   private static final class CountingIntFeatureList extends AbstractList<Object> {
     private final int size;
@@ -309,7 +309,7 @@ class NavigationSelectNotEmptyStreamingTest {
     // and the nodeTypes key-mismatch fix (which removed a spurious LazyOperations#dedupe layer -
     // see class javadoc), the count is 2, not the naively expected 1, from two independent,
     // one-element lookahead layers each contributing exactly one extra pull:
-    //   pull #1 (index 0, the actual match): EvaluationVisitor.SkipNullMappingIterator's
+    //   pull #1 (index 0, the actual match): NavigationEvaluation.SkipNullMappingIterator's
     //     constructor runs its own advance() the moment FlatMapIterator first expands the {self}
     //     receiver element, to have hasNext() answerable without a further pull.
     //   pull #2 (index 1, never consumed downstream): when FlatMapIterator#next() extracts index

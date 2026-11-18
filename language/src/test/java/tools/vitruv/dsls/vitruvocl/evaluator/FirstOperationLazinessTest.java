@@ -71,6 +71,16 @@ class FirstOperationLazinessTest {
       }
 
       @Override
+      public Value evaluateWithReceiver(Value receiver, ParserRuleContext node) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public Value evaluateChildrenWithReceiver(Value receiver, ParserRuleContext node) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
       public void error(ParserRuleContext ctx, String message) {
         throw new UnsupportedOperationException(message);
       }

@@ -30,6 +30,15 @@ interface OperationEvaluationContext {
   /** Evaluates an argument expression. */
   Value evaluate(ParserRuleContext expression);
 
+  /** Evaluates {@code node} with {@code receiver} as the receiver of the operation it denotes. */
+  Value evaluateWithReceiver(Value receiver, ParserRuleContext node);
+
+  /**
+   * Evaluates the children of {@code node} with {@code receiver} as the receiver of the operation
+   * they denote (an operation call delegates to its single alternative).
+   */
+  Value evaluateChildrenWithReceiver(Value receiver, ParserRuleContext node);
+
   /** Reports an evaluation error at {@code ctx}. */
   void error(ParserRuleContext ctx, String message);
 

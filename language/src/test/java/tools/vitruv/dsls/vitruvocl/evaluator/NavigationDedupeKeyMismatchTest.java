@@ -43,12 +43,12 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Correctness proof for the {@code nodeTypes} key-mismatch fix in {@link
- * EvaluationVisitor#visitPropertyAccessWithReceiver}.
+ * NavigationEvaluation#property}.
  *
  * <p><b>The bug:</b> {@link
  * tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor#visitPropertyNav} stores the combined
  * Ctype for a navigation {@code e.p} keyed by the outer {@code PropertyNavContext} ({@code
- * nodeTypes.put(ctx, resultType)}). {@code visitPropertyAccessWithReceiver} used to look the type
+ * nodeTypes.put(ctx, resultType)}). {@code NavigationEvaluation#property} (formerly in the visitor) used to look the type
  * back up keyed by the <em>inner</em> {@code PropertyAccessContext} - a different parse tree node -
  * so the lookup always missed and silently fell back to {@code Type.set(Type.ANY)}, which is always
  * {@code unique=true}. That made {@code LazyOperations#dedupe} run unconditionally on every {@code

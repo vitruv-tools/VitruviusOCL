@@ -47,7 +47,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Targeted checks that the {@code navigateOne()} many-valued-feature streaming fix ({@link
- * EvaluationVisitor.SkipNullMappingIterator}) preserves two behaviors the old eager {@code for
+ * NavigationEvaluation.SkipNullMappingIterator}) preserves two behaviors the old eager {@code for
  * (Object item : list) if (item != null) ...} loop had, now that pulling happens lazily one element
  * at a time instead of all at once up front.
  *
@@ -55,7 +55,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *   <li><b>Null-skipping</b>: {@code null} entries in the backing list must still be skipped, one
  *       at a time as encountered, not just when the whole list happens to be pre-scanned.
  *   <li><b>EReference vs. EAttribute</b>: a many-valued {@code EReference} (whose elements wrap to
- *       {@link OCLElement.MetaclassValue} via {@link EvaluationVisitor#wrapValue}) must work
+ *       {@link OCLElement.MetaclassValue} via {@link NavigationEvaluation#wrap}) must work
  *       per-element exactly like a many-valued {@code EAttribute} - including when a reference slot
  *       is {@code null} (an unset/absent reference in the list) interspersed with EObject values.
  * </ol>
@@ -288,7 +288,7 @@ class NavigationNullAndReferenceHandlingTest {
   @Test
   void nullReferenceSlotsInAManyValuedEReferenceAreSkippedAndRemainingObjectsWrapCorrectly() {
     // children = [A, null, B, null] - two real Child EObjects with an unset reference slot
-    // between and after each. Proves wrapValue()'s EObject branch still runs correctly per
+    // between and after each. Proves wrap()'s EObject branch still runs correctly per
     // element when reached lazily, and that a null EReference slot is skipped exactly like a
     // null EAttribute slot.
     Child a = new Child("alpha");
