@@ -14,6 +14,7 @@
 package tools.vitruv.dsls.vitruvocl.typechecker;
 
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
@@ -40,6 +41,27 @@ interface OperationTypingContext {
 
   /** Reports a type error at {@code ctx}. */
   void error(ParserRuleContext ctx, String message);
+
+  /** Reports a type error covering exactly {@code token}. */
+  void error(Token token, String message);
+
+  /** Reports a type error covering exactly {@code token} with a quick-fix {@code suggestion}. */
+  void error(Token token, String message, String suggestion);
+
+  /** Reports a type error from {@code start} to the (exclusive) end position. */
+  void spanError(Token start, int endLine, int endColumn, String message);
+
+  /** Returns the number of diagnostics reported so far, to detect new ones. */
+  int errorCount();
+
+  /**
+   * Whether {@code ctx} contains a parse error ANTLR recovered from, see {@link
+   * SyntaxRecoveryReporter#hasParseErrors}.
+   */
+  boolean hasParseErrors(ParserRuleContext ctx);
+
+  /** Returns the kind of constraint block ({@code inv}/{@code pre}/{@code post}) being checked. */
+  ConstraintSectionKind section();
 
   /** Reports a type warning at {@code ctx}. */
   void warning(ParserRuleContext ctx, String message);

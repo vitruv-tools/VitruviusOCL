@@ -36,7 +36,7 @@ final class SyntaxRecoveryReporter {
 
   private static final Set<String> COMPARISON_OPS = Set.of("==", "!=", "<", "<=", ">", ">=");
 
-  private static final Set<String> CORR_OPS_SET = Set.copyOf(TypeCheckVisitor.CORR_OPS);
+  private static final Set<String> CORR_OPS_SET = Set.copyOf(CorrespondenceTyping.CORR_OPS);
 
   /** Receives the errors this reporter finds, as a span from a start token to an end position. */
   @FunctionalInterface

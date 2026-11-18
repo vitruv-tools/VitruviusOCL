@@ -24,7 +24,6 @@ import tools.vitruv.dsls.vitruvocl.symboltable.Symbol;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.TypeExpressionResolver;
 import tools.vitruv.dsls.vitruvocl.symboltable.VariableSymbol;
-import tools.vitruv.dsls.vitruvocl.types.Multiplicity;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 import tools.vitruv.dsls.vitruvocl.types.TypeResolver;
 
@@ -121,19 +120,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    */
   private final Deque<Type> receiverStack = new ArrayDeque<>();
 
-  /**
-   * Which kind of constraint block ({@code inv}/{@code pre}/{@code post}) is currently being
-   * type-checked. Used to restrict {@code @pre} and the {@code OCLisNew}/{@code OCLisModified}/
-   * {@code OCLisDeleted} lifecycle predicates to {@code post} blocks only. Set at the start of
-   * {@link #visitInvCS}/{@link #visitPreCS}/{@link #visitPostCS}; these blocks never nest, so a
-   * single field (rather than a stack) is sufficient.
-   */
-  private enum ConstraintSectionKind {
-    INV,
-    PRE,
-    POST
-  }
-
+  /** The constraint block being checked; see {@link ConstraintSectionKind}. */
   private ConstraintSectionKind currentSection = ConstraintSectionKind.INV;
 
   /**
@@ -171,6 +158,17 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
   /** Variables whose initializer is being checked; referencing them there is an error. */
   private final Map<VariableSymbol, Boolean> initializing = new IdentityHashMap<>();
+
+  /** Type rules of the correspondence operations, see {@link CorrespondenceTyping}. */
+  private final CorrespondenceTyping correspondences =
+      new CorrespondenceTyping(new TypingContext());
+
+  /** Type rules of {@code @pre} and the lifecycle predicates, see {@link LifecycleTyping}. */
+  private final LifecycleTyping lifecycle = new LifecycleTyping(new TypingContext());
+
+  /** Type rules of allInstances and the type operations, see {@link MetamodelOperationTyping}. */
+  private final MetamodelOperationTyping metamodelOperations =
+      new MetamodelOperationTyping(new TypingContext());
 
   /** Type rules of the String operations, see {@link StringOperationTyping}. */
   private final StringOperationTyping strings =
@@ -233,20 +231,17 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   static final String ERR_NO_SCOPE = "Internal error: No scope annotation from Pass 1";
   private static final String ERR_TYPE_MISMATCH_PREFIX = "Type mismatch: cannot apply '";
   private static final String ERR_TO = "' to ";
-  private static final String ERR_DID_YOU_MEAN = "' — did you mean '";
+  static final String ERR_DID_YOU_MEAN = "' — did you mean '";
   private static final String AND_SEPARATOR = " and ";
   private static final String ERR_ORDERING_TYPES =
       "Ordering comparison requires numeric or String types, got: ";
   private static final String ERR_BRANCH_TYPES = "Incompatible branch types: ";
-  private static final String ERR_UNKNOWN_OP = "Unknown operation '";
-  private static final String OP_SELECT = "select";
-  private static final String OP_REJECT = "reject";
-  private static final String OP_EXISTS = "exists";
+  static final String ERR_UNKNOWN_OP = "Unknown operation '";
   private static final String OP_AS_SET = "asSet";
   private static final String OP_AS_BAG = "asBag";
   private static final String OP_AS_SEQUENCE = "asSequence";
   private static final String OP_AS_ORDERED_SET = "asOrderedSet";
-  private static final String ERR_OP_DOES_NOT_EXIST = "' — this operation does not exist";
+  static final String ERR_OP_DOES_NOT_EXIST = "' — this operation does not exist";
 
   @Override
   protected String phaseTag() {
@@ -1267,74 +1262,9 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   @Override
   public Type visitNavigationChainCS(VitruvOCLParser.NavigationChainCSContext ctx) {
     if (ctx.AT_PRE() != null) {
-      return visitAtPre(ctx);
+      return lifecycle.atPre(ctx);
     }
     return visit(ctx.navigationTargetCS());
-  }
-
-  /**
-   * Type checks the {@code @pre} postfix operator ({@code self.attr@pre}).
-   *
-   * <p>{@code @pre} is type-neutral: it doesn't change the type of the navigation step it follows,
-   * only the point in time the value is read from (transaction start vs. current). Restrictions
-   * (both deliberate, not grammar-enforced — see {@link ConstraintSectionKind}):
-   *
-   * <ul>
-   *   <li>Only valid inside {@code post} blocks.
-   *   <li>Must directly follow a property access — {@code self.attr@pre} is valid, bare {@code
-   *       self@pre} is not, since there is no "old state" for a receiver that wasn't itself a
-   *       navigated feature.
-   * </ul>
-   *
-   * @param ctx the navigation chain node whose {@code AT_PRE()} terminal is non-null
-   * @return the unchanged receiver type, or Type.ERROR if misplaced
-   */
-  private Type visitAtPre(VitruvOCLParser.NavigationChainCSContext ctx) {
-    if (currentSection != ConstraintSectionKind.POST) {
-      reportError(ctx.AT_PRE().getSymbol(), "'@pre' is only valid inside 'post' blocks");
-      nodeTypes.put(ctx, Type.ERROR);
-      return Type.ERROR;
-    }
-    if (!previousNavWasPropertyAccess(ctx)) {
-      reportError(
-          ctx.AT_PRE().getSymbol(),
-          "'@pre' must directly follow a property access, e.g. 'self.attr@pre'");
-      nodeTypes.put(ctx, Type.ERROR);
-      return Type.ERROR;
-    }
-    Type receiverType = receiverStack.peek();
-    nodeTypes.put(ctx, receiverType);
-    return receiverType;
-  }
-
-  /**
-   * Returns the enclosing {@code navigationChainCS} list that {@code navChainCtx} is an element
-   * of — either a {@code primaryWithNav}'s or a {@code prefixedQualified}'s navigation chain.
-   */
-  private List<VitruvOCLParser.NavigationChainCSContext> enclosingNavigationChain(
-      ParserRuleContext navChainCtx) {
-    ParseTree parent = navChainCtx.getParent();
-    if (parent instanceof VitruvOCLParser.PrimaryWithNavContext p) {
-      return p.navigationChainCS();
-    }
-    if (parent instanceof VitruvOCLParser.PrefixedQualifiedContext p) {
-      return p.navigationChainCS();
-    }
-    return List.of();
-  }
-
-  /**
-   * Returns {@code true} if the navigation-chain step immediately before {@code ctx} is a plain
-   * property access.
-   */
-  private boolean previousNavWasPropertyAccess(VitruvOCLParser.NavigationChainCSContext ctx) {
-    List<VitruvOCLParser.NavigationChainCSContext> chain = enclosingNavigationChain(ctx);
-    int idx = chain.indexOf(ctx);
-    if (idx <= 0) {
-      return false; // first step in the chain — no preceding property access
-    }
-    VitruvOCLParser.NavigationChainCSContext prev = chain.get(idx - 1);
-    return prev.navigationTargetCS() instanceof VitruvOCLParser.PropertyNavContext;
   }
 
   /**
@@ -1403,142 +1333,22 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
   // ==================== Object-Lifecycle Predicates ====================
 
-  /**
-   * Validates a lifecycle predicate's ({@code OCLisNew}/{@code OCLisModified}/{@code OCLisDeleted})
-   * placement (post-only, see {@link ConstraintSectionKind}) and receiver type (must be an object
-   * type, singular or collection).
-   *
-   * @param ctx the predicate node, used for error positions
-   * @param predName the predicate's display name, for error messages
-   * @return {@code !Boolean!} for a singleton/bare receiver, a same-kind Boolean collection for a
-   *     multi-valued receiver, or Type.ERROR if misplaced/mistyped
-   */
-  private Type checkLifecyclePredicateReceiver(ParserRuleContext ctx, String predName) {
-    if (currentSection != ConstraintSectionKind.POST) {
-      reportError(ctx, "'" + predName + "' is only valid inside 'post' blocks");
-      return Type.ERROR;
-    }
-    Type receiverType = receiverStack.peek();
-    if (receiverType == Type.ERROR) {
-      return Type.ERROR; // already reported upstream
-    }
-    Type elementType =
-        (receiverType.isSingleton() || receiverType.isOptional() || receiverType.isCollection())
-            ? receiverType.getElementType()
-            : receiverType;
-    if (!elementType.isMetaclassType()) {
-      reportError(ctx, "'" + predName + "' requires an object receiver, got " + receiverType);
-      return Type.ERROR;
-    }
-    if (receiverType.isCollection() && !receiverType.isSingleton()) {
-      return Type.preserveCollectionKind(receiverType, Type.BOOLEAN);
-    }
-    return Type.singleton(Type.BOOLEAN);
-  }
-
-  /**
-   * Type checks the named-argument aggregate call form ({@code OCLisNew(attr => val, ...)}).
-   * Resolves each attribute against the receiver's EClass and checks the value expression's type
-   * conformance. Deliberately does NOT require every attribute to be listed (no completeness
-   * check — partial aggregates are valid per spec).
-   *
-   * @param argsCtx the aggregate argument list, or {@code null} if the bare (no-parens) form was
-   *     used
-   * @param receiverType the (already-validated) object receiver type
-   */
-  private void checkLifecycleAggregateArgs(
-      VitruvOCLParser.LifecycleAggregateArgsContext argsCtx, Type receiverType) {
-    if (argsCtx == null) {
-      return;
-    }
-    Type elementType =
-        (receiverType.isSingleton() || receiverType.isOptional() || receiverType.isCollection())
-            ? receiverType.getElementType()
-            : receiverType;
-    if (!elementType.isMetaclassType()) {
-      return; // receiver error already reported by checkLifecyclePredicateReceiver
-    }
-    EClass eClass = elementType.getEClass();
-    for (VitruvOCLParser.LifecycleAggregateArgContext arg : argsCtx.lifecycleAggregateArg()) {
-      String attrName = arg.attr.getText();
-      EStructuralFeature feature = eClass.getEStructuralFeature(attrName);
-      if (feature == null) {
-        feature = FeatureTypeMapper.findFeatureInSubtypes(eClass, attrName);
-      }
-      Type valueType = visit(arg.value);
-      if (feature == null) {
-        reportError(arg.attr, unknownPropertyMessage(attrName, eClass));
-        continue;
-      }
-      if (valueType == Type.ERROR) {
-        continue; // already reported
-      }
-      Type featureType = FeatureTypeMapper.featureType(feature);
-      Type expectedElem =
-          (featureType.isSingleton() || featureType.isOptional())
-              ? featureType.getElementType()
-              : featureType;
-      Type actualElem =
-          (valueType.isSingleton() || valueType.isOptional())
-              ? valueType.getElementType()
-              : valueType;
-      if (!actualElem.isConformantTo(expectedElem)) {
-        reportError(
-            arg.value,
-            "Type mismatch: attribute '"
-                + attrName
-                + "' expects "
-                + featureType
-                + ", got "
-                + valueType);
-      }
-    }
-  }
-
-  /**
-   * Type checks {@code OCLisNew} (bare or with a {@code (attr => val, ...)} aggregate).
-   *
-   * @param ctx The OCLisNew predicate node
-   * @return see {@link #checkLifecyclePredicateReceiver}
-   */
+  /** Type checks {@code OCLisNew}. See {@link LifecycleTyping#isNew}. */
   @Override
   public Type visitOclIsNewPred(VitruvOCLParser.OclIsNewPredContext ctx) {
-    Type resultType = checkLifecyclePredicateReceiver(ctx, "OCLisNew");
-    if (resultType != Type.ERROR) {
-      checkLifecycleAggregateArgs(ctx.lifecycleAggregateArgs(), receiverStack.peek());
-    }
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return lifecycle.isNew(ctx);
   }
 
-  /**
-   * Type checks {@code OCLisModified} (bare or with a {@code (attr => val, ...)} aggregate). The
-   * aggregate values are target/post-state values, not deltas — see grammar documentation.
-   *
-   * @param ctx The OCLisModified predicate node
-   * @return see {@link #checkLifecyclePredicateReceiver}
-   */
+  /** Type checks {@code OCLisModified}. See {@link LifecycleTyping#isModified}. */
   @Override
   public Type visitOclIsModifiedPred(VitruvOCLParser.OclIsModifiedPredContext ctx) {
-    Type resultType = checkLifecyclePredicateReceiver(ctx, "OCLisModified");
-    if (resultType != Type.ERROR) {
-      checkLifecycleAggregateArgs(ctx.lifecycleAggregateArgs(), receiverStack.peek());
-    }
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return lifecycle.isModified(ctx);
   }
 
-  /**
-   * Type checks {@code OCLisDeleted}. No aggregate form exists — the grammar itself rules it out.
-   *
-   * @param ctx The OCLisDeleted predicate node
-   * @return see {@link #checkLifecyclePredicateReceiver}
-   */
+  /** Type checks {@code OCLisDeleted}. See {@link LifecycleTyping#isDeleted}. */
   @Override
   public Type visitOclIsDeletedPred(VitruvOCLParser.OclIsDeletedPredContext ctx) {
-    Type resultType = checkLifecyclePredicateReceiver(ctx, "OCLisDeleted");
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return lifecycle.isDeleted(ctx);
   }
 
   /**
@@ -1619,7 +1429,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     return Type.ERROR;
   }
 
-  private static String unknownPropertyMessage(String propName, EClass eClass) {
+  static String unknownPropertyMessage(String propName, EClass eClass) {
     return "Unknown property '"
         + propName
         + "' on type '"
@@ -2374,458 +2184,69 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
   // ==================== Type Operations ====================
 
-  /**
-   * Type checks the {@code oclIsKindOf()} operation.
-   *
-   * <p>For a singleton {@code !T!} or bare metaclass receiver, returns {@code !Boolean!}. For a
-   * multi-valued collection receiver, returns a collection of Boolean with the same kind.
-   *
-   * @param ctx The oclIsKindOf operation node
-   * @return {@code !Boolean!} for singleton/bare receivers; {@code Collection(Boolean)} for
-   *     multi-valued receivers
-   */
+  /** Type checks {@code oclIsKindOf(T)}. See {@link MetamodelOperationTyping#isKindOf}. */
   @Override
   public Type visitOclIsKindOfOp(VitruvOCLParser.OclIsKindOfOpContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == Type.ERROR) {
-      return Type.ERROR; // already reported upstream
-    }
-
-    Type targetType = visit(ctx.type);
-
-    // Mirror the logic of visitOclAsTypeOp: Singleton !T! must not be wrapped in Set first,
-    // otherwise preserveCollectionKind would return Set{Boolean} = {Boolean} instead of !Boolean!
-    Type resultType;
-    if (receiverType.isCollection() && !receiverType.isSingleton()) {
-      // Multi-valued collection: one Boolean per element, preserve collection kind
-      resultType = Type.preserveCollectionKind(receiverType, Type.BOOLEAN);
-    } else {
-      // Singleton !T! or bare metaclass T → oclIsKindOf returns a single !Boolean!
-      resultType = Type.singleton(Type.BOOLEAN);
-    }
-
-    nodeTypes.put(ctx, resultType);
-    nodeTypes.put(ctx.type, targetType);
-    return resultType;
+    return metamodelOperations.isKindOf(ctx);
   }
 
-  /**
-   * Visits an 'oclIsTypeOf' operation node in the AST.
-   *
-   * <p>This operation checks whether each element of a collection is exactly of a given type.
-   *
-   * <ul>
-   *   <li>Ensures that the receiver is a collection; otherwise reports an error and returns {@link
-   *       Type#ERROR}.
-   *   <li>The resulting type preserves the collection kind of the receiver, but with {@link
-   *       Type#BOOLEAN} as element type.
-   *   <li>The resulting type is stored in {@code nodeTypes}.
-   * </ul>
-   *
-   * @param ctx the context of the 'oclIsTypeOf' operation node in the AST
-   * @return the collection of Boolean type if receiver is valid; otherwise {@link Type#ERROR}
-   */
+  /** Type checks {@code oclIsTypeOf(T)}. See {@link MetamodelOperationTyping#isTypeOf}. */
   @Override
   public Type visitOclIsTypeOfOp(VitruvOCLParser.OclIsTypeOfOpContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == Type.ERROR) {
-      return Type.ERROR; // already reported upstream
-    }
-
-    Type targetType = visit(ctx.type);
-
-    // Mirror visitOclIsKindOfOp: Singleton !T! must not be wrapped in Set first
-    Type resultType;
-    if (receiverType.isCollection() && !receiverType.isSingleton()) {
-      // Multi-valued collection: one Boolean per element, preserve collection kind
-      resultType = Type.preserveCollectionKind(receiverType, Type.BOOLEAN);
-    } else {
-      // Singleton !T! or bare metaclass T → oclIsTypeOf returns a single !Boolean!
-      resultType = Type.singleton(Type.BOOLEAN);
-    }
-    nodeTypes.put(ctx, resultType);
-    nodeTypes.put(ctx.type, targetType);
-    return resultType;
+    return metamodelOperations.isTypeOf(ctx);
   }
 
-  /**
-   * Whether a value of {@code source} can be an instance of {@code target}. Casts between two
-   * metaclasses are always possible statically (EMF has multiple inheritance, and every class is an
-   * {@code EObject}), so only casts involving a primitive type are checked: their member types must
-   * be related by conformance in either direction, or one of them is untyped.
-   */
-  private static boolean isPossibleCast(Type source, Type target) {
-    Type from = memberType(source);
-    Type to = memberType(target);
-    if (from == Type.ERROR || to == Type.ERROR || from == Type.ANY || to == Type.ANY) {
-      return true;
-    }
-    if (from.isMetaclassType() && to.isMetaclassType()) {
-      return true;
-    }
-    return from.isConformantTo(to) || to.isConformantTo(from);
-  }
-
-  /** The member type of {@code type}: unwraps singleton, optional and collection types. */
-  private static Type memberType(Type type) {
-    Type member = type;
-    while (member.isSingleton() || member.isOptional() || member.isCollection()) {
-      Type element = member.getElementType();
-      if (element == member) {
-        break;
-      }
-      member = element;
-    }
-    return member;
-  }
-
-  /**
-   * Visits an 'oclAsType' operation node in the AST.
-   *
-   * <p>Casts the receiver to the target type while preserving the multiplicity. The receiver's
-   * ctype multiplicity is preserved — only the member type τ is replaced by the target type:
-   *
-   * <ul>
-   *   <li>{@code ¡Shape! .oclAsType(Box)} → {@code ¡Box!}
-   *   <li>{@code {Shape} .oclAsType(Box)} → {@code {Box}}
-   *   <li>{@code [Real] .oclAsType(Set(Integer))} → {@code [Integer]} (a collection target only
-   *       contributes its member type, as at runtime)
-   * </ul>
-   *
-   * <p>A cast involving a primitive type whose member types are unrelated (neither conforms to the
-   * other) is an error; casts between metaclasses are checked at runtime.
-   *
-   * @param ctx the context of the 'oclAsType' operation node in the AST
-   * @return the cast type with preserved multiplicity, or {@link Type#ERROR}
-   */
+  /** Type checks {@code oclAsType(T)}. See {@link MetamodelOperationTyping#asType}. */
   @Override
   public Type visitOclAsTypeOp(VitruvOCLParser.OclAsTypeOpContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == Type.ERROR) {
-      return Type.ERROR; // already reported upstream
-    }
-
-    Type targetType = visit(ctx.type);
-
-    if (!isPossibleCast(receiverType, targetType)) {
-      reportError(ctx, "Cannot cast " + receiverType + " to unrelated type " + targetType);
-      nodeTypes.put(ctx, Type.ERROR);
-      return Type.ERROR;
-    }
-    if (targetType.isCollection() && !targetType.isSingleton()) {
-      // the evaluator casts the members and keeps the receiver's kind: only the member counts
-      targetType = memberType(targetType);
-    }
-
-    // preserve the receiver's multiplicity, replace only the
-    // member type τ. Bare metaclass types are implicitly ¡T! (singleton).
-    Type resultType;
-    if (receiverType.isCollection() && !receiverType.isSingleton()) {
-      // Multi-valued collection {T}, [T], etc. — preserve collection kind
-      resultType = Type.preserveCollectionKind(receiverType, targetType);
-    } else {
-      // Singleton ¡T! or bare metaclass T → result is ¡targetType!
-      resultType = Type.singleton(targetType);
-    }
-
-    nodeTypes.put(ctx, resultType);
-    nodeTypes.put(ctx.type, targetType);
-    return resultType;
+    return metamodelOperations.asType(ctx);
   }
 
   // ==================== Metamodel Operations ====================
-  /**
-   * Type checks the {@code allInstances()} operation.
-   *
-   * <p>Requires metaclass receiver, returns Set of that metaclass type.
-   *
-   * <p><b>Example:</b> {@code Person.allInstances()} → OrderedSet(Person)
-   *
-   * @param ctx The allInstances operation node
-   * @return OrderedSet(MetaclassType)
-   */
+  /** Type checks {@code allInstances()}. See {@link MetamodelOperationTyping#allInstances}. */
   @Override
   public Type visitAllInstancesOp(VitruvOCLParser.AllInstancesOpContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == Type.ERROR) {
-      return Type.ERROR; // already reported upstream
-    }
-
-    if (!receiverType.isMetaclassType()) {
-      reportError(ctx, "allInstances() requires metaclass receiver");
-      return Type.ERROR;
-    }
-
-    Type resultType = Type.orderedSet(receiverType);
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return metamodelOperations.allInstances(ctx);
   }
 
-  // ==================== Not Yet Implemented ====================
+  // ==================== Correspondence Operations ====================
   /**
-   * Type checks correspondence operator (~).
-   *
-   * <p>The correspondence operator is a binary predicate that checks if two objects are related via
-   * a Correspondence model instance. Both operands must be single object instances (not
-   * collections, not primitives).
-   *
-   * <p><b>Syntax:</b> {@code obj1 ~ obj2}
-   *
-   * <p><b>Type:</b> {@code Boolean}
-   *
-   * <p><b>Examples:</b>
-   *
-   * <pre>
-   * self ~ sat                                    // Boolean
-   * Satellite.allInstances().select(s | self ~ s) // Filtered collection
-   * self ~ sat implies sat.active                 // Consistency check
-   * </pre>
-   *
-   * @param ctx Correspondence comparison operation node
-   * @return Type.BOOLEAN if operands are valid, Type.ERROR otherwise
+   * Type checks the correspondence operator {@code obj1 ~ obj2}. See {@link
+   * CorrespondenceTyping#operator}.
    */
   @Override
   public Type visitCorrespondence(VitruvOCLParser.CorrespondenceContext ctx) {
-    Type leftType = visit(ctx.left);
-    Type rightType = visit(ctx.right);
-
-    // Unwrap singletons to get base types
-    Type baseLeftType = leftType.isSingleton() ? leftType.getElementType() : leftType;
-
-    // Both sides must be single objects (singleton or object type, not multi-valued collection)
-    if (leftType.isCollection() && leftType.getMultiplicity() != Multiplicity.SINGLETON) {
-      reportError(
-          ctx.left,
-          "Correspondence operator ~ requires single object on left side, got collection: "
-              + leftType);
-      return Type.ERROR;
-    }
-
-    if (rightType.isCollection() && rightType.getMultiplicity() != Multiplicity.SINGLETON) {
-      reportError(
-          ctx.right,
-          "Correspondence operator ~ requires single object on right side, got collection: "
-              + rightType);
-      return Type.ERROR;
-    }
-
-    // Both must be metaclass types (not primitives)
-    if (!baseLeftType.isMetaclassType() && baseLeftType != Type.ANY) {
-      reportError(
-          ctx.left,
-          "Correspondence operator ~ requires object type on left side, got: " + baseLeftType);
-      return Type.ERROR;
-    }
-
-    Type baseRightType = rightType.isSingleton() ? rightType.getElementType() : rightType;
-    if (!baseRightType.isMetaclassType() && baseRightType != Type.ANY) {
-      reportError(
-          ctx.right,
-          "Correspondence operator ~ requires object type on right side, got: " + baseRightType);
-      return Type.ERROR;
-    }
-
-    // Result is always Boolean
-    Type resultType = Type.BOOLEAN;
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return correspondences.operator(ctx);
   }
 
   /**
-   * Type checks select(~) / select(~, Type=T, Tag='x') shorthand.
-   *
-   * <p>Without a Type filter: returns the receiver collection type unchanged. With a Type filter:
-   * returns a collection of that metaclass type (same collection kind, narrowed element type).
-   *
-   * @param ctx The selectCorrespondence node
-   * @return Refined or unchanged receiver collection type, or Type.ERROR
+   * Type checks {@code select(~)} with optional Type/Tag filters. See {@link
+   * CorrespondenceTyping#select}.
    */
   @Override
   public Type visitSelectCorrespondence(VitruvOCLParser.SelectCorrespondenceContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == null || receiverType == Type.ERROR) {
-      reportError(ctx, "Cannot determine receiver type for select(~)");
-      return Type.ERROR;
-    }
-
-    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-    if (selfSymbol == null) {
-      reportError(ctx, "select(~) requires 'self' to be bound in current context");
-      return Type.ERROR;
-    }
-
-    Type baseSelfType = selfSymbol.getType();
-    if (baseSelfType.isSingleton()) {
-      baseSelfType = baseSelfType.getElementType();
-    }
-
-    if (!baseSelfType.isMetaclassType() && baseSelfType != Type.ANY) {
-      reportError(ctx, "select(~) requires 'self' to be an object type, got: " + baseSelfType);
-      return Type.ERROR;
-    }
-
-    Type elemType = receiverType.getElementType();
-    if (!elemType.isMetaclassType() && elemType != Type.ANY) {
-      reportError(ctx, "select(~) requires collection of object types, got: " + elemType);
-      return Type.ERROR;
-    }
-
-    // Visit filter to check options and extract optional Type refinement
-    int corrErrsBefore = errors.getErrors().size();
-    Type filterType = visit(ctx.corrFilter);
-    if (reportCorrFilterParseError(ctx.corrFilter, ctx, OP_SELECT, corrErrsBefore)) {
-      return Type.ERROR;
-    }
-
-    // If a Type filter was given, narrow the result collection element type
-    Type resultType =
-        (filterType != Type.ANY && filterType != Type.ERROR)
-            ? Type.preserveCollectionKind(receiverType, filterType)
-            : receiverType;
-
-    nodeTypes.put(ctx, resultType);
-    return resultType;
+    return correspondences.select(ctx);
   }
 
   /**
-   * Type checks reject(~) / reject(~, Type=T, Tag='x') shorthand.
-   *
-   * <p>The type filter does not narrow the result: reject keeps the elements that are not a
-   * corresponding T, which includes every non-T element.
-   *
-   * @param ctx The rejectCorrespondence node
-   * @return the unchanged receiver collection type, or Type.ERROR
+   * Type checks {@code reject(~)} with optional Type/Tag filters. See {@link
+   * CorrespondenceTyping#reject}.
    */
   @Override
   public Type visitRejectCorrespondence(VitruvOCLParser.RejectCorrespondenceContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == null || receiverType == Type.ERROR) {
-      reportError(ctx, "Cannot determine receiver type for reject(~)");
-      return Type.ERROR;
-    }
-
-    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-    if (selfSymbol == null) {
-      reportError(ctx, "reject(~) requires 'self' to be bound in current context");
-      return Type.ERROR;
-    }
-
-    Type baseSelfType = selfSymbol.getType();
-    if (baseSelfType.isSingleton()) {
-      baseSelfType = baseSelfType.getElementType();
-    }
-
-    if (!baseSelfType.isMetaclassType() && baseSelfType != Type.ANY) {
-      reportError(ctx, "reject(~) requires 'self' to be an object type, got: " + baseSelfType);
-      return Type.ERROR;
-    }
-
-    Type elemType = receiverType.getElementType();
-    if (!elemType.isMetaclassType() && elemType != Type.ANY) {
-      reportError(ctx, "reject(~) requires collection of object types, got: " + elemType);
-      return Type.ERROR;
-    }
-
-    int corrErrsBefore = errors.getErrors().size();
-    visit(ctx.corrFilter);
-    if (reportCorrFilterParseError(ctx.corrFilter, ctx, OP_REJECT, corrErrsBefore)) {
-      return Type.ERROR;
-    }
-
-    // No narrowing: reject keeps every element that is not a corresponding T, so the result
-    // still contains non-T elements and has the receiver's element type.
-    nodeTypes.put(ctx, receiverType);
-    return receiverType;
+    return correspondences.reject(ctx);
   }
 
   /**
-   * Type checks exists(~) / exists(~, Type=T, Tag='x') shorthand.
-   *
-   * <p>Always returns Boolean. Type/Tag filters are validated but don't change the return type.
-   *
-   * @param ctx The existsCorrespondence node
-   * @return Type.BOOLEAN if validation succeeds, Type.ERROR otherwise
+   * Type checks {@code exists(~)} with optional Type/Tag filters. See {@link
+   * CorrespondenceTyping#exists}.
    */
   @Override
   public Type visitExistsCorrespondence(VitruvOCLParser.ExistsCorrespondenceContext ctx) {
-    Type receiverType = receiverStack.peek();
-    if (receiverType == null || receiverType == Type.ERROR) {
-      reportError(ctx, "Cannot determine receiver type for exists(~)");
-      return Type.ERROR;
-    }
-
-    VariableSymbol selfSymbol = symbolTable.resolveVariable("self");
-    if (selfSymbol == null) {
-      reportError(ctx, "exists(~) requires 'self' to be bound in current context");
-      return Type.ERROR;
-    }
-
-    Type baseSelfType = selfSymbol.getType();
-    if (baseSelfType.isSingleton()) {
-      baseSelfType = baseSelfType.getElementType();
-    }
-
-    if (!baseSelfType.isMetaclassType() && baseSelfType != Type.ANY) {
-      reportError(ctx, "exists(~) requires 'self' to be an object type, got: " + baseSelfType);
-      return Type.ERROR;
-    }
-
-    Type elemType = receiverType.getElementType();
-    if (!elemType.isMetaclassType() && elemType != Type.ANY) {
-      reportError(ctx, "exists(~) requires collection of object types, got: " + elemType);
-      return Type.ERROR;
-    }
-
-    // Validate filter options (type-checks the Type= expression if present)
-    int corrErrsBefore = errors.getErrors().size();
-    visit(ctx.corrFilter);
-    if (reportCorrFilterParseError(ctx.corrFilter, ctx, OP_EXISTS, corrErrsBefore)) {
-      return Type.ERROR;
-    }
-
-    nodeTypes.put(ctx, Type.BOOLEAN);
-    return Type.BOOLEAN;
+    return correspondences.exists(ctx);
   }
 
-  /**
-   * Checks whether a correspondenceFilterCS subtree had ANTLR parse errors (silent recovery from
-   * e.g. extra commas like {@code reject(~, , , Type=T)}). When errors are detected and no
-   * TypeChecker error was already reported for the filter, adds a targeted error spanning the full
-   * operation call (e.g. the whole {@code reject(~, , , ...)}) and returns {@code true}.
-   *
-   * @param corrFilter the parsed correspondenceFilterCS context
-   * @param callCtx the parent iterator/correspondence call context (for span)
-   * @param opName operation name for the message (e.g. "reject")
-   * @param errsBefore error count before visiting the filter
-   * @return {@code true} if a parse error was detected
-   */
-  private boolean reportCorrFilterParseError(
-      org.antlr.v4.runtime.ParserRuleContext corrFilter,
-      org.antlr.v4.runtime.ParserRuleContext callCtx,
-      String opName,
-      int errsBefore) {
-    boolean tcErr = errors.getErrors().size() > errsBefore;
-    boolean parseErr = syntaxRecovery.hasParseErrors(corrFilter);
-    if (!parseErr && !tcErr) {
-      return false;
-    }
-    if (!tcErr) {
-      // ANTLR recovered silently — no TypeChecker error was emitted yet → report one
-      org.antlr.v4.runtime.Token start = callCtx.getStart();
-      org.antlr.v4.runtime.Token stop = callCtx.getStop();
-      int endLine = stop != null ? stop.getLine() : start.getLine();
-      int endCol =
-          stop != null
-              ? stop.getCharPositionInLine() + stop.getText().length()
-              : start.getCharPositionInLine() + callCtx.getText().length();
-      reportSpanError(
-          start,
-          endLine,
-          endCol,
-          "'" + opName + "(~, ...)' has invalid arguments — check for extra or misplaced commas");
-    }
-    return true;
-  }
+  // ==================== Not Yet Implemented ====================
 
   /** Placeholder for message operator (^). */
   @Override
@@ -3030,33 +2451,12 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   // ==================== Correspondence Filter ====================
 
   /**
-   * Type checks a correspondence filter expression.
-   *
-   * <p>A correspondence filter consists of the '~' marker and optional Type/Tag options. This
-   * method validates the options and returns the target metaclass type if a Type filter is present,
-   * or Type.ANY otherwise.
-   *
-   * <p><b>Examples:</b>
-   *
-   * <pre>
-   *   ~                                    // no filter
-   *   ~, Tag = 'Brother'                  // tag filter only
-   *   ~, Type = MM::Person               // type filter only
-   *   ~, Type = MM::Person, Tag = 'Sibling'  // both
-   * </pre>
-   *
-   * @param ctx The correspondence filter node
-   * @return The resolved target metaclass type, or Type.ANY if no Type filter
+   * Type checks a correspondence filter ({@code ~} with optional options). See {@link
+   * CorrespondenceTyping#filter}.
    */
   @Override
   public Type visitCorrespondenceFilterCS(VitruvOCLParser.CorrespondenceFilterCSContext ctx) {
-    if (ctx.correspondenceOptions() == null) {
-      nodeTypes.put(ctx, Type.ANY);
-      return Type.ANY;
-    }
-    Type result = visit(ctx.correspondenceOptions());
-    nodeTypes.put(ctx, result);
-    return result;
+    return correspondences.filter(ctx);
   }
 
   // ==================== New Iterator Operations ====================
@@ -3242,137 +2642,47 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   }
 
   /**
-   * Type checks the list of correspondence filter options.
-   *
-   * <p>Iterates all options, visits each one, and returns the metaclass type found in a Type filter
-   * (if any). Tag filters return Type.ANY. If multiple Type filters are present the last one wins
-   * (grammar does not forbid it; a warning is issued).
-   *
-   * @param ctx The correspondence options node
-   * @return The resolved target metaclass type, or Type.ANY if only Tag options present
+   * Type checks the options of a correspondence filter. See {@link CorrespondenceTyping#options}.
    */
   @Override
   public Type visitCorrespondenceOptions(VitruvOCLParser.CorrespondenceOptionsContext ctx) {
-    Type resolvedType = Type.ANY;
-    boolean hadTypeFilter = false;
-
-    for (VitruvOCLParser.CorrespondenceOptionContext option : ctx.correspondenceOption()) {
-      Type optType = visit(option);
-      if (optType != Type.ANY) {
-        if (hadTypeFilter) {
-          reportWarning(
-              option, "Duplicate Type filter in correspondence — only one Type filter allowed");
-        }
-        resolvedType = optType;
-        hadTypeFilter = true;
-      }
-    }
-
-    nodeTypes.put(ctx, resolvedType);
-    return resolvedType;
+    return correspondences.options(ctx);
   }
 
   /**
-   * Type checks a 'Type = ...' correspondence filter option.
-   *
-   * <p>Resolves the given type expression to a metaclass type and validates that it is indeed a
-   * metaclass (not a primitive). Returns the resolved metaclass type so the evaluator can use it
-   * for instanceof filtering.
-   *
-   * @param ctx The corrTypeFilter node
-   * @return The resolved metaclass type, or Type.ERROR if invalid
+   * Type checks a {@code Type = ...} correspondence filter option. See {@link
+   * CorrespondenceTyping#typeOption}.
    */
   @Override
   public Type visitCorrTypeFilter(VitruvOCLParser.CorrTypeFilterContext ctx) {
-    Type targetType = visit(ctx.type);
-
-    if (targetType == Type.ERROR) {
-      return Type.ERROR;
-    }
-
-    // Unwrap singleton if needed (e.g. !Person! → Person)
-    Type baseType = targetType.isSingleton() ? targetType.getElementType() : targetType;
-
-    if (!baseType.isMetaclassType() && baseType != Type.ANY) {
-      org.antlr.v4.runtime.Token start = ctx.getStart();
-      org.antlr.v4.runtime.Token stop = ctx.getStop();
-      int endCol =
-          (stop != null
-              ? stop.getCharPositionInLine() + stop.getText().length()
-              : start.getCharPositionInLine() + start.getText().length());
-      reportSpanError(
-          start,
-          stop != null ? stop.getLine() : start.getLine(),
-          endCol,
-          "Type filter must be a metaclass (e.g. persons::Person), got: " + baseType);
-      return Type.ERROR;
-    }
-
-    nodeTypes.put(ctx, baseType);
-    return baseType;
+    return correspondences.typeOption(ctx);
   }
 
   /**
-   * Type checks a 'Tag = ...' correspondence filter option.
-   *
-   * <p>Tags are plain string literals — no further type validation needed. Returns Type.ANY to
-   * signal to the caller that no metaclass type was produced.
-   *
-   * @param ctx The corrTagFilter node
-   * @return Type.ANY (tag carries no type information)
+   * Reports a correspondence filter option other than {@code Type} and {@code Tag}. See {@link
+   * CorrespondenceTyping#unknownOption}.
    */
   @Override
   public Type visitUnknownFilterOption(VitruvOCLParser.UnknownFilterOptionContext ctx) {
-    visit(ctx.badVal); // visit value so its own errors surface
-
-    String typed = ctx.badKey.getText();
-    java.util.List<String> validKeys = java.util.List.of("Tag", "Type");
-
-    String best = SuggestionProvider.closest(typed, validKeys);
-    int dist = best == null ? Integer.MAX_VALUE : SuggestionProvider.distance(typed, best);
-
-    String message =
-        dist <= 2
-            ? "Unknown filter option '" + typed + ERR_DID_YOU_MEAN + best + "'?"
-            : "Unknown filter option '" + typed + "' — valid options are 'Tag' and 'Type'";
-
-    reportError(ctx.badKey, message, best);
-
-    nodeTypes.put(ctx, Type.ERROR);
-    return Type.ERROR;
+    return correspondences.unknownOption(ctx);
   }
 
+  /**
+   * Reports a correspondence filter argument that is not an option. See {@link
+   * CorrespondenceTyping#invalidArgument}.
+   */
   @Override
   public Type visitInvalidFilterArg(VitruvOCLParser.InvalidFilterArgContext ctx) {
-    org.antlr.v4.runtime.Token tok = ctx.badArg;
-    reportError(
-        tok,
-        "Invalid filter argument '"
-            + tok.getText()
-            + "' — expected 'Type = <type>' or 'Tag = <string>'");
-    return Type.ERROR;
+    return correspondences.invalidArgument(ctx);
   }
 
+  /**
+   * Type checks a {@code Tag = ...} correspondence filter option. See {@link
+   * CorrespondenceTyping#tagOption}.
+   */
   @Override
   public Type visitCorrTagFilter(VitruvOCLParser.CorrTagFilterContext ctx) {
-    Type tagType = visit(ctx.tag);
-    // Unwrap singleton wrapper to compare bare primitive type
-    Type bare = (tagType != null && tagType.isSingleton()) ? tagType.getElementType() : tagType;
-    if (bare != null && bare != Type.STRING && bare != Type.ANY && bare != Type.ERROR) {
-      org.antlr.v4.runtime.Token start = ctx.getStart();
-      org.antlr.v4.runtime.Token stop = ctx.getStop();
-      int endCol =
-          (stop != null
-              ? stop.getCharPositionInLine() + stop.getText().length()
-              : start.getCharPositionInLine() + start.getText().length());
-      reportSpanError(
-          start,
-          stop != null ? stop.getLine() : start.getLine(),
-          endCol,
-          "Tag filter value must be String, got " + bare);
-    }
-    nodeTypes.put(ctx, Type.ANY);
-    return Type.ANY;
+    return correspondences.tagOption(ctx);
   }
 
   /**
@@ -3464,36 +2774,13 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
   // ==================== Unknown Operator Catch-All ====================
 
-  /** Correspondence iterator operations — candidates for unknownCorrOp suggestions. */
-  static final java.util.List<String> CORR_OPS = java.util.List.of(OP_SELECT, OP_REJECT, OP_EXISTS);
-
   /**
-   * Reports a precise error when a correspondence-style call like {@code selcft(~, ...)} is used
-   * but the operation name is not one of the known correspondence iterators.
-   *
-   * <p>Without this rule the grammar would try to parse the {@code ~} as an expression argument
-   * inside {@code unknownOpCS} and produce a cryptic "mismatched input '~' expecting {...}"
-   * message. This alternative catches the pattern before that happens.
+   * Reports a correspondence-style call like {@code selcft(~)} with an unknown operation. See
+   * {@link CorrespondenceTyping#unknownOperation}.
    */
   @Override
   public Type visitUnknownCorrOp(VitruvOCLParser.UnknownCorrOpContext ctx) {
-    // Still validate the filter so that Tag/Type errors are reported correctly.
-    visit(ctx.corrFilter);
-
-    String typed = ctx.opName.getText();
-    String best = SuggestionProvider.closest(typed, CORR_OPS);
-    String message =
-        SuggestionProvider.isClose(typed, best)
-            ? ERR_UNKNOWN_OP + typed + ERR_DID_YOU_MEAN + best + "'?"
-            : ERR_UNKNOWN_OP
-                + typed
-                + ERR_OP_DOES_NOT_EXIST
-                + " (valid correspondence ops: select, reject, exists)";
-
-    reportError(ctx.opName, message, best);
-
-    nodeTypes.put(ctx, Type.ERROR);
-    return Type.ERROR;
+    return correspondences.unknownOperation(ctx);
   }
 
   /** Keyword binary operators — candidates for "did you mean?" suggestions. */
@@ -3622,6 +2909,36 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     @Override
     public void error(ParserRuleContext ctx, String message) {
       reportError(ctx, message);
+    }
+
+    @Override
+    public void error(Token token, String message) {
+      reportError(token, message);
+    }
+
+    @Override
+    public void error(Token token, String message, String suggestion) {
+      reportError(token, message, suggestion);
+    }
+
+    @Override
+    public void spanError(Token start, int endLine, int endColumn, String message) {
+      reportSpanError(start, endLine, endColumn, message);
+    }
+
+    @Override
+    public int errorCount() {
+      return errors.getErrors().size();
+    }
+
+    @Override
+    public boolean hasParseErrors(ParserRuleContext ctx) {
+      return syntaxRecovery.hasParseErrors(ctx);
+    }
+
+    @Override
+    public ConstraintSectionKind section() {
+      return currentSection;
     }
 
     @Override
