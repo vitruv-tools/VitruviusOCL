@@ -31,13 +31,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -263,19 +263,19 @@ class OCLIsKindOfTest extends DummyTestSpecification {
 context spaceMission::Spacecraft inv kindOfSpacecraft:
   spaceMission::Spacecraft.allInstances().oclIsKindOf(spaceMission::Spacecraft).select(b | b).size()
     == spaceMission::Spacecraft.allInstances().size()
-""",
+        """,
 """
 context spaceMission::Spacecraft inv kindOfSatellite:
   spaceMission::Spacecraft.allInstances()
     .oclIsKindOf(satelliteSystem::Satellite).select(b | b).size()
     == 0
-""",
+        """,
 """
 context satelliteSystem::Satellite inv kindOfSatellite:
   satelliteSystem::Satellite.allInstances()
     .oclIsKindOf(satelliteSystem::Satellite).select(b | b).size()
     == satelliteSystem::Satellite.allInstances().size()
-""");
+        """);
   }
 
   /** Tests oclIsKindOf used inside select iterator (uses extra instance file SPACECRAFT_ATLAS). */

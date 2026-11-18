@@ -13,7 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.incremental;
 
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 
 /**
  * Result of one incremental evaluation: all <em>current</em> violations (same semantics as a full

@@ -19,7 +19,7 @@ import java.util.List;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * A transaction re-renders only the results it can change: those of re-evaluated constraints and

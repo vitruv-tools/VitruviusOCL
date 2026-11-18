@@ -18,9 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Regression tests for the Ctype combination rule of implicit-collect navigation ({@code e.p} where

@@ -20,10 +20,10 @@ import java.util.List;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation.Family;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /** Hover docs and completion must cover every operation of the shared catalog. */
 class OclOperationDocsCoverageTest {

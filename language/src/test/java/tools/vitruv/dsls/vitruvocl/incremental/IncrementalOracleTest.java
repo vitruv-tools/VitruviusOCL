@@ -27,11 +27,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ConstraintCorpus;
 import tools.vitruv.dsls.vitruvocl.incremental.support.LiveModel;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ModelMutator;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ModelSet;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /**
  * Differential (oracle) tests of the incremental evaluator against full evaluation, over the

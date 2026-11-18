@@ -31,8 +31,8 @@ import tools.vitruv.change.correspondence.Correspondence;
 import tools.vitruv.change.correspondence.model.CorrespondenceModelFactory;
 import tools.vitruv.change.correspondence.view.CorrespondenceModelViewFactory;
 import tools.vitruv.change.correspondence.view.EditableCorrespondenceModelView;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**

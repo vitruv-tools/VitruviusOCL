@@ -25,12 +25,21 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.SmartLoader;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintListEvaluator;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
+import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalResult;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
+import tools.vitruv.dsls.vitruvocl.result.Warning;
 import tools.vitruv.framework.vsum.VirtualModel;
 
 /** Static facade for evaluating VitruvOCL constraints against a VSUM or standalone files. */
@@ -321,9 +330,10 @@ public class VitruvOCL {
    * resolved directly to a {@link #duplicateResult}. This keeps duplicate-detection order-stable
    * regardless of thread pool size, and avoids redundant work. Each submitted constraint is
    * compiled and evaluated by {@link #compileAndEvaluate}, which creates its own {@link
-   * VitruvOCLCompiler} (and thus its own {@link tools.vitruv.dsls.vitruvocl.common.ErrorCollector})
-   * per call — so no compiler-level state is shared between concurrently-running tasks. Results are
-   * returned in the same order as {@code constraints}, independent of completion order.
+   * tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler} (and thus its own {@link
+   * tools.vitruv.dsls.vitruvocl.common.ErrorCollector}) per call — so no compiler-level state is
+   * shared between concurrently-running tasks. Results are returned in the same order as {@code
+   * constraints}, independent of completion order.
    *
    * @param constraints the OCL constraint expressions, in the order results should be returned
    * @param wrapper shared metamodel/instance access, reused (read-mostly) across all tasks
@@ -621,15 +631,6 @@ public class VitruvOCL {
   private static ConstraintResult duplicateResult(String constraint) {
     return ConstraintEvaluations.duplicateResult(constraint);
   }
-
-  /**
-   * Stable, greppable prefix identifying a pre/post-skip notice among a {@code ConstraintResult}'s
-   * plain-string warnings (the {@code WarningType} itself is not serialized to CLI/JSON output —
-   * see {@code VitruvOclCli}). Consumers (e.g. the VS Code extension) match on this prefix to
-   * display skip notices distinctly from constraint violations, and to surface them even when the
-   * constraint's invariants all passed (a skipped pre/post is not a violation).
-   */
-  public static final String PRE_POST_SKIPPED_PREFIX = "PRE/POST SKIPPED:";
 
   private static List<String> parseConstraintsFile(Path file) throws IOException {
     String content = Files.readString(file);

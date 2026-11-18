@@ -31,13 +31,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -263,11 +263,11 @@ class OCLIsTypeOfTest extends DummyTestSpecification {
 """
 context spaceMission::Spacecraft inv typeOfSpacecraft:
   spaceMission::Spacecraft.allInstances().oclIsTypeOf(spaceMission::Spacecraft).forAll(b | b)
-""",
+        """,
 """
 context satelliteSystem::Satellite inv typeOfSatellite:
   satelliteSystem::Satellite.allInstances().oclIsTypeOf(satelliteSystem::Satellite).forAll(b | b)
-""");
+        """);
   }
 
   /** Spacecraft is NOT exactly of type Satellite → constraint fails. */
@@ -277,7 +277,7 @@ context satelliteSystem::Satellite inv typeOfSatellite:
 """
 context spaceMission::Spacecraft inv typeOfSatellite:
   spaceMission::Spacecraft.allInstances().oclIsTypeOf(satelliteSystem::Satellite).forAll(b | b)
-""";
+        """;
     ConstraintResult r =
         VitruvOCL.evaluateConstraint(
             constraint,

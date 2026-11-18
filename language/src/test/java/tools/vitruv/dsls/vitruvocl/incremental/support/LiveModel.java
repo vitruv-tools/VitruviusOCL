@@ -33,7 +33,7 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.change.composite.recording.ChangeRecorder;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 

@@ -8,9 +8,9 @@ import org.eclipse.emf.ecore.EPackage;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Tests for @severity and @message annotation type-checking.

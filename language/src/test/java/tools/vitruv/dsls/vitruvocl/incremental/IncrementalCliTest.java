@@ -24,8 +24,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.cli.VitruvOclCli;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /**
  * The CLI option {@code --incremental-level}: the CLI has no transaction, so every level must

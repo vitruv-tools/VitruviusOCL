@@ -22,7 +22,7 @@ import java.nio.file.Path;
 import org.eclipse.emf.ecore.EClass;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 
 /**
  * Integration test suite for metamodel loading and access in VitruvOCL.

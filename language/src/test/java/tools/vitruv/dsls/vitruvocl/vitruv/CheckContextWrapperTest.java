@@ -20,7 +20,7 @@ import static org.mockito.Mockito.mock;
 import org.eclipse.emf.ecore.EcorePackage;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.composite.propagation.ChangePropagationListener;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 
 /** Tests for a {@link VsumWrapper} created for a single constraint check. */
 class CheckContextWrapperTest {

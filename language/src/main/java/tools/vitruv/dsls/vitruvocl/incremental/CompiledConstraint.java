@@ -19,6 +19,8 @@ import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
+import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.PathAnalyzer;
@@ -26,8 +28,6 @@ import tools.vitruv.dsls.vitruvocl.incremental.analysis.PolarityAnalyzer;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSetAnalyzer;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint;
 
 /**
  * A constraint text compiled once (parse, symbol table, type check) and evaluable many times

@@ -37,7 +37,7 @@ import org.eclipse.lsp4j.services.LanguageClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 
 /**
  * Robustness of the language server against broken metamodels and pathological documents: a

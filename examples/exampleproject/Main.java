@@ -13,9 +13,9 @@
 
 import java.nio.file.Path;
 import java.util.List;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Demonstration of VitruvOCL API usage patterns.

@@ -43,10 +43,11 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.change.composite.description.TransactionalChange;
 import tools.vitruv.change.composite.recording.ChangeRecorder;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.framework.views.ViewSource;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
@@ -273,7 +274,7 @@ class VsumTransactionConstraintTest {
         result.getWarnings().stream()
             .anyMatch(
                 w ->
-                    w.getMessage().startsWith(VitruvOCL.PRE_POST_SKIPPED_PREFIX)
+                    w.getMessage().startsWith(ConstraintEvaluations.PRE_POST_SKIPPED_PREFIX)
                         && w.getMessage().contains("post")
                         && w.getMessage().contains("spaceMission::Spacecraft")),
         "Expected a PRE/POST SKIPPED warning naming the block and context, got: "

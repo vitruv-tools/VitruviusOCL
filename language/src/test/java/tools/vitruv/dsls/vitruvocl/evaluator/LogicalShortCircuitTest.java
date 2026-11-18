@@ -23,9 +23,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
  * {@code and}, {@code or} and {@code implies} skip their right operand when the left one already

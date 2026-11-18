@@ -23,9 +23,9 @@ import java.util.stream.Collectors;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalLevel;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Command-line interface for VitruvOCL compiler. Outputs JSON for easy integration with IDEs and

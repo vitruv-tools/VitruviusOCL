@@ -35,11 +35,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Comprehensive test suite for {@code @severity} and {@code @message} constraint annotations.
@@ -526,7 +526,7 @@ class AnnotationSyntaxAndSemanticsTest {
      */
     private List<EvaluationVisitor.ViolationRecord> getRecords(String constraint) {
       var loadResult =
-          tools.vitruv.dsls.vitruvocl.pipeline.SmartLoader.loadForConstraint(
+          tools.vitruv.dsls.vitruvocl.adapter.emf.SmartLoader.loadForConstraint(
               constraint, new Path[] {ECORE}, new Path[] {XMI});
       assertFalse(loadResult.hasErrors(), "Load must succeed");
       var compiler = new VitruvOCLCompiler(loadResult.wrapper, null);

@@ -31,8 +31,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.incremental.support.CorrespondingElementsSpecification;
 import tools.vitruv.dsls.vitruvocl.incremental.support.RealVsumFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 

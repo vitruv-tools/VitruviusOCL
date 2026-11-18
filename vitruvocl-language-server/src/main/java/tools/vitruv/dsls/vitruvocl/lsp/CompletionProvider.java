@@ -26,10 +26,10 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.Position;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation.Family;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**

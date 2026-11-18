@@ -30,6 +30,8 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
@@ -42,10 +44,8 @@ import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
 import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.model.TransactionSource;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Stateful incremental evaluation of a fixed list of constraints against one model (VSUM or

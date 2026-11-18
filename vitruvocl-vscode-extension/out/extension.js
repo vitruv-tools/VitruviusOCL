@@ -640,7 +640,7 @@ async function findInstanceFiles(constraintFileUri) {
 let outputChannel;
 /**
  * Stable prefix identifying a pre/post-skip notice among a constraint's plain-string warnings —
- * must match {@code VitruvOCL.PRE_POST_SKIPPED_PREFIX} on the Java side exactly. Pre/post
+ * must match {@code ConstraintEvaluations.PRE_POST_SKIPPED_PREFIX} on the Java side exactly. Pre/post
  * constraints (anything using `pre`/`post`/`@pre`/`OCLisNew`/`OCLisModified`/`OCLisDeleted`) cannot
  * be evaluated by this plugin: it has no notion of a transaction (that only exists once a real
  * Reactions integration supplies one), so the CLI it shells out to always uses the no-transaction

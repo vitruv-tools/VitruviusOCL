@@ -30,13 +30,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -203,7 +203,7 @@ class OCLAsTypeTest extends DummyTestSpecification {
 context spaceMission::Spacecraft inv asTypeSpacecraft:
   spaceMission::Spacecraft.allInstances().oclAsType(spaceMission::Spacecraft).size()
     == spaceMission::Spacecraft.allInstances().size()
-""";
+        """;
 
     ConstraintResult result =
         VitruvOCL.evaluateConstraint(
@@ -228,7 +228,7 @@ context spaceMission::Spacecraft inv selectThenAsType:
     .select(sc | sc.oclIsKindOf(spaceMission::Spacecraft))
     .oclAsType(spaceMission::Spacecraft)
     .size() > 0
-""";
+        """;
 
     ConstraintResult result =
         VitruvOCL.evaluateConstraint(

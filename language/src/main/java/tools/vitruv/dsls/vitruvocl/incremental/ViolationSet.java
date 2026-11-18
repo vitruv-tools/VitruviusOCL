@@ -19,8 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.emf.ecore.EObject;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor.ViolationRecord;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
 
 /**
  * The current outcome of every constraint of a session, kept between transactions (building block

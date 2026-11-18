@@ -22,8 +22,8 @@ import java.util.List;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
  * The session answers every correspondence check of a transaction's evaluations from its snapshot,

@@ -22,11 +22,11 @@ import java.util.List;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
-import tools.vitruv.dsls.vitruvocl.pipeline.Warning;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
+import tools.vitruv.dsls.vitruvocl.result.Warning;
 
 /**
  * End-to-end tests for the {@code threadPoolSize}-configurable batch evaluation entry points on

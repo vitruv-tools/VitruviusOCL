@@ -22,12 +22,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ConstraintCorpus;
 import tools.vitruv.dsls.vitruvocl.incremental.support.LiveModel;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ModelSet;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
 
 /**
  * Differential check of the correspondence fast paths: every corpus constraint gives the same

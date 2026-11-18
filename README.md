@@ -247,18 +247,18 @@ Coverage report: `language/target/site/jacoco/index.html`
 ## Java API
 
 ```java
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
 import java.nio.file.Path;
+import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 
 // Evaluate all constraints in a project directory
-BatchValidationResult result = VitruvOCLCompiler.evaluateProject(Path.of("."));
+BatchValidationResult result = VitruvOCL.evaluateProject(Path.of("."));
 
-System.out.println("Satisfied: " + result.getSatisfiedCount());
-System.out.println("Violated:  " + result.getViolatedCount());
+System.out.println("Satisfied: " + result.getSatisfiedConstraints().size());
+System.out.println("Violated:  " + result.getViolatedConstraints().size());
 ```
 
-See `tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler` for the full API.
+See `tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL` for the full API.
 
 ### Constraints of a Vitruvius VSUM
 

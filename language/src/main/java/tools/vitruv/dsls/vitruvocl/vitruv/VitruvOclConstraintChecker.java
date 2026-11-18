@@ -32,14 +32,14 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import org.eclipse.emf.ecore.EPackage;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.pipeline.DependencyAnalyzer;
-import tools.vitruv.dsls.vitruvocl.pipeline.FileError;
-import tools.vitruv.dsls.vitruvocl.pipeline.Violation;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.DependencyAnalyzer;
+import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
-import tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.result.FileError;
+import tools.vitruv.dsls.vitruvocl.result.Violation;
 import tools.vitruv.dsls.vitruvocl.vitruv.OclInvariantParser.ParsedInvariant;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
 import tools.vitruv.framework.vsum.constraints.ConstraintChecker;
@@ -335,7 +335,7 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    * unknown types, features and other compile errors with their position in the given source.
    */
   private static void typeCheck(String source) {
-    tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult result =
+    tools.vitruv.dsls.vitruvocl.result.ConstraintResult result =
         VitruvOCL.evaluateConstraint(
             OclInvariantParser.withoutImports(source), new VsumWrapper(EmptyCheckContext.INSTANCE));
     if (!result.getCompilerErrors().isEmpty()) {
@@ -416,7 +416,7 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
   private static ConstraintResult evaluate(
       ConstraintDescriptor descriptor, PreparedConstraint compiled, VsumWrapper wrapper) {
     try {
-      tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult oclResult =
+      tools.vitruv.dsls.vitruvocl.result.ConstraintResult oclResult =
           compiled == null
               ? VitruvOCL.evaluateConstraint(descriptor.source(), wrapper)
               : ConstraintEvaluations.render(
@@ -433,7 +433,7 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
 
   private static ConstraintResult toVitruvResult(
       ConstraintDescriptor descriptor,
-      tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult oclResult) {
+      tools.vitruv.dsls.vitruvocl.result.ConstraintResult oclResult) {
     if (!oclResult.isSuccess()) {
       List<String> errors = new ArrayList<>();
       for (CompileError error : oclResult.getCompilerErrors()) {

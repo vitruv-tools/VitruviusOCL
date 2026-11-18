@@ -28,11 +28,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
 import tools.vitruv.dsls.vitruvocl.incremental.support.CorrespondingElementsSpecification;
 import tools.vitruv.dsls.vitruvocl.incremental.support.RealVsumFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 

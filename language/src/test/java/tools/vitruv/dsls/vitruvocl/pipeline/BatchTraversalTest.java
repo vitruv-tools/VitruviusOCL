@@ -23,8 +23,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
+import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.incremental.support.LiveModel;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * A batch of constraints over different types reads the live VSUM's models a bounded number of

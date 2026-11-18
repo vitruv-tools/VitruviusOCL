@@ -19,8 +19,8 @@ import java.util.List;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
  * {@code @pre} after a navigation that starts at a qualified metaclass (e.g. {@code

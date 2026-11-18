@@ -20,8 +20,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
 
 /**
  * Oracle of the incremental evaluator: compares an incrementally maintained outcome with the

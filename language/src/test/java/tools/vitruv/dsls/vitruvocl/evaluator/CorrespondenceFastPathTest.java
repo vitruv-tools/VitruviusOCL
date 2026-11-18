@@ -21,8 +21,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
  * In {@code G and R} and {@code G implies R} with a correspondence guard {@code G}, the right side

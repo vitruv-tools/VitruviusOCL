@@ -24,8 +24,8 @@ import org.eclipse.emf.ecore.EPackage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /**
  * Which metamodels {@link FeatureIndex#forWrapper} indexes. Besides the global registry it must

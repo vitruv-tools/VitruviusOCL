@@ -27,7 +27,7 @@ import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ConstraintCorpus;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ModelMutator;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Targeted edge cases (task item 3) on the {@link EdgeFixture} model, each run in oracle mode for

@@ -37,9 +37,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.vitruv.change.correspondence.Correspondence;
 import tools.vitruv.change.correspondence.view.CorrespondenceModelView;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.incremental.support.CorrespondingElementsSpecification;
 import tools.vitruv.dsls.vitruvocl.incremental.support.RealVsumFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 

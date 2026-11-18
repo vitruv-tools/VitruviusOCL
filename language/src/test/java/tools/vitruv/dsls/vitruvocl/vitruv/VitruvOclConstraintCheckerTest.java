@@ -258,12 +258,12 @@ class VitruvOclConstraintCheckerTest {
     List<String> ids = List.of(NON_NEGATIVE, AFFORDABLE, NOT_FREE);
 
     List<ConstraintResult> first = checker.check(context(), ids);
-    long before = tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations();
+    long before = tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint.preparations();
     List<ConstraintResult> second = checker.check(context(), ids);
 
     assertEquals(
         0,
-        tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations() - before,
+        tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint.preparations() - before,
         "a second check must reuse the compiled constraints");
     assertEquals(
         first.stream().map(ConstraintResult::status).toList(),
@@ -284,10 +284,10 @@ class VitruvOclConstraintCheckerTest {
     extra.setNsURI("http://test/checker-cache-extra");
     org.eclipse.emf.ecore.EPackage.Registry.INSTANCE.put(extra.getNsURI(), extra);
     try {
-      long before = tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations();
+      long before = tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint.preparations();
       checker.check(context(), ids);
       assertEquals(
-          3, tools.vitruv.dsls.vitruvocl.pipeline.PreparedConstraint.preparations() - before);
+          3, tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint.preparations() - before);
     } finally {
       org.eclipse.emf.ecore.EPackage.Registry.INSTANCE.remove(extra.getNsURI());
     }
