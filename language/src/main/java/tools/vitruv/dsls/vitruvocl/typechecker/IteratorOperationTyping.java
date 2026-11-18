@@ -689,7 +689,7 @@ final class IteratorOperationTyping {
     boolean invalid =
         body == null
             || body.exception != null
-            || TypeCheckVisitor.hasErrorNode(body)
+            || SyntaxRecoveryReporter.hasErrorNode(body)
             || body.getChildCount() == 0;
     if (invalid) {
       context.error(

@@ -124,3 +124,35 @@ true andd false
 ### unknownOperation
 persons::Person.allInstances().sizee() > 0
 => 2:33-2:38 ERROR type-checker code=null fix=size | Unknown operation 'sizee' — did you mean 'size'?
+
+### unknownCorrespondenceOperationFarAway
+persons::Person.allInstances().frobnicate(~).notEmpty()
+=> 2:33-2:43 ERROR type-checker code=null fix=reject | Unknown operation 'frobnicate' — this operation does not exist (valid correspondence ops: select, reject, exists)
+
+### unknownFilterOptionDistanceTwo
+persons::Person.allInstances().select(~, Taggg = "x").notEmpty()
+=> 2:43-2:48 ERROR type-checker code=null fix=Tag | Unknown filter option 'Taggg' — did you mean 'Tag'?
+
+### unknownFilterOptionFarAway
+persons::Person.allInstances().select(~, Xyzzy = "x").notEmpty()
+=> 2:43-2:48 ERROR type-checker code=null fix=Type | Unknown filter option 'Xyzzy' — valid options are 'Tag' and 'Type'
+
+### unknownOperationFarAway
+persons::Person.allInstances().zzzzzzzzzz() > 0
+=> 2:33-2:43 ERROR type-checker code=null fix=size | Unknown operation 'zzzzzzzzzz' — this operation does not exist
+
+### unknownOperationOtherCase
+persons::Person.allInstances().SIZE() > 0
+=> 2:33-2:37 ERROR type-checker code=null fix=size | Unknown operation 'SIZE' — did you mean 'size'?
+
+### unknownBinaryOperatorOtherCase
+true ANDD false
+=> 2:7-2:11 ERROR type-checker code=null fix=and | Unknown operator 'ANDD' — did you mean 'and'?
+
+### undefinedVariableOtherCase
+Self.firstName == "a"
+=> 2:2-2:6 ERROR type-checker code=null fix=self | Undefined variable 'Self' — did you mean 'self'?
+
+### unknownBinaryOperatorTieGoesToFirstCandidate
+true nor false
+=> 2:7-2:10 ERROR type-checker code=null fix=or | Unknown operator 'nor' — did you mean 'or'?

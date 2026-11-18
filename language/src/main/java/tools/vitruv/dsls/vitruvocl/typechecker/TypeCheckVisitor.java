@@ -3,23 +3,16 @@ package tools.vitruv.dsls.vitruvocl.typechecker;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EClass;
-import org.eclipse.emf.ecore.EClassifier;
-import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EStructuralFeature;
-import org.eclipse.emf.ecore.EcorePackage;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
@@ -151,6 +144,13 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    */
   private final ParseTreeProperty<Type> nodeTypes = new ParseTreeProperty<>();
 
+  /**
+   * Error recovery over the raw token stream; without a token stream (see {@link #setTokenStream})
+   * it reports nothing. Not final because {@link #setTokenStream} replaces it.
+   */
+  private SyntaxRecoveryReporter syntaxRecovery =
+      new SyntaxRecoveryReporter(null, this::reportSpanError);
+
   /** Variables whose initializer is being checked; referencing them there is an error. */
   private final Map<VariableSymbol, Boolean> initializing = new IdentityHashMap<>();
 
@@ -177,14 +177,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
    * visitor) retrieves these annotations to enter the correct scopes.
    */
   private final ScopeAnnotator scopeAnnotator;
-
-  /**
-   * Token stream for accessing keyword positions.
-   *
-   * <p>Used in {@link #visitIfExpCS} to determine which expressions belong to condition,
-   * then-branch, and else-branch based on keyword positions.
-   */
-  private org.antlr.v4.runtime.TokenStream tokens;
 
   // ==================== Constructor ====================
 
@@ -248,29 +240,13 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
   @Override
   protected void handleUndefinedSymbol(String name, ParserRuleContext ctx) {
-    String lower = name.toLowerCase(java.util.Locale.ROOT);
-
-    // Check against keyword-like names first (self, null, true, false)
-    String bestKeyword =
-        KEYWORD_LIKE_NAMES.stream()
-            .min(
-                java.util.Comparator.comparingInt(
-                    k ->
-                        EditDistance.damerauLevenshtein(
-                            lower, k.toLowerCase(java.util.Locale.ROOT))))
-            .orElse(null);
-    int kwDist =
-        bestKeyword == null
-            ? Integer.MAX_VALUE
-            : EditDistance.damerauLevenshtein(
-                lower, bestKeyword.toLowerCase(java.util.Locale.ROOT));
-
-    int threshold = EditDistance.editThreshold(name.length());
+    // Check against keyword-like names (self, null, true, false)
+    String closeKeyword = SuggestionProvider.closeMatch(name, KEYWORD_LIKE_NAMES);
     String message;
     String suggestion;
-    if (kwDist <= threshold) {
-      message = "Undefined variable '" + name + ERR_DID_YOU_MEAN + bestKeyword + "'?";
-      suggestion = bestKeyword;
+    if (closeKeyword != null) {
+      message = "Undefined variable '" + name + ERR_DID_YOU_MEAN + closeKeyword + "'?";
+      suggestion = closeKeyword;
     } else {
       message = "Undefined variable: " + name;
       suggestion = null;
@@ -462,12 +438,14 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       boolean newErrorsInSpec = errors.getErrors().size() > errorsBefore;
 
       // If the spec already has errors, an error node, or produced new errors, skip further checks.
-      if (specType.equals(Type.ERROR) || hasErrorNode(spec) || newErrorsInSpec) {
+      if (specType.equals(Type.ERROR)
+          || SyntaxRecoveryReporter.hasErrorNode(spec)
+          || newErrorsInSpec) {
         // skip — would only produce misleading follow-up diagnostics
-      } else if (reportMissingOperandAfter(spec)) {
+      } else if (syntaxRecovery.reportMissingOperandAfter(spec)) {
         // Spec was cut short by a missing operand (operator token follows immediately)
         resultType = Type.ERROR;
-      } else if (reportMissingOperatorBetweenExpressions(spec)) {
+      } else if (syntaxRecovery.reportMissingOperatorBetweenExpressions(spec)) {
         // Forgotten logical operator between two expressions
         resultType = Type.ERROR;
       } else {
@@ -778,8 +756,8 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       org.antlr.v4.runtime.ParserRuleContext left,
       org.antlr.v4.runtime.Token op,
       org.antlr.v4.runtime.ParserRuleContext right) {
-    boolean leftBad = left == null || hasErrorNode(left);
-    boolean rightBad = right == null || hasErrorNode(right);
+    boolean leftBad = left == null || SyntaxRecoveryReporter.hasErrorNode(left);
+    boolean rightBad = right == null || SyntaxRecoveryReporter.hasErrorNode(right);
     if (!leftBad && !rightBad) {
       return true; // both OK
     }
@@ -1174,9 +1152,13 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     int errsAfterRight = errors.getErrors().size();
 
     boolean leftFailed =
-        leftType == Type.ERROR || hasErrorNode(ctx.left) || errsAfterLeft > errsBefore;
+        leftType == Type.ERROR
+            || SyntaxRecoveryReporter.hasErrorNode(ctx.left)
+            || errsAfterLeft > errsBefore;
     boolean rightFailed =
-        rightType == Type.ERROR || hasErrorNode(ctx.right) || errsAfterRight > errsAfterLeft;
+        rightType == Type.ERROR
+            || SyntaxRecoveryReporter.hasErrorNode(ctx.right)
+            || errsAfterRight > errsAfterLeft;
 
     // Swallow cascade when the root cause was already reported in either operand.
     if (leftFailed || rightFailed) {
@@ -1192,19 +1174,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     if (!rightType.isConformantTo(Type.BOOLEAN)) {
       // Try to find the unparsed navigation step right after ctx.right that caused the issue
       // (e.g. .reject(~, , , ...) that ANTLR couldn't parse due to extra commas).
-      int[] badCallSpan = findUnparsedCorrCallAfter(ctx.right);
-      if (badCallSpan.length > 0) {
-        org.antlr.v4.runtime.Token opTok = tokens.get(badCallSpan[0]);
-        org.antlr.v4.runtime.Token endTok = tokens.get(badCallSpan[1]);
-        reportSpanError(
-            opTok,
-            endTok.getLine(),
-            endTok.getCharPositionInLine() + endTok.getText().length(),
-            "'"
-                + opTok.getText()
-                + "(~, ...)' has invalid arguments — check for syntax errors inside the"
-                + " parentheses");
-      } else {
+      if (!syntaxRecovery.reportUnparsedCorrCallAfter(ctx.right)) {
         org.antlr.v4.runtime.Token rs = ctx.right.getStart();
         reportError(rs, "Right operand of 'implies' must be Boolean, got " + rightType);
       }
@@ -1588,7 +1558,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       String attrName = arg.attr.getText();
       EStructuralFeature feature = eClass.getEStructuralFeature(attrName);
       if (feature == null) {
-        feature = findFeatureInSubtypes(eClass, attrName);
+        feature = FeatureTypeMapper.findFeatureInSubtypes(eClass, attrName);
       }
       Type valueType = visit(arg.value);
       if (feature == null) {
@@ -1598,7 +1568,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       if (valueType == Type.ERROR) {
         continue; // already reported
       }
-      Type featureType = mapFeatureToType(feature);
+      Type featureType = FeatureTypeMapper.featureType(feature);
       Type expectedElem =
           (featureType.isSingleton() || featureType.isOptional())
               ? featureType.getElementType()
@@ -1701,14 +1671,14 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       EStructuralFeature feature = eClass.getEStructuralFeature(propName);
 
       if (feature == null) {
-        feature = findFeatureInSubtypes(eClass, propName);
+        feature = FeatureTypeMapper.findFeatureInSubtypes(eClass, propName);
         if (feature == null) {
           reportError(propertyNameToken, unknownPropertyMessage(propName, eClass));
           return Type.ERROR;
         }
       }
 
-      Type featureType = mapFeatureToType(feature);
+      Type featureType = FeatureTypeMapper.featureType(feature);
 
       // Combine the receiver's Ctype with the navigated feature's own Ctype (OCL#, Sect. 4.4.4:
       // "e.p" combines receiver and feature multiplicity via ω ∨ ω' for orderedness). A
@@ -1730,14 +1700,14 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       EStructuralFeature feature = eClass.getEStructuralFeature(propName);
 
       if (feature == null) {
-        feature = findFeatureInSubtypes(eClass, propName);
+        feature = FeatureTypeMapper.findFeatureInSubtypes(eClass, propName);
         if (feature == null) {
           reportError(propertyNameToken, unknownPropertyMessage(propName, eClass));
           return Type.ERROR;
         }
       }
 
-      return mapFeatureToType(feature);
+      return FeatureTypeMapper.featureType(feature);
     }
 
     reportError(propertyNameToken, "Cannot access property on " + receiverType);
@@ -1752,159 +1722,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
         + "'"
         + " (not found on declared type or any known subtype;"
         + " use oclIsKindOf + oclAsType to cast to the concrete subtype first)";
-  }
-
-  /**
-   * Searches all known subclasses of {@code abstractClass} (reachable via EMF EPackage hierarchy)
-   * for a structural feature named {@code propName}. Returns the feature if found unambiguously on
-   * one or more subtypes (all with the same defining EClass), or {@code null} if not found or
-   * ambiguous across incompatible types.
-   */
-  private EStructuralFeature findFeatureInSubtypes(EClass abstractClass, String propName) {
-    // Collect all EPackages reachable from the root package
-    EPackage rootPkg = abstractClass.getEPackage();
-    while (rootPkg.getESuperPackage() != null) {
-      rootPkg = rootPkg.getESuperPackage();
-    }
-    List<EClass> allClasses = new ArrayList<>();
-    collectEClasses(rootPkg, allClasses, new HashSet<>());
-
-    // Find feature on any subtype (abstractClass.isSuperTypeOf(candidate) is true for subtypes)
-    EStructuralFeature found = null;
-    for (EClass candidate : allClasses) {
-      if (candidate == abstractClass || !abstractClass.isSuperTypeOf(candidate)) {
-        continue;
-      }
-      EStructuralFeature f = candidate.getEStructuralFeature(propName);
-      if (f != null) {
-        if (found == null) {
-          found = f;
-        } else if (found.getEType() != f.getEType() || found.isMany() != f.isMany()) {
-          // Ambiguous: same feature name but different types on different subtypes — reject
-          return null;
-        }
-      }
-    }
-    return found;
-  }
-
-  private void collectEClasses(EPackage pkg, List<EClass> result, Set<EPackage> visited) {
-    if (!visited.add(pkg)) {
-      return;
-    }
-    for (EClassifier c : pkg.getEClassifiers()) {
-      if (c instanceof EClass eClass) {
-        result.add(eClass);
-      }
-    }
-    for (EPackage sub : pkg.getESubpackages()) {
-      collectEClasses(sub, result, visited);
-    }
-  }
-
-  /**
-   * Maps an EMF structural feature to a VitruvOCL type.
-   *
-   * <p>Respects EMF ordering and uniqueness annotations:
-   *
-   * <ul>
-   *   <li>ordered + unique → OrderedSet {@code <T>}
-   *   <li>ordered + !unique → Sequence {@code [T]}
-   *   <li>!ordered + unique → Set {@code {T}}
-   *   <li>!ordered + !unique → Bag {@code {{T}}}
-   *   <li>single-valued → Singleton {@code !T!}
-   * </ul>
-   *
-   * @param feature The EMF structural feature
-   * @return The corresponding VitruvOCL type
-   */
-  @SuppressWarnings("java:S125")
-  private Type mapFeatureToType(EStructuralFeature feature) {
-    Type baseType = mapEClassifierToType(feature.getEType());
-
-    if (feature.getUpperBound() > 1 || feature.getUpperBound() == -1) {
-      // Multi-valued: respect EMF ordering and uniqueness annotations
-      boolean ordered = feature.isOrdered();
-      boolean unique = feature.isUnique();
-      // EMF's upperBound already uses -1 for "unbounded", matching Type.UNBOUNDED — no
-      // translation needed.
-      int lowerBound = feature.getLowerBound();
-      int upperBound = feature.getUpperBound();
-
-      if (ordered && unique) {
-        return Type.orderedSet(baseType, lowerBound, upperBound); // <T>
-      } else if (ordered) {
-        return Type.sequence(baseType, lowerBound, upperBound); // [T]
-      } else if (unique) {
-        return Type.set(baseType, lowerBound, upperBound); // {T}
-      } else {
-        return Type.bag(baseType, lowerBound, upperBound); // {{T}}
-      }
-    } else {
-      // EAttribute with lowerBound=0: primitive always has a default value → ¡T!
-      // EReference with lowerBound=0: reference may be absent → ¿T?
-      // Any single-valued with lowerBound>=1: always present → ¡T!
-      if (feature instanceof org.eclipse.emf.ecore.EReference && feature.getLowerBound() == 0) {
-        return Type.optional(baseType);
-      } else {
-        return Type.singleton(baseType);
-      }
-    }
-  }
-
-  /**
-   * Maps an EMF EClassifier to a VitruvOCL type.
-   *
-   * <p>Handles:
-   *
-   * <ul>
-   *   <li>EString → Type.STRING
-   *   <li>EInt → Type.INTEGER
-   *   <li>EBoolean → Type.BOOLEAN
-   *   <li>EClass → metaclass type
-   * </ul>
-   *
-   * @param classifier The EMF classifier
-   * @return The corresponding VitruvOCL type
-   */
-  private Type mapEClassifierToType(EClassifier classifier) {
-    // Handle primitive types
-    switch (classifier.getName()) {
-      case "EString":
-        return Type.STRING;
-      case "EInt":
-        return Type.INTEGER;
-      case "EBoolean":
-        return Type.BOOLEAN;
-      case "EFloat":
-        return Type.FLOAT;
-      case "EDouble":
-        return Type.DOUBLE;
-      default:
-        if (EcorePackage.Literals.ECLASS.equals(classifier.eClass())) {
-          return Type.metaclassType((EClass) classifier);
-        }
-        // Handle EEnum — enum literals are compared by value in OCL
-        if (classifier instanceof org.eclipse.emf.ecore.EEnum eEnum) {
-          return Type.enumType(eEnum);
-        }
-        // Handle custom EDataType (e.g. autosar::Identifier with
-        // instanceClassName="java.lang.String")
-        if (classifier instanceof org.eclipse.emf.ecore.EDataType eDataType) {
-          String instanceClass = eDataType.getInstanceClassName();
-          if (instanceClass != null) {
-            return switch (instanceClass) {
-              case "java.lang.String", TYPE_STRING -> Type.STRING;
-              case "int", "java.lang.Integer" -> Type.INTEGER;
-              case TYPE_BOOLEAN, "java.lang.Boolean" -> Type.BOOLEAN;
-              case "float", "java.lang.Float" -> Type.FLOAT;
-              case "double", "java.lang.Double" -> Type.DOUBLE;
-              default -> Type.STRING; // fallback: treat unknown scalar datatypes as String
-            };
-          }
-        }
-        return Type.ERROR;
-    }
   }
 
   // ==================== Control Flow ====================
@@ -3103,7 +2920,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       String opName,
       int errsBefore) {
     boolean tcErr = errors.getErrors().size() > errsBefore;
-    boolean parseErr = hasErrorNode(corrFilter) || hasExtraCommasInRange(corrFilter);
+    boolean parseErr = syntaxRecovery.hasParseErrors(corrFilter);
     if (!parseErr && !tcErr) {
       return false;
     }
@@ -3123,184 +2940,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
           "'" + opName + "(~, ...)' has invalid arguments — check for extra or misplaced commas");
     }
     return true;
-  }
-
-  /**
-   * Tokens that can start a new expression — if one follows a complete spec, an operator is
-   * missing.
-   */
-  private static final java.util.Set<String> EXPR_START_KEYWORDS =
-      java.util.Set.of("self", "true", "false", "not", "if", "let");
-
-  /**
-   * Checks whether there are expression-starting tokens immediately after {@code spec.getStop()}
-   * that were silently dropped by ANTLR error recovery. This catches patterns like {@code self.a ==
-   * "x" persons::Foo.allInstances()...} where the user forgot {@code and}/{@code or}/{@code
-   * implies} between two sub-expressions.
-   *
-   * @param spec the parsed specification context
-   * @return {@code true} if a missing-operator error was reported
-   */
-  private boolean reportMissingOperatorBetweenExpressions(
-      org.antlr.v4.runtime.ParserRuleContext spec) {
-    if (tokens == null || spec.getStop() == null) {
-      return false;
-    }
-    int idx = nextDefault(spec.getStop().getTokenIndex() + 1);
-    if (idx < 0) {
-      return false;
-    }
-    org.antlr.v4.runtime.Token next = tokens.get(idx);
-    // Token types that terminate an invCS (not expression starters)
-    String txt = next.getText();
-    if (",".equals(txt)
-        || ")".equals(txt)
-        || "context".equals(txt)
-        || "inv".equals(txt)
-        || "<EOF>".equals(txt)) {
-      return false;
-    }
-    // Is it an expression-starting token?
-    boolean isExprStart =
-        EXPR_START_KEYWORDS.contains(txt)
-            // ID followed by '::' (qualified name) or '.' (navigation) or '(' (call)
-            || (txt.matches("[a-zA-Z_]\\w*") && isFollowedByNavOrScope(idx))
-            // string literal
-            || (txt.startsWith("\"") || txt.startsWith("'"))
-            // numeric literal
-            || txt.matches("-?\\d+(\\.\\d+)?");
-    if (!isExprStart) {
-      return false;
-    }
-    reportError(
-        next,
-        "Missing logical operator before this expression — did you mean 'and', 'or', or"
-            + " 'implies'?");
-    return true;
-  }
-
-  private boolean isFollowedByNavOrScope(int idIdx) {
-    int next = nextDefault(idIdx + 1);
-    if (next < 0) {
-      return false;
-    }
-    String t = tokens.get(next).getText();
-    return "::".equals(t) || ".".equals(t) || "(".equals(t);
-  }
-
-  private static final java.util.Set<String> COMPARISON_OPS =
-      java.util.Set.of("==", "!=", "<", "<=", ">", ">=");
-
-  /**
-   * Checks whether the token immediately after {@code ctx.getStop()} in the stream is a comparison
-   * or arithmetic operator that implies a missing right-hand operand. If so, reports the error ON
-   * that operator token and returns {@code true}.
-   */
-  private boolean reportMissingOperandAfter(org.antlr.v4.runtime.ParserRuleContext ctx) {
-    if (tokens == null || ctx.getStop() == null) {
-      return false;
-    }
-    int idx = nextDefault(ctx.getStop().getTokenIndex() + 1);
-    if (idx < 0) {
-      return false;
-    }
-    org.antlr.v4.runtime.Token opTok = tokens.get(idx);
-    if (!COMPARISON_OPS.contains(opTok.getText())) {
-      return false;
-    }
-    reportError(opTok, "Missing right-hand operand for '" + opTok.getText() + "'");
-    return true;
-  }
-
-  private static final java.util.Set<String> CORR_OPS_SET =
-      java.util.Set.of(OP_REJECT, OP_SELECT, OP_EXISTS);
-
-  /**
-   * Looks in the token stream immediately after {@code parsedExpr.getStop()} for an unparsed
-   * navigation step of the form {@code .reject(~…)/select(~…)/exists(~…)} that ANTLR failed to
-   * match (typically due to extra commas inside the correspondence filter).
-   *
-   * @return [opTokenIndex, closingParenTokenIndex] if found, or empty array if not found
-   */
-  private int[] findUnparsedCorrCallAfter(org.antlr.v4.runtime.ParserRuleContext parsedExpr) {
-    if (tokens == null || parsedExpr.getStop() == null) {
-      return new int[0];
-    }
-    int idx = parsedExpr.getStop().getTokenIndex() + 1;
-    idx = nextDefault(idx);
-    if (idx < 0) {
-      return new int[0];
-    }
-    // expect '.'
-    if (!".".equals(tokens.get(idx).getText())) {
-      return new int[0];
-    }
-    idx = nextDefault(idx + 1);
-    if (idx < 0) {
-      return new int[0];
-    }
-    // expect reject / select / exists
-    org.antlr.v4.runtime.Token opTok = tokens.get(idx);
-    if (!CORR_OPS_SET.contains(opTok.getText())) {
-      return new int[0];
-    }
-    final int opIdx = idx;
-    idx = nextDefault(idx + 1);
-    if (idx < 0) {
-      return new int[0];
-    }
-    // expect '('
-    if (!"(".equals(tokens.get(idx).getText())) {
-      return new int[0];
-    }
-    // find matching ')'
-    int depth = 0;
-    for (int i = idx; i < tokens.size(); i++) {
-      String txt = tokens.get(i).getText();
-      if ("(".equals(txt)) {
-        depth++;
-      } else if (")".equals(txt)) {
-        depth--;
-        if (depth == 0) {
-          return new int[] {opIdx, i};
-        }
-      }
-    }
-    return new int[0];
-  }
-
-  /** Returns the index of the next token on the default channel at or after {@code from}, or -1. */
-  private int nextDefault(int from) {
-    for (int i = from; i < tokens.size(); i++) {
-      if (tokens.get(i).getChannel() == org.antlr.v4.runtime.Token.DEFAULT_CHANNEL) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private boolean hasExtraCommasInRange(org.antlr.v4.runtime.ParserRuleContext ctx) {
-    if (tokens == null || ctx.getStart() == null) {
-      return false;
-    }
-    int from = ctx.getStart().getTokenIndex();
-    int to = ctx.getStop() != null ? ctx.getStop().getTokenIndex() : from;
-    boolean prevWasComma = false;
-    for (int i = from; i <= to; i++) {
-      org.antlr.v4.runtime.Token t = tokens.get(i);
-      if (t.getChannel() != org.antlr.v4.runtime.Token.DEFAULT_CHANNEL) {
-        continue;
-      }
-      if (",".equals(t.getText())) {
-        if (prevWasComma) {
-          return true; // two consecutive commas
-        }
-        prevWasComma = true;
-      } else {
-        prevWasComma = false;
-      }
-    }
-    return false;
   }
 
   /** Placeholder for message operator (^). */
@@ -3804,21 +3443,8 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     String typed = ctx.badKey.getText();
     java.util.List<String> validKeys = java.util.List.of("Tag", "Type");
 
-    String best =
-        validKeys.stream()
-            .min(
-                java.util.Comparator.comparingInt(
-                    k ->
-                        EditDistance.damerauLevenshtein(
-                            typed.toLowerCase(java.util.Locale.ROOT),
-                            k.toLowerCase(java.util.Locale.ROOT))))
-            .orElse(null);
-
-    int dist =
-        best == null
-            ? Integer.MAX_VALUE
-            : EditDistance.damerauLevenshtein(
-                typed.toLowerCase(java.util.Locale.ROOT), best.toLowerCase(java.util.Locale.ROOT));
+    String best = SuggestionProvider.closest(typed, validKeys);
+    int dist = best == null ? Integer.MAX_VALUE : SuggestionProvider.distance(typed, best);
 
     String message =
         dist <= 2
@@ -3954,8 +3580,7 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   // ==================== Unknown Operator Catch-All ====================
 
   /** Correspondence iterator operations — candidates for unknownCorrOp suggestions. */
-  private static final java.util.List<String> CORR_OPS =
-      java.util.List.of(OP_SELECT, OP_REJECT, OP_EXISTS);
+  static final java.util.List<String> CORR_OPS = java.util.List.of(OP_SELECT, OP_REJECT, OP_EXISTS);
 
   /**
    * Reports a precise error when a correspondence-style call like {@code selcft(~, ...)} is used
@@ -3971,24 +3596,9 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     visit(ctx.corrFilter);
 
     String typed = ctx.opName.getText();
-    String typedLow = typed.toLowerCase(java.util.Locale.ROOT);
-
-    String best =
-        CORR_OPS.stream()
-            .min(
-                java.util.Comparator.comparingInt(
-                    k ->
-                        EditDistance.damerauLevenshtein(
-                            typedLow, k.toLowerCase(java.util.Locale.ROOT))))
-            .orElse(null);
-    int dist =
-        best == null
-            ? Integer.MAX_VALUE
-            : EditDistance.damerauLevenshtein(typedLow, best.toLowerCase(java.util.Locale.ROOT));
-
-    int threshold = EditDistance.editThreshold(typed.length());
+    String best = SuggestionProvider.closest(typed, CORR_OPS);
     String message =
-        dist <= threshold
+        SuggestionProvider.isClose(typed, best)
             ? ERR_UNKNOWN_OP + typed + ERR_DID_YOU_MEAN + best + "'?"
             : ERR_UNKNOWN_OP
                 + typed
@@ -4011,27 +3621,12 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
     visit(ctx.right);
 
     String typed = ctx.op.getText();
-    String typedLow = typed.toLowerCase(java.util.Locale.ROOT);
 
-    // Find the closest keyword operator (case-insensitive Levenshtein)
-    String best =
-        KNOWN_BINARY_OPS.stream()
-            .min(
-                java.util.Comparator.comparingInt(
-                    k ->
-                        EditDistance.damerauLevenshtein(
-                            typedLow, k.toLowerCase(java.util.Locale.ROOT))))
-            .orElse(null);
-    int dist =
-        best == null
-            ? Integer.MAX_VALUE
-            : EditDistance.damerauLevenshtein(typedLow, best.toLowerCase(java.util.Locale.ROOT));
-
-    // Use "did you mean" when the name is close enough; threshold scales with length
-    int threshold = EditDistance.editThreshold(typed.length());
+    // Find the closest keyword operator; "did you mean" only when it is close enough
+    String best = SuggestionProvider.closest(typed, KNOWN_BINARY_OPS);
     String message;
     String suggestion;
-    if (dist <= threshold) {
+    if (SuggestionProvider.isClose(typed, best)) {
       message = "Unknown operator '" + typed + ERR_DID_YOU_MEAN + best + "'?";
       suggestion = best;
     } else {
@@ -4056,15 +3651,15 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
       visit(arg);
     }
     String typed = ctx.opName.getText();
-    java.util.Optional<String> close = suggestOperation(typed); // within threshold
-    String best = bestOperation(typed); // unconditional best
+    String close = SuggestionProvider.closeOperation(typed); // within threshold
+    String best = SuggestionProvider.closestOperation(typed); // unconditional best
 
     String message;
     String suggestion; // stored for Quick Fix — always the best candidate
-    if (close.isPresent()) {
+    if (close != null) {
       // Close enough: "did you mean?"
-      message = ERR_UNKNOWN_OP + typed + ERR_DID_YOU_MEAN + close.get() + "'?";
-      suggestion = close.get();
+      message = ERR_UNKNOWN_OP + typed + ERR_DID_YOU_MEAN + close + "'?";
+      suggestion = close;
     } else if (best != null) {
       // Too far for a confident suggestion, but we still offer a fix in the tooltip
       message = ERR_UNKNOWN_OP + typed + ERR_OP_DOES_NOT_EXIST;
@@ -4078,84 +3673,6 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
 
     nodeTypes.put(ctx, Type.ERROR);
     return Type.ERROR;
-  }
-
-  // ==================== Operation Name Suggestion ====================
-
-  /**
-   * All operation names known to VitruvOCL, from the shared {@link OclOperations} catalog.
-   *
-   * <p>Used by {@link #suggestOperation} to propose the closest match when an unknown operation
-   * name is encountered.
-   */
-  private static final java.util.List<String> KNOWN_OPERATIONS = OclOperations.names();
-
-  /**
-   * Returns the single closest known operation name to {@code typed}, regardless of distance.
-   *
-   * <p>Used to populate the Quick Fix even when the name is too different for a confident "did you
-   * mean?" message. Returns {@code null} only when {@code KNOWN_OPERATIONS} is empty.
-   */
-  private static String bestOperation(String typed) {
-    String lower = typed.toLowerCase(java.util.Locale.ROOT);
-    String best = null;
-    int bestDist = Integer.MAX_VALUE;
-    for (String known : KNOWN_OPERATIONS) {
-      int dist = EditDistance.damerauLevenshtein(lower, known.toLowerCase(java.util.Locale.ROOT));
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = known;
-      }
-    }
-    return best;
-  }
-
-  /**
-   * Returns the closest known operation name to {@code typed} if it is within the edit-distance
-   * threshold, otherwise returns empty.
-   *
-   * <p>Threshold scales with name length:
-   *
-   * <ul>
-   *   <li>1–3 chars → max distance 1
-   *   <li>4–6 chars → max distance 2
-   *   <li>7+ chars → max distance 3
-   * </ul>
-   *
-   * <p>Comparison is case-insensitive so "Select" suggests "select".
-   */
-  private static java.util.Optional<String> suggestOperation(String typed) {
-    int threshold = EditDistance.editThreshold(typed.length());
-    String lower = typed.toLowerCase(java.util.Locale.ROOT);
-
-    String best = null;
-    int bestDist = threshold + 1;
-
-    for (String known : KNOWN_OPERATIONS) {
-      int dist = EditDistance.damerauLevenshtein(lower, known.toLowerCase(java.util.Locale.ROOT));
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = known;
-      }
-    }
-
-    return java.util.Optional.ofNullable(best);
-  }
-
-  /** Recursively checks whether any node in the subtree is an ANTLR {@link ErrorNode}. */
-  static boolean hasErrorNode(ParseTree tree) {
-    if (tree instanceof ErrorNode) {
-      return true;
-    }
-    if (tree instanceof org.antlr.v4.runtime.ParserRuleContext prc && prc.exception != null) {
-      return true;
-    }
-    for (int i = 0; i < tree.getChildCount(); i++) {
-      if (hasErrorNode(tree.getChild(i))) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
@@ -4186,19 +3703,18 @@ public class TypeCheckVisitor extends AbstractPhaseVisitor<Type> {
   }
 
   /**
-   * Sets the token stream for keyword-based parsing.
-   *
-   * <p>Required for {@link #visitIfExpCS} to determine expression partitioning.
+   * Enables the syntax-recovery diagnostics over the token stream (missing operator or operand,
+   * unparsed correspondence calls, doubled commas); without it, they are not reported.
    *
    * @param tokens The ANTLR token stream
    */
   public void setTokenStream(org.antlr.v4.runtime.TokenStream tokens) {
-    this.tokens = tokens;
     // Eagerly fill the token buffer so all tokens are accessible by index,
     // even tokens that ANTLR's error recovery consumed (or skipped) during parsing.
     if (tokens instanceof org.antlr.v4.runtime.BufferedTokenStream bts) {
       bts.fill();
     }
+    this.syntaxRecovery = new SyntaxRecoveryReporter(tokens, this::reportSpanError);
   }
 
   /** Exposes this visitor's state to the operation-family type checkers. */
