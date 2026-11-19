@@ -34,39 +34,50 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateDiagnosticsForConstraint = updateDiagnosticsForConstraint;
+exports.clearDiagnosticsOf = clearDiagnosticsOf;
 exports.updateDiagnosticsForConstraintBatch = updateDiagnosticsForConstraintBatch;
 /**
- * The compilation errors of run constraints, as diagnostics.
+ * The compilation errors of run constraints, as diagnostics on the document lines they belong to.
  */
 const vscode = __importStar(require("vscode"));
-const units_1 = require("./units");
-function compilationError(error) {
-    const line = Math.max(0, error.line - 1);
-    const diagnostic = new vscode.Diagnostic(new vscode.Range(line, 0, line, 1000), `Compilation Error: ${error.message}`, vscode.DiagnosticSeverity.Error);
+/** An error of the constraint `name`, which its `code` names so that a new run can replace it. */
+function compilationError(name, line, message) {
+    const diagnostic = new vscode.Diagnostic(new vscode.Range(line, 0, line, 1000), `Compilation Error: ${message}`, vscode.DiagnosticSeverity.Error);
     diagnostic.source = 'vitruvocl';
+    diagnostic.code = name;
     return diagnostic;
 }
 /**
- * Replaces the diagnostics of one constraint run with `eval`: those on its header line are
- * dropped, the result's compilation errors are added.
+ * Replaces the diagnostics of one invariant run with `eval`: its earlier errors are dropped, the
+ * result's compilation errors are added.
+ *
+ * @param layout the layout the invariant's text was taken from
  */
-function updateDiagnosticsForConstraint(collection, document, constraintName, result) {
+function updateDiagnosticsForConstraint(collection, document, layout, constraintName, result) {
     const diagnostics = [];
     if (!result.success) {
-        for (const error of result.errors) {
-            diagnostics.push(compilationError(error));
+        for (const error of result.errors ?? []) {
+            diagnostics.push(compilationError(constraintName, layout.documentLine(constraintName, error.line), error.message));
         }
     }
-    const existingDiagnostics = Array.from(collection.get(document.uri) || []);
-    const otherDiagnostics = existingDiagnostics.filter(d => (0, units_1.constraintNameAtLine)(document.getText(), d.range.start.line) !== constraintName);
+    const otherDiagnostics = Array.from(collection.get(document.uri) || [])
+        .filter(d => d.code !== constraintName);
     collection.set(document.uri, [...otherDiagnostics, ...diagnostics]);
 }
-/** Adds the compilation errors of one constraint run with `eval-batch`. */
-function updateDiagnosticsForConstraintBatch(collection, document, constraint) {
+/** Drops the diagnostics of a constraint, e.g. when it could not be evaluated. */
+function clearDiagnosticsOf(collection, document, constraintName) {
+    collection.set(document.uri, Array.from(collection.get(document.uri) || []).filter(d => d.code !== constraintName));
+}
+/**
+ * Adds the compilation errors of one constraint run with `eval-batch`.
+ *
+ * @param documentLine the document line of a line of the constraint's errors, starting at 1
+ */
+function updateDiagnosticsForConstraintBatch(collection, document, constraint, documentLine) {
     const diagnostics = Array.from(collection.get(document.uri) || []);
     if (!constraint.success && constraint.errors) {
         for (const error of constraint.errors) {
-            diagnostics.push(compilationError(error));
+            diagnostics.push(compilationError(constraint.name, documentLine(error.line), error.message));
         }
     }
     collection.set(document.uri, diagnostics);

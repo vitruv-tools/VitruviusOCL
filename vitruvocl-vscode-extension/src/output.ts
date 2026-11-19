@@ -15,6 +15,11 @@ function channel(): vscode.OutputChannel {
     return outputChannel;
 }
 
+/** Logs a message of the extension itself. */
+export function logLine(message: string): void {
+    channel().appendLine(message);
+}
+
 /** Logs the CLI's standard error, if the output channel exists already. */
 export function logStderr(stderr: string): void {
     if (stderr && outputChannel) {

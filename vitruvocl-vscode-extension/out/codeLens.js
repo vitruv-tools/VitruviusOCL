@@ -36,31 +36,33 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OCLCodeLensProvider = void 0;
 /**
  * The run buttons above the constraints: "Run All" above the first `context`, and one per
- * constraint header.
+ * named invariant.
  */
 const vscode = __importStar(require("vscode"));
-const units_1 = require("./units");
 class OCLCodeLensProvider {
-    constructor() {
+    constructor(units) {
+        this.units = units;
         this._onDidChangeCodeLenses = new vscode.EventEmitter();
         this.onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
     }
     refresh() {
         this._onDidChangeCodeLenses.fire();
     }
-    provideCodeLenses(document) {
+    async provideCodeLenses(document) {
+        const layout = await this.units.layoutOf(document);
+        if (!layout) {
+            return []; // the document changed meanwhile; VS Code asks again
+        }
         const codeLenses = [];
-        const text = document.getText();
-        const lines = text.split('\n');
-        const runAllLine = (0, units_1.firstContextLine)(text);
-        if (runAllLine >= 0) {
-            codeLenses.push(new vscode.CodeLens(new vscode.Range(runAllLine, 0, runAllLine, 0), {
+        if (layout.runAllLine >= 0) {
+            codeLenses.push(new vscode.CodeLens(new vscode.Range(layout.runAllLine, 0, layout.runAllLine, 0), {
                 title: '▶ Run All',
                 command: 'vitruvocl.runAllConstraints'
             }));
         }
-        for (const header of (0, units_1.findConstraintHeaders)(text)) {
-            codeLenses.push(new vscode.CodeLens(new vscode.Range(header.line, 0, header.line, lines[header.line].length), {
+        for (const header of layout.headers) {
+            const lineLength = header.line < document.lineCount ? document.lineAt(header.line).text.length : 0;
+            codeLenses.push(new vscode.CodeLens(new vscode.Range(header.line, 0, header.line, lineLength), {
                 title: '▶',
                 command: 'vitruvocl.runConstraint',
                 arguments: [header.name, document.uri]

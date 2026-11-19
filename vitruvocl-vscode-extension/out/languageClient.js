@@ -34,12 +34,15 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startLanguageClient = startLanguageClient;
+exports.unitSourceOf = unitSourceOf;
 /**
  * The client of the VitruvOCL language server (`language-server.jar`).
  */
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
+const constraintLayout_1 = require("./constraintLayout");
 const discovery_1 = require("./discovery");
+const output_1 = require("./output");
 /**
  * Starts the language server, if its jar is found.
  *
@@ -48,7 +51,7 @@ const discovery_1 = require("./discovery");
 function startLanguageClient(context) {
     const serverJar = (0, discovery_1.findLanguageServerJar)(context);
     if (!serverJar) {
-        console.warn('[OCL-LS] language-server.jar not found — LSP features disabled.');
+        (0, output_1.logLine)('[OCL-LS] language-server.jar not found — LSP features disabled.');
         return undefined;
     }
     const serverOptions = {
@@ -65,5 +68,12 @@ function startLanguageClient(context) {
     languageClient.start();
     context.subscriptions.push(languageClient);
     return languageClient;
+}
+/** The units request of a running language client. */
+function unitSourceOf(client) {
+    return {
+        ready: () => client.state === node_1.State.Running,
+        request: document => client.sendRequest(constraintLayout_1.CONSTRAINT_UNITS_METHOD, { uri: client.code2ProtocolConverter.asUri(document.uri) }),
+    };
 }
 //# sourceMappingURL=languageClient.js.map

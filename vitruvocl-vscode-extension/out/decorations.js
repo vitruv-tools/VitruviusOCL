@@ -43,6 +43,7 @@ exports.ConstraintDecorations = void 0;
  */
 const vscode = __importStar(require("vscode"));
 const decorationPlan_1 = require("./decorationPlan");
+const output_1 = require("./output");
 function svgIcon(svg) {
     return vscode.Uri.parse('data:image/svg+xml;utf8,' + encodeURIComponent(svg));
 }
@@ -86,8 +87,9 @@ function lineRanges(lines) {
 }
 /** Owns the four decoration types; an update only sets their ranges. */
 class ConstraintDecorations {
-    constructor(results) {
+    constructor(results, units) {
         this.results = results;
+        this.units = units;
         this.notRun = gutterType(RUN_ICON);
         this.passed = gutterType(PASS_ICON);
         this.failed = gutterType(FAIL_ICON);
@@ -95,10 +97,18 @@ class ConstraintDecorations {
     }
     /**
      * Sets the gutter icon of every constraint header, and shows the first violation at the end
-     * of every failed constraint's header line, all of them on hover.
+     * of every failed constraint's header line, all of them on hover. If the document changes
+     * before its layout is known, the marks are left as they are (VS Code moves them with the
+     * text) until the update for the change.
      */
-    update(editor) {
-        const plan = (0, decorationPlan_1.planDecorations)(editor.document.getText(), this.results);
+    async update(editor) {
+        const document = editor.document;
+        const layout = await this.units.layoutOf(document);
+        if (!layout) {
+            return;
+        }
+        const lines = document.getText().split(/\r?\n/);
+        const plan = (0, decorationPlan_1.planDecorations)(layout.headers, lines, this.results);
         editor.setDecorations(this.notRun, lineRanges(plan.notRun));
         editor.setDecorations(this.passed, lineRanges(plan.passed));
         editor.setDecorations(this.failed, lineRanges(plan.failed));
@@ -120,11 +130,16 @@ class ConstraintDecorations {
      *
      * @param document if given, only the editors showing it
      */
-    updateVisible(document) {
-        vscode.window.visibleTextEditors
-            .filter(editor => editor.document.languageId === 'vitruvocl')
-            .filter(editor => !document || editor.document === document)
-            .forEach(editor => this.update(editor));
+    async updateVisible(document) {
+        try {
+            await Promise.all(vscode.window.visibleTextEditors
+                .filter(editor => editor.document.languageId === 'vitruvocl')
+                .filter(editor => !document || editor.document === document)
+                .map(editor => this.update(editor)));
+        }
+        catch (error) {
+            (0, output_1.logLine)(`[VitruvOCL] could not update the constraint marks: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
     dispose() {
         [this.notRun, this.passed, this.failed, this.inline].forEach(type => type.dispose());

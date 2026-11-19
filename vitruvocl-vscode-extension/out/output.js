@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.logLine = logLine;
 exports.logStderr = logStderr;
 exports.showEvalResult = showEvalResult;
 exports.showSkipNotice = showSkipNotice;
@@ -49,6 +50,10 @@ function channel() {
         outputChannel = vscode.window.createOutputChannel('VitruvOCL');
     }
     return outputChannel;
+}
+/** Logs a message of the extension itself. */
+function logLine(message) {
+    channel().appendLine(message);
 }
 /** Logs the CLI's standard error, if the output channel exists already. */
 function logStderr(stderr) {

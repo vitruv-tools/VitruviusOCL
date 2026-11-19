@@ -33,10 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.cliFailure = cliFailure;
 exports.evalBatchArgs = evalBatchArgs;
 exports.evalArgs = evalArgs;
 exports.runJava = runJava;
 exports.writeTempConstraint = writeTempConstraint;
+exports.deleteTempConstraint = deleteTempConstraint;
 /**
  * Running the VitruvOCL CLI (`vitruvOCL.jar`) and the JSON it prints. Does not use `vscode`, so
  * that it can be tested with `node --test`.
@@ -47,6 +49,16 @@ const fs = __importStar(require("fs"));
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const execFile = util.promisify(child_process.execFile);
+/**
+ * Why the CLI failed as a whole, as its `{"success":false,"error":...}` says, rather than the
+ * constraint failing to compile; `undefined` if it did not.
+ */
+function cliFailure(result) {
+    if (result.success) {
+        return undefined;
+    }
+    return typeof result.error === 'string' ? result.error : undefined;
+}
 /** The `java` arguments of `eval-batch` for a whole constraint file. */
 function evalBatchArgs(compilerPath, constraintFile, ecoreFiles, instanceFiles) {
     return [
@@ -78,8 +90,13 @@ async function runJava(args) {
 }
 /** Writes the constraint to a new temporary `.ocl` file and returns its path. */
 function writeTempConstraint(constraint) {
-    const tempFile = path.join(os.tmpdir(), `vitruvocl-${Date.now()}.ocl`);
+    // a directory of its own, so that runs started at the same time do not share the file
+    const tempFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vitruvocl-')), 'constraint.ocl');
     fs.writeFileSync(tempFile, constraint, 'utf-8');
     return tempFile;
+}
+/** Deletes a file written by `writeTempConstraint`, with its directory. */
+function deleteTempConstraint(tempFile) {
+    fs.rmSync(path.dirname(tempFile), { recursive: true, force: true });
 }
 //# sourceMappingURL=cliRunner.js.map

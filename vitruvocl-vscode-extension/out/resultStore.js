@@ -36,6 +36,10 @@ class ResultStore {
     violationsOf(name) {
         return this.results.get(name)?.violations ?? [];
     }
+    /** Forgets the result of the constraint, so that it shows as not run. */
+    forget(name) {
+        this.results.delete(name);
+    }
     clear() {
         this.results.clear();
     }

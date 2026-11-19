@@ -32,9 +32,11 @@ import org.eclipse.lsp4j.RegistrationParams;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SetTraceParams;
 import org.eclipse.lsp4j.SignatureHelpOptions;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageClientAware;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -145,6 +147,16 @@ public class OCLLanguageServer implements LanguageServer, LanguageClientAware {
   @Override
   public void exit() {
     System.exit(0);
+  }
+
+  /**
+   * The custom request {@value ConstraintUnits#METHOD}: the constraint units of an open document,
+   * which the VS Code extension runs and maps the CLI's error lines with.
+   */
+  @JsonRequest(ConstraintUnits.METHOD)
+  public CompletableFuture<List<ConstraintUnits.Unit>> constraintUnits(
+      TextDocumentIdentifier document) {
+    return textDocumentService.constraintUnits(document);
   }
 
   @Override

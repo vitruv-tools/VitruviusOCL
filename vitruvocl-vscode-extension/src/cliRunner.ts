@@ -22,8 +22,11 @@ export interface EvalError {
 export interface EvalResult {
     success: boolean;
     satisfied: boolean;
-    errors: EvalError[];
-    warnings: string[];
+    /** The compilation errors; absent if the CLI itself failed (see `error`). */
+    errors?: EvalError[];
+    warnings?: string[];
+    /** Why the CLI failed, e.g. an exception or invalid arguments; only then present. */
+    error?: string;
 }
 
 /** One constraint of an `eval-batch` result. */
@@ -39,6 +42,19 @@ export interface ConstraintBatchResult {
 export interface BatchEvalResult {
     success: boolean;
     constraints: ConstraintBatchResult[];
+    /** Why the CLI failed; only present if it did. */
+    error?: string;
+}
+
+/**
+ * Why the CLI failed as a whole, as its `{"success":false,"error":...}` says, rather than the
+ * constraint failing to compile; `undefined` if it did not.
+ */
+export function cliFailure(result: { success: boolean; error?: unknown }): string | undefined {
+    if (result.success) {
+        return undefined;
+    }
+    return typeof result.error === 'string' ? result.error : undefined;
 }
 
 /** What the Java process printed. */
@@ -81,7 +97,13 @@ export async function runJava(args: string[]): Promise<ProcessOutput> {
 
 /** Writes the constraint to a new temporary `.ocl` file and returns its path. */
 export function writeTempConstraint(constraint: string): string {
-    const tempFile = path.join(os.tmpdir(), `vitruvocl-${Date.now()}.ocl`);
+    // a directory of its own, so that runs started at the same time do not share the file
+    const tempFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vitruvocl-')), 'constraint.ocl');
     fs.writeFileSync(tempFile, constraint, 'utf-8');
     return tempFile;
+}
+
+/** Deletes a file written by `writeTempConstraint`, with its directory. */
+export function deleteTempConstraint(tempFile: string): void {
+    fs.rmSync(path.dirname(tempFile), { recursive: true, force: true });
 }

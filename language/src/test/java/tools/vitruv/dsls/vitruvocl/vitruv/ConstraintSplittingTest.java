@@ -119,6 +119,7 @@ class ConstraintSplittingTest {
       checkerErrors = invalid.getDiagnostics();
     }
     OclSourceSplitter.SplitResult split = OclSourceSplitter.split(content);
+    assertEquals(split.units(), OclSourceSplitter.unitsOf(content), "unitsOf finds the same units");
 
     List<String> actual = new ArrayList<>();
     files.forEach(unit -> actual.add("files " + escape(unit)));

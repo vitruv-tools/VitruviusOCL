@@ -1,27 +1,30 @@
 /**
  * The run buttons above the constraints: "Run All" above the first `context`, and one per
- * constraint header.
+ * named invariant.
  */
 import * as vscode from 'vscode';
-import { findConstraintHeaders, firstContextLine } from './units';
+import { ConstraintUnitIndex } from './unitIndex';
 
 export class OCLCodeLensProvider implements vscode.CodeLensProvider {
     private _onDidChangeCodeLenses = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
 
+    constructor(private readonly units: ConstraintUnitIndex) {}
+
     refresh() {
         this._onDidChangeCodeLenses.fire();
     }
 
-    provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+    async provideCodeLenses(document: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+        const layout = await this.units.layoutOf(document);
+        if (!layout) {
+            return []; // the document changed meanwhile; VS Code asks again
+        }
         const codeLenses: vscode.CodeLens[] = [];
-        const text = document.getText();
-        const lines = text.split('\n');
 
-        const runAllLine = firstContextLine(text);
-        if (runAllLine >= 0) {
+        if (layout.runAllLine >= 0) {
             codeLenses.push(new vscode.CodeLens(
-                new vscode.Range(runAllLine, 0, runAllLine, 0),
+                new vscode.Range(layout.runAllLine, 0, layout.runAllLine, 0),
                 {
                     title: '▶ Run All',
                     command: 'vitruvocl.runAllConstraints'
@@ -29,9 +32,10 @@ export class OCLCodeLensProvider implements vscode.CodeLensProvider {
             ));
         }
 
-        for (const header of findConstraintHeaders(text)) {
+        for (const header of layout.headers) {
+            const lineLength = header.line < document.lineCount ? document.lineAt(header.line).text.length : 0;
             codeLenses.push(new vscode.CodeLens(
-                new vscode.Range(header.line, 0, header.line, lines[header.line].length),
+                new vscode.Range(header.line, 0, header.line, lineLength),
                 {
                     title: '▶',
                     command: 'vitruvocl.runConstraint',

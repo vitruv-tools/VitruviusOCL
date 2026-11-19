@@ -85,6 +85,17 @@ public final class OclSourceSplitter {
     return split(content, true);
   }
 
+  /**
+   * The constraint blocks of a document, without looking for syntax errors: only the tokens are
+   * needed, so this is cheaper than {@link #split(String)} and suits a call per keystroke.
+   *
+   * @param content the content of an {@code .ocl} file
+   * @return its constraint blocks in document order, including contexts without blocks
+   */
+  public static List<ConstraintUnit> unitsOf(String content) {
+    return split(content, false).units();
+  }
+
   private static SplitResult split(String content, boolean collectSyntaxErrors) {
     CharStream input = CharStreams.fromString(withoutImports(content));
     List<SourceDiagnostic> syntaxErrors = new ArrayList<>();

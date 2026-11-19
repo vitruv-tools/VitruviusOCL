@@ -42,3 +42,11 @@ test('a passed constraint has no violations', () => {
     assert.deepEqual(store.violationsOf('a'), []);
     assert.deepEqual(store.violationsOf('unknown'), []);
 });
+
+test('forget shows the constraint as not run again', () => {
+    const store = new ResultStore();
+    store.record('a', false, ['v']);
+    store.forget('a');
+    assert.equal(store.stateOf('a'), 'notRun');
+    assert.deepEqual(store.violationsOf('a'), []);
+});

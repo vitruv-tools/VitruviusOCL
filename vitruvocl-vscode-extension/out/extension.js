@@ -39,10 +39,14 @@ const vscode = __importStar(require("vscode"));
 const codeLens_1 = require("./codeLens");
 const decorations_1 = require("./decorations");
 const languageClient_1 = require("./languageClient");
+const output_1 = require("./output");
 const resultStore_1 = require("./resultStore");
 const constraintRunner_1 = require("./constraintRunner");
 const suggest_1 = require("./suggest");
+const unitIndex_1 = require("./unitIndex");
 let languageClient;
+/** How long the marks wait after a keystroke, so that typing asks the language server less often. */
+const MARK_UPDATE_DELAY_MS = 200;
 async function applyThemeOnFirstInstall(context) {
     const THEME_KEY = 'vitruvocl.themeApplied';
     const alreadyApplied = context.globalState.get(THEME_KEY, false);
@@ -65,11 +69,14 @@ function activate(context) {
     applyThemeOnFirstInstall(context);
     const diagnosticCollection = vscode.languages.createDiagnosticCollection('vitruvocl');
     context.subscriptions.push(diagnosticCollection);
+    // Started first: the constraint units come from the language server if it runs
+    languageClient = (0, languageClient_1.startLanguageClient)(context);
+    const units = new unitIndex_1.ConstraintUnitIndex(languageClient && (0, languageClient_1.unitSourceOf)(languageClient), output_1.logLine);
     const results = new resultStore_1.ResultStore();
-    const codeLensProvider = new codeLens_1.OCLCodeLensProvider();
-    const constraintDecorations = new decorations_1.ConstraintDecorations(results);
+    const codeLensProvider = new codeLens_1.OCLCodeLensProvider(units);
+    const constraintDecorations = new decorations_1.ConstraintDecorations(results, units);
     context.subscriptions.push(constraintDecorations);
-    const runner = new constraintRunner_1.ConstraintRunner(results, constraintDecorations, codeLensProvider, diagnosticCollection);
+    const runner = new constraintRunner_1.ConstraintRunner(results, constraintDecorations, codeLensProvider, diagnosticCollection, units);
     context.subscriptions.push(vscode.languages.registerCodeLensProvider({ language: 'vitruvocl' }, codeLensProvider));
     context.subscriptions.push(vscode.commands.registerCommand('vitruvocl.runConstraint', async (constraintName, documentUri) => {
         await runner.runConstraint(constraintName, documentUri);
@@ -77,19 +84,33 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('vitruvocl.runAllConstraints', async () => {
         await runner.runAllConstraints();
     }));
-    context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors(() => constraintDecorations.updateVisible()));
+    context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors(() => void constraintDecorations.updateVisible()));
+    const pendingUpdates = new Map();
+    context.subscriptions.push(new vscode.Disposable(() => pendingUpdates.forEach(clearTimeout)));
     context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
         if (event.document.languageId !== 'vitruvocl') {
             return;
         }
-        constraintDecorations.updateVisible(event.document);
+        const key = event.document.uri.toString();
+        clearTimeout(pendingUpdates.get(key));
+        pendingUpdates.set(key, setTimeout(() => {
+            pendingUpdates.delete(key);
+            void constraintDecorations.updateVisible(event.document);
+        }, MARK_UPDATE_DELAY_MS));
         const editor = vscode.window.activeTextEditor;
         if (editor && editor.document === event.document) {
             (0, suggest_1.triggerSuggestAfterInvNewline)(editor, event);
         }
     }));
-    constraintDecorations.updateVisible();
-    languageClient = (0, languageClient_1.startLanguageClient)(context);
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => units.forget(document)));
+    // Found by the own scan until the language server runs, then from its units
+    if (languageClient) {
+        context.subscriptions.push(languageClient.onDidChangeState(() => {
+            codeLensProvider.refresh();
+            void constraintDecorations.updateVisible();
+        }));
+    }
+    void constraintDecorations.updateVisible();
 }
 function deactivate() {
     return languageClient?.stop();

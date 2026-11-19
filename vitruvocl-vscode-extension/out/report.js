@@ -15,7 +15,7 @@ function evalReport(name, result) {
     const { skipNotices, others } = splitWarnings(result.warnings);
     if (!result.success) {
         lines.push('❌ COMPILATION ERRORS:');
-        result.errors.forEach(e => lines.push(`  Line ${e.line}: ${e.message}`));
+        (result.errors ?? []).forEach(e => lines.push(`  Line ${e.line}: ${e.message}`));
     }
     else if (result.satisfied) {
         lines.push('✅ CONSTRAINT SATISFIED\nAll instances pass.');

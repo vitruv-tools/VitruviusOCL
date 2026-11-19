@@ -3,7 +3,7 @@
  * Pure functions without `vscode`, so that they can be tested with `node --test`.
  */
 import { ResultStore } from './resultStore';
-import { findConstraintHeaders } from './units';
+import { ConstraintHeader } from './constraintLayout';
 import { genericViolation, inlineSummary, parseViolationBlock, styleOf } from './violations';
 
 /** One entry of a failed constraint's hover: a violation, or a generic note without any. */
@@ -42,11 +42,15 @@ function hoverEntries(constraintName: string, violations: readonly string[]): Ho
     });
 }
 
-/** The marks of every constraint header in the text. */
-export function planDecorations(text: string, results: ResultStore): DecorationPlan {
-    const lines = text.split(/\r?\n/);
+/**
+ * The marks of the constraint headers of a document.
+ *
+ * @param headers the header lines, from the document's constraint layout
+ * @param lines the lines of the document, without line breaks
+ */
+export function planDecorations(headers: ConstraintHeader[], lines: string[], results: ResultStore): DecorationPlan {
     const plan: DecorationPlan = { notRun: [], passed: [], failed: [], inline: [] };
-    for (const header of findConstraintHeaders(text)) {
+    for (const header of headers) {
         const state = results.stateOf(header.name);
         plan[state].push(header.line); // the states name the gutter lists of the plan
         if (state !== 'failed') {
@@ -56,7 +60,7 @@ export function planDecorations(text: string, results: ResultStore): DecorationP
         const summary = inlineSummary(header.name, violations);
         plan.inline.push({
             line: header.line,
-            column: lines[header.line].length,
+            column: lines[header.line]?.length ?? 0,
             text: summary.text,
             color: summary.color,
             hover: hoverEntries(header.name, violations),

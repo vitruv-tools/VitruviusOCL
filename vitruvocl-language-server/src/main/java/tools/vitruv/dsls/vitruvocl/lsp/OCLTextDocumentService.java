@@ -50,6 +50,7 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureHelpParams;
 import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -399,6 +400,17 @@ public class OCLTextDocumentService implements TextDocumentService {
     action.setIsPreferred(true);
 
     return Either.forRight(action);
+  }
+
+  /**
+   * The constraint units of an open document, for the request {@value ConstraintUnits#METHOD}.
+   *
+   * @return the units in document order; empty if the document is not open
+   */
+  public CompletableFuture<List<ConstraintUnits.Unit>> constraintUnits(
+      TextDocumentIdentifier document) {
+    String text = documents.get(document.getUri());
+    return CompletableFuture.completedFuture(text == null ? List.of() : ConstraintUnits.of(text));
   }
 
   /**

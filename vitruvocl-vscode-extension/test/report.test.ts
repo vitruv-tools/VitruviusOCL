@@ -34,9 +34,12 @@ test('evalReport of a constraint that does not compile lists its errors', () => 
     ]);
 });
 
-test('evalReport fails on a failed result without errors', () => {
-    const result = { success: false, satisfied: false, warnings: [] } as any;
-    assert.throws(() => evalReport('a', result), TypeError);
+test('evalReport of a failed result without errors or warnings lists none', () => {
+    assert.deepEqual(evalReport('a', { success: false, satisfied: false }), [
+        '=== a ===\n',
+        '❌ COMPILATION ERRORS:',
+        '',
+    ]);
 });
 
 test('summaryReport when all passed', () => {

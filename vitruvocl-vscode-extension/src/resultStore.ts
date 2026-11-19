@@ -50,6 +50,11 @@ export class ResultStore {
         return this.results.get(name)?.violations ?? [];
     }
 
+    /** Forgets the result of the constraint, so that it shows as not run. */
+    forget(name: string): void {
+        this.results.delete(name);
+    }
+
     clear(): void {
         this.results.clear();
     }
