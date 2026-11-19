@@ -68,6 +68,15 @@ class VitruvOclEditableCheckerTest {
   }
 
   @Test
+  @DisplayName("a constraint the type checker only warns about is accepted")
+  void createWithWarning() {
+    ConstraintDescriptor created =
+        checker.create("context shop::Item inv mixed: Set{1}.includes(\"x\")");
+
+    assertEquals("mixed", created.name());
+  }
+
+  @Test
   @DisplayName("an existing constraint cannot be created again")
   void duplicate() {
     checker.create("context shop::Item inv positive: self.price > 0");

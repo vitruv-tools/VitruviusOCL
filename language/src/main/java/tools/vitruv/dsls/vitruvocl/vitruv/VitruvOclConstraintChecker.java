@@ -33,6 +33,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.eclipse.emf.ecore.EPackage;
 import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalysis;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalyzer;
 import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
@@ -331,21 +333,28 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
   }
 
   /**
-   * Compiles the constraint against the registered metamodels and an empty model, reporting
-   * unknown types, features and other compile errors with their position in the given source.
+   * Type-checks the constraint against the registered metamodels, reporting unknown types, features
+   * and other compile errors with their position in the given source; nothing is evaluated.
    */
   private static void typeCheck(String source) {
-    tools.vitruv.dsls.vitruvocl.result.ConstraintResult result =
-        VitruvOclEngine.forModel(new VsumWrapper(EmptyCheckContext.INSTANCE))
-            .evaluate(OclSourceSplitter.withoutImports(source));
-    if (!result.getCompilerErrors().isEmpty()) {
-      List<ConstraintDiagnostic> diagnostics = new ArrayList<>();
-      for (CompileError error : result.getCompilerErrors()) {
-        diagnostics.add(
-            new ConstraintDiagnostic(error.getLine(), error.getColumn(), error.getMessage()));
-      }
-      throw new InvalidConstraintException(diagnostics);
+    OclAnalysis analysis =
+        OclAnalyzer.analyze(
+            OclSourceSplitter.withoutImports(source),
+            new VsumWrapper(EmptyCheckContext.INSTANCE),
+            OclAnalyzer.Mode.STRICT);
+    if (analysis.compiled()) {
+      return; // warnings alone do not reject a constraint
     }
+    List<ConstraintDiagnostic> diagnostics = new ArrayList<>();
+    for (CompileError error : analysis.allErrors()) {
+      diagnostics.add(
+          new ConstraintDiagnostic(error.getLine(), error.getColumn(), error.getMessage()));
+    }
+    if (diagnostics.isEmpty()) {
+      // the source was split from a syntactically valid document, so this is not expected
+      diagnostics.add(new ConstraintDiagnostic(1, 0, "Syntax error in constraint"));
+    }
+    throw new InvalidConstraintException(diagnostics);
   }
 
   /**

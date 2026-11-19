@@ -96,10 +96,10 @@ public final class ConstraintEvaluations {
 
   /**
    * Renders {@code outcome} into the user-facing result: failures become a non-successful result
-   * carrying the errors (a parser failure, which reports no errors, becomes a generic syntax
-   * error); successes carry one {@code PRE_POST_SKIPPED} warning per skipped block and one {@code
-   * CONSTRAINT_VIOLATION} warning per violation record, in record order, headed by the name of the
-   * constraint's first block (or "unnamed").
+   * carrying the errors, syntax errors with their positions (a failure without any error becomes a
+   * generic syntax error); successes carry one {@code PRE_POST_SKIPPED} warning per skipped block
+   * and one {@code CONSTRAINT_VIOLATION} warning per violation record, in record order, headed by
+   * the name of the constraint's first block (or "unnamed").
    *
    * <p>Instance labels and source files are computed from the instances' <em>current</em> state,
    * i.e. at render time.

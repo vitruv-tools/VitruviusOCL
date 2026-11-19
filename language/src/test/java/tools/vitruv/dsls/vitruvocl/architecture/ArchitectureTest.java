@@ -62,6 +62,7 @@ class ArchitectureTest {
           new Layer("Types", "types"),
           new Layer("SymbolTable", "symboltable"),
           new Layer("TypeChecker", "typechecker", "operations"),
+          new Layer("Analysis", "analysis"),
           new Layer("Evaluator", "evaluator.."),
           new Layer("Result", "result"),
           new Layer("Compiler", "compiler"),

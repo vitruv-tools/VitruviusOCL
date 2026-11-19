@@ -130,25 +130,37 @@ context spaceMission::Spacecraft inv massCheck:
 ### Supported Operations
 
 **Collection:**
-- `select(x | cond)`, `reject(x | cond)`, `collect(x | expr)`
-- `forAll(x | cond)`, `exists(x | cond)`
-- `size()`, `isEmpty()`, `notEmpty()`
-- `includes(v)`, `excludes(v)`, `including(v)`, `excluding(v)`
-- `union(c)`, `intersection(c)`, `append(v)`, `flatten()`
-- `first()`, `last()`, `reverse()`, `at(i)` (1-based)
-- `sum()`, `avg()`, `min()`, `max()`
-- `allInstances()` — all EMF instances of a type
+- query: `includes(v)`, `excludes(v)`, `includesAll(c)`, `excludesAll(c)`, `count(v)`,
+  `size()`, `isEmpty()`, `notEmpty()`, `first()`, `last()`, `at(i)` (1-based)
+- modification: `including(v)`, `excluding(v)`, `union(c)`, `intersection(c)`,
+  `symmetricDifference(c)`, `append(v)`, `prepend(v)`, `insertAt(i, v)`,
+  `subSequence(start, end)`, `reverse()`, `flatten()`, `lift()`
+- conversion: `asSet()`, `asBag()`, `asSequence()`, `asOrderedSet()`
+- aggregation: `sum()`, `avg()`, `min()`, `max()`
 
-**Arithmetic:** `+`, `-`, `*`, `/`, `%`, unary `-`
+**Iterators:** `select(x | cond)`, `reject(x | cond)`, `collect(x | expr)`,
+`collectNested(x | expr)`, `forAll(x | cond)`, `exists(x | cond)`, `one(x | cond)`,
+`any(x | cond)`, `isUnique(x | expr)`, `sortedBy(x | expr)`,
+`iterate(x; acc : Type = init | expr)`
 
-**Math:** `abs()`, `floor()`, `ceil()`, `round()`
+**Classifier:** `allInstances()` — all EMF instances of a type
+
+**Arithmetic:** `+`, `-`, `*`, `/`, unary `-` (integer division and remainder: `div(n)`, `mod(n)`)
+
+**Numeric:** `abs()`, `floor()`, `ceil()`, `ceiling()`, `round()`, `div(n)`, `mod(n)`
 
 **Comparison:** `<`, `<=`, `>`, `>=`, `==`, `!=`
 
 **Boolean:** `and`, `or`, `xor`, `not`, `implies`
 
-**String:** `concat(s)`, `size()`, `length()`, `toUpper()`, `toLower()`,
-`substring(start, end)`, `indexOf(s)`, `equalsIgnoreCase(s)`
+**String:** `concat(s)`, `length()`, `toUpper()`, `toLower()`,
+`substring(start, end)`, `indexOf(s)`, `equalsIgnoreCase(s)`, `toInteger()`, `toReal()`,
+`characters()`, `matches(pattern)`, `substituteAll(pattern, replacement)`,
+`substituteFirst(pattern, replacement)`, `tokenize(delimiters)`
+
+**Transactions** (in `post` blocks): `self.attr@pre` reads the value before the transaction;
+`OCLisNew`, `OCLisModified` and `OCLisDeleted` test what the transaction did to an object
+(`OCLisNew(attr => value, ...)` also checks its values)
 
 **Control Flow:**
 ```ocl
@@ -241,6 +253,33 @@ This skips the long-running tests tagged `slow` (e.g. the incremental oracle). T
 ```
 
 Coverage report: `language/target/site/jacoco/index.html`
+
+---
+
+## Adding an Operation
+
+A new built-in operation touches these places; `OperationCoverageTest`, `ReadmeOperationsTest` and
+`OclOperationDocsCoverageTest` fail until the wiring is complete:
+
+1. **Grammar** (`language/src/main/antlr4/.../VitruvOCL.g4`): a labeled alternative in the rule of
+   its family, e.g. `| 'trim' '(' ')' # trimOp` in `stringOpCS`, and the keyword in the fallback
+   alternative `opMissingParens` of `operationCall` (and in `noArgOpWithArgs` if it takes no
+   arguments), so that a misuse gets a helpful message. ANTLR generates a default `visitTrimOp`
+   that only visits the children. The name becomes a keyword: a metamodel feature called `trim`
+   can no longer be navigated by that name.
+2. **Type rule:** a one-line `visitTrimOp` in `TypeCheckVisitor` delegating to the family's typing
+   class (`StringOperationTyping`, `CollectionOperationTyping`, `NumericOperationTyping`,
+   `IteratorOperationTyping`, `MetamodelOperationTyping`, ...), which holds the rule.
+3. **Runtime semantics:** a one-line `visitTrimOp` in `EvaluationVisitor` delegating to the
+   family's evaluation class (`StringOperationEvaluation`, ...), which holds the implementation.
+4. **Catalog:** `add(STRING, "trim")` in `operations/OclOperations.java`; the catalog drives the
+   "did you mean" suggestions.
+5. **Documentation:** an entry in `OclOperationDocs` of the language server (hover, completion,
+   signature help) and the operation in [Supported Operations](#supported-operations) above.
+
+Without steps 2 and 3 the operation would still compile, but silently fall back to the generated
+default, which is why `OperationCoverageTest` checks that every operation of the grammar is
+declared in both visitors.
 
 ---
 

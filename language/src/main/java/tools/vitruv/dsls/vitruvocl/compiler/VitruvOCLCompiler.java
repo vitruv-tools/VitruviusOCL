@@ -16,22 +16,15 @@ package tools.vitruv.dsls.vitruvocl.compiler;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalysis;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalyzer;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.common.OclLexers;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
-import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * 3-pass compiler for VitruvOCL constraints.
@@ -120,20 +113,18 @@ public class VitruvOCLCompiler {
    * @throws IOException If file cannot be read
    */
   public ValidationResult compile() throws IOException {
-    runPipeline(CharStreams.fromPath(oclFile));
+    runPipeline(CharStreams.fromPath(oclFile).toString());
     return new ValidationResult(errors.getErrors(), java.util.List.of());
   }
 
   /**
-   * Compiles constraint from string source with debug output.
-   *
-   * <p>Prints error messages to stderr after each pass for debugging.
+   * Compiles and evaluates a constraint given as a string.
    *
    * @param oclSource OCL constraint expression
    * @return Evaluation result, or null if any pass fails
    */
   public Value compile(String oclSource) {
-    Value result = runPipeline(CharStreams.fromString(oclSource));
+    Value result = runPipeline(oclSource);
 
     if (errors.hasErrors()) {
       return null;
@@ -143,58 +134,35 @@ public class VitruvOCLCompiler {
   }
 
   /**
-   * Runs the full 3-pass pipeline on the given input and returns the evaluation result.
+   * Runs the full 3-pass pipeline on the given input and returns the evaluation result: passes 1
+   * and 2 through {@link OclAnalyzer}, whose syntax errors are reported like the passes' errors,
+   * pass 3 here.
    *
    * <p>Accumulates errors in {@link #errors}; returns {@code null} if parsing fails or any pass
    * before evaluation reports errors. Sets {@link #lastEvaluator} when evaluation runs.
    *
-   * @param input character stream of the constraint source
+   * @param source the constraint source
    * @return the evaluation {@link Value}, or {@code null} if a pass before evaluation failed
    */
-  private Value runPipeline(CharStream input) {
-    VitruvOCLLexer lexer = OclLexers.create(input);
-    CommonTokenStream tokens = new CommonTokenStream(lexer);
-    VitruvOCLParser parser = new VitruvOCLParser(tokens);
-    VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
-
-    if (parser.getNumberOfSyntaxErrors() > 0) {
-      return null;
-    }
-
-    // Initialize 3-pass architecture
-    SymbolTableImpl symbolTable = new SymbolTableImpl(wrapper);
-    ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
-
-    // PASS 1: Symbol Table Construction
-    SymbolTableBuilder symbolTableBuilder =
-        new SymbolTableBuilder(symbolTable, wrapper, errors, scopeAnnotator);
-    symbolTableBuilder.visit(tree);
-
-    if (errors.hasErrors()) {
-      return null;
-    }
-
-    // PASS 2: Type Checking
-    TypeCheckVisitor typeChecker =
-        new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
-    typeChecker.setTokenStream(tokens);
-    typeChecker.visit(tree);
-
-    if (errors.hasErrors()) {
+  private Value runPipeline(String source) {
+    // PASSES 1 and 2: symbol table construction and type checking
+    OclAnalysis analysis = OclAnalyzer.analyze(source, wrapper, OclAnalyzer.Mode.STRICT);
+    analysis.allErrors().forEach(errors::add);
+    if (!analysis.compiled()) {
       return null;
     }
 
     // PASS 3: Evaluation
     EvaluationVisitor evaluator =
         new EvaluationVisitor(
-            symbolTable,
+            analysis.symbolTable(),
             wrapper,
             errors,
-            typeChecker.getNodeTypes(),
+            analysis.nodeTypes(),
             transaction,
             transactionSupported);
     lastEvaluator = evaluator;
-    return evaluator.visit(tree);
+    return evaluator.visit(analysis.tree());
   }
 
   /**

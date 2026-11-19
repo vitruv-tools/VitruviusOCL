@@ -19,23 +19,21 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalysis;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalyzer;
+import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.common.OclLexers;
 import tools.vitruv.dsls.vitruvocl.evaluator.AllInstancesTypeScanner;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
@@ -45,8 +43,8 @@ import tools.vitruv.dsls.vitruvocl.types.Type;
  * values of one evaluation; the parse tree and the node types are read-only and may be shared by
  * concurrent evaluations.
  *
- * <p>A constraint that does not compile is evaluated with {@link
- * ConstraintEvaluations#evaluateFresh}, which reports its errors exactly like a fresh compile.
+ * <p>A constraint that does not compile keeps the errors of its analysis; every evaluation reports
+ * them, exactly like a fresh compile, without compiling again.
  */
 public final class PreparedConstraint {
 
@@ -56,11 +54,21 @@ public final class PreparedConstraint {
   private final VitruvOCLParser.ContextDeclCSContext tree;
   private final ParseTreeProperty<Type> nodeTypes;
 
+  /**
+   * The syntax errors, or the errors and warnings of passes 1 and 2, if the constraint did not
+   * compile.
+   */
+  private final List<CompileError> compileErrors;
+
   private PreparedConstraint(
-      String text, VitruvOCLParser.ContextDeclCSContext tree, ParseTreeProperty<Type> nodeTypes) {
+      String text,
+      VitruvOCLParser.ContextDeclCSContext tree,
+      ParseTreeProperty<Type> nodeTypes,
+      List<CompileError> compileErrors) {
     this.text = text;
     this.tree = tree;
     this.nodeTypes = nodeTypes;
+    this.compileErrors = compileErrors;
   }
 
   /**
@@ -69,29 +77,11 @@ public final class PreparedConstraint {
    */
   public static PreparedConstraint prepare(String text, ModelAccess wrapper) {
     PREPARATIONS.incrementAndGet();
-    VitruvOCLLexer lexer = OclLexers.create(CharStreams.fromString(text));
-    lexer.removeErrorListeners(); // a failed preparation is re-reported by evaluateFresh
-    CommonTokenStream tokens = new CommonTokenStream(lexer);
-    VitruvOCLParser parser = new VitruvOCLParser(tokens);
-    parser.removeErrorListeners();
-    VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
-    if (parser.getNumberOfSyntaxErrors() > 0) {
-      return new PreparedConstraint(text, null, null);
+    OclAnalysis analysis = OclAnalyzer.analyze(text, wrapper, OclAnalyzer.Mode.STRICT);
+    if (!analysis.compiled()) {
+      return new PreparedConstraint(text, null, null, analysis.allErrors());
     }
-    ErrorCollector errors = new ErrorCollector();
-    SymbolTableImpl symbolTable = new SymbolTableImpl(wrapper);
-    ScopeAnnotator scopes = new ScopeAnnotator();
-    new SymbolTableBuilder(symbolTable, wrapper, errors, scopes).visit(tree);
-    if (errors.hasErrors()) {
-      return new PreparedConstraint(text, null, null);
-    }
-    TypeCheckVisitor typeChecker = new TypeCheckVisitor(symbolTable, wrapper, errors, scopes);
-    typeChecker.setTokenStream(tokens);
-    typeChecker.visit(tree);
-    if (errors.hasErrors()) {
-      return new PreparedConstraint(text, null, null);
-    }
-    return new PreparedConstraint(text, tree, typeChecker.getNodeTypes());
+    return new PreparedConstraint(text, analysis.tree(), analysis.nodeTypes(), List.of());
   }
 
   /** How many constraints were prepared so far in this JVM (for tests and monitoring). */
@@ -163,7 +153,7 @@ public final class PreparedConstraint {
       boolean transactionSupported,
       Function<VitruvOCLParser.ClassifierContextCSContext, List<EObject>> instanceOverride) {
     if (!isCompiled()) {
-      return ConstraintEvaluations.evaluateFresh(text, view, transaction, transactionSupported);
+      return EvaluationOutcome.failure(compileErrors);
     }
     ErrorCollector errors = new ErrorCollector();
     SymbolTableImpl symbolTable = new SymbolTableImpl(view);
