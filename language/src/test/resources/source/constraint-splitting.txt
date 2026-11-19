@@ -1,9 +1,11 @@
 # How .ocl documents are split into constraints. Each case: "### name", the document, then "=> "
 # lines: "files <unit>" per unit of ConstraintFiles.read, then "checker name=.. context=..
-# severity=.. | <source>" per invariant of OclInvariantParser.parse, or "checker error
-# <line>:<column> <message>". Texts have \n and \r escaped. A name ending in [crlf] uses CRLF line
-# breaks, [noeol] omits the final line break, [fix] marks an accepted difference between
-# ConstraintFiles and the splitter. Change expectations only for intended behaviour changes.
+# severity=.. | <source>" per invariant of OclInvariantParser.parse or "checker error
+# <line>:<column> <message>", then the units and syntax errors of OclSourceSplitter. Texts have \n
+# and \r escaped. Tags: [crlf] and [cr] use CRLF and CR line breaks, [noeol] omits the final
+# line break, [fix]
+# marks where the former regex-based ConstraintFiles.read (or, for the byte order mark, the
+# checker) split differently. Change expectations only for intended behaviour changes.
 
 ### empty
 
@@ -113,7 +115,7 @@ context shop::Item
 context shop::Item
   inv a: self.price > 0 -- must be positive
   inv b: true
-=> files context shop::Item\ninv a: self.price > 0 -- must be positive
+=> files context shop::Item\ninv a: self.price > 0
 => files context shop::Item\ninv b: true
 => checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.price > 0
 => checker name=b context=shop::Item severity=WARNING | context shop::Item\n  inv b: true
@@ -125,7 +127,7 @@ context shop::Item
 ### trailingCommentAtEnd[fix][noeol]
 context shop::Item
   inv a: self.price > 0 -- must be positive
-=> files context shop::Item\ninv a: self.price > 0 -- must be positive
+=> files context shop::Item\ninv a: self.price > 0
 => checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.price > 0
 => splitter INV name=a context=shop::Item severity=null start=2:2 lines=[1, 2] | context shop::Item\ninv a: self.price > 0
 => splitter source | context shop::Item\n  inv a: self.price > 0
@@ -199,9 +201,7 @@ context shop::Item
 ### keywordInString[fix]
 context shop::Item
   inv a: self.name != "inv b: context x"
-=> files context shop::Item\ninv a: self.name != "
-=> files context shop::Item\ninv b:
-=> files context x"
+=> files context shop::Item\ninv a: self.name != "inv b: context x"
 => checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.name != "inv b: context x"
 => splitter INV name=a context=shop::Item severity=null start=2:2 lines=[1, 2] | context shop::Item\ninv a: self.name != "inv b: context x"
 => splitter source | context shop::Item\n  inv a: self.name != "inv b: context x"
@@ -210,8 +210,8 @@ context shop::Item
 context shop::Item
   inv a: self.price > 0 -- context shop::Order
   inv b: true
-=> files context shop::Item\ninv a: self.price > 0 --
-=> files context shop::Order\ninv b: true
+=> files context shop::Item\ninv a: self.price > 0
+=> files context shop::Item\ninv b: true
 => checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.price > 0
 => checker name=b context=shop::Item severity=WARNING | context shop::Item\n  inv b: true
 => splitter INV name=a context=shop::Item severity=null start=2:2 lines=[1, 2] | context shop::Item\ninv a: self.price > 0
@@ -253,7 +253,7 @@ context shop::Item
   inv a:
     self.price > 0
       and self.price < 100
-=> files context shop::Item\ninv a:\r\n    self.price > 0\r\n      and self.price < 100
+=> files context shop::Item\ninv a:\n    self.price > 0\n      and self.price < 100
 => checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a:\n    self.price > 0\n      and self.price < 100
 => splitter INV name=a context=shop::Item severity=null start=2:2 lines=[1, 2, 3, 4] | context shop::Item\ninv a:\n    self.price > 0\n      and self.price < 100
 => splitter source | context shop::Item\n  inv a:\n    self.price > 0\n      and self.price < 100
@@ -306,8 +306,7 @@ context shop::Item -- note
 context shop::Item
   inv a: self.subcontext
     > 0
-=> files context shop::Item\ninv a: self.sub
-=> files context\n    > 0
+=> files context shop::Item\ninv a: self.subcontext\n    > 0
 => checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.subcontext\n    > 0
 => splitter INV name=a context=shop::Item severity=null start=2:2 lines=[1, 2, 3] | context shop::Item\ninv a: self.subcontext\n    > 0
 => splitter source | context shop::Item\n  inv a: self.subcontext\n    > 0
@@ -456,13 +455,62 @@ context shop::Order inv b: true
 => splitter INV name=b context=shop::Order severity=null start=4:20 lines=[4, 4] | context shop::Order\ninv b: true
 => splitter source | context shop::Order\n  inv b: true
 
-### byteOrderMark
+### byteOrderMark[fix]
 ﻿context shop::Item inv a: true
 => files context shop::Item\ninv a: true
-=> checker error 1:0 token recognition error at: '﻿'
-=> splitter INV name=a context=shop::Item severity=null start=1:20 lines=[1, 1] | context shop::Item\ninv a: true
+=> checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: true
+=> splitter INV name=a context=shop::Item severity=null start=1:19 lines=[1, 1] | context shop::Item\ninv a: true
 => splitter source | context shop::Item\n  inv a: true
-=> splitter error 1:0 token recognition error at: '﻿'
+
+### commentFirstCrOnly[cr][fix]
+-- a comment
+context shop::Item
+  inv a: self.price > 0
+=> files context shop::Item\ninv a: self.price > 0
+=> checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.price > 0
+=> splitter INV name=a context=shop::Item severity=null start=3:2 lines=[2, 3] | context shop::Item\ninv a: self.price > 0
+=> splitter source | context shop::Item\n  inv a: self.price > 0
+
+### formFeedAndLineSeparator[fix]
+context shop::Item
+  inv a: self.price > 0  inv b: true   inv c: true
+=> files context shop::Item\ninv a: self.price > 0
+=> files context shop::Item\ninv b: true
+=> files context shop::Item\ninv c: true
+=> checker name=a context=shop::Item severity=WARNING | context shop::Item\n  inv a: self.price > 0
+=> checker name=b context=shop::Item severity=WARNING | context shop::Item\n  inv b: true
+=> checker name=c context=shop::Item severity=WARNING | context shop::Item\n  inv c: true
+=> splitter INV name=a context=shop::Item severity=null start=2:2 lines=[1, 2] | context shop::Item\ninv a: self.price > 0
+=> splitter source | context shop::Item\n  inv a: self.price > 0
+=> splitter INV name=b context=shop::Item severity=null start=3:2 lines=[1, 3] | context shop::Item\ninv b: true
+=> splitter source | context shop::Item\n  inv b: true
+=> splitter INV name=c context=shop::Item severity=null start=4:2 lines=[1, 4] | context shop::Item\ninv c: true
+=> splitter source | context shop::Item\n  inv c: true
+
+### twoUnknownSeverities
+context shop::Item
+  inv a: @severity FATAL true
+  inv b: @severity WORSE true
+=> files context shop::Item\ninv a: @severity FATAL true
+=> files context shop::Item\ninv b: @severity WORSE true
+=> checker error 2:9 unknown severity 'FATAL', valid values are [INFO, WARNING, MINOR, MAJOR, CRITICAL]
+=> splitter INV name=a context=shop::Item severity=FATAL@2:9 start=2:2 lines=[1, 2] | context shop::Item\ninv a: @severity FATAL true
+=> splitter source | context shop::Item\n  inv a: @severity FATAL true
+=> splitter INV name=b context=shop::Item severity=WORSE@3:9 start=3:2 lines=[1, 3] | context shop::Item\ninv b: @severity WORSE true
+=> splitter source | context shop::Item\n  inv b: @severity WORSE true
+
+### unknownSeverityAndSyntaxError
+context shop::Item
+  inv a: @severity FATAL true
+  inv b: self.price >
+=> files context shop::Item\ninv a: @severity FATAL true
+=> files context shop::Item\ninv b: self.price >
+=> checker error 3:20 unexpected input '>'
+=> splitter INV name=a context=shop::Item severity=FATAL@2:9 start=2:2 lines=[1, 2] | context shop::Item\ninv a: @severity FATAL true
+=> splitter source | context shop::Item\n  inv a: @severity FATAL true
+=> splitter INV name=b context=shop::Item severity=null start=3:2 lines=[1, 3] | context shop::Item\ninv b: self.price >
+=> splitter source | context shop::Item\n  inv b: self.price >
+=> splitter error 3:20 unexpected input '>'
 
 ### syntaxError
 context shop::Item

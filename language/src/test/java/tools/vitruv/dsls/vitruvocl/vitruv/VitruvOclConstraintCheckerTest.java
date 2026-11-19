@@ -108,6 +108,17 @@ class VitruvOclConstraintCheckerTest {
   }
 
   @Test
+  @DisplayName("a byte order mark at the start of the content is ignored")
+  void ignoresAByteOrderMark() {
+    List<ConstraintDescriptor> constraints =
+        VitruvOclConstraintChecker.fromString("﻿" + CONSTRAINTS).getConstraints();
+
+    assertEquals(
+        List.of(NON_NEGATIVE, AFFORDABLE, NOT_FREE),
+        constraints.stream().map(ConstraintDescriptor::id).toList());
+  }
+
+  @Test
   @DisplayName("each invariant reports the metamodels it reads, the context metamodel first")
   void reportsTheMetamodelsOfEachInvariant() {
     List<ConstraintDescriptor> constraints =

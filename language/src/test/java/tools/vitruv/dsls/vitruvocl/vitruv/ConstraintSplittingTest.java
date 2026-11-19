@@ -36,18 +36,21 @@ import tools.vitruv.framework.vsum.constraints.ConstraintDiagnostic;
 import tools.vitruv.framework.vsum.constraints.InvalidConstraintException;
 
 /**
- * Side-by-side characterization of how {@code .ocl} files are split into constraints: by {@link
- * ConstraintFiles#read} (CLI and engine), by {@link OclInvariantParser#parse} (Vitruv checker) and
- * by {@link OclSourceSplitter}.
+ * How {@code .ocl} files are split into constraints, side by side for the three users of {@link
+ * OclSourceSplitter}: {@link ConstraintFiles#read} (CLI and engine), {@link
+ * OclInvariantParser#parse} (Vitruv checker) and the splitter itself.
  *
  * <p>For every document in {@code source/constraint-splitting.txt} it records the units all three
  * produce (texts with {@code \n} and {@code \r} escaped) and the diagnostics the checker and the
- * splitter report, and it asserts that the splitter reproduces both old splitters: the units of
- * {@link ConstraintFiles#read} (except in cases tagged {@code [fix]}, whose differences are
- * accepted corrections) and the invariant sources and syntax errors of the checker.
+ * splitter report, and it asserts that both users reproduce the splitter: the unit texts, and the
+ * invariant sources, names, context types and syntax errors of the checker. Since both users are
+ * built on the splitter, these assertions check the wiring; the snapshot pins the behaviour. Until
+ * then it pinned the users' own implementations; a case tagged {@code [fix]} marks where the former
+ * regex-based {@link ConstraintFiles#read} (or, for a byte order mark, the checker) behaved
+ * differently.
  *
- * <p>Tags in a case name: {@code [crlf]} uses CRLF line breaks, {@code [noeol]} omits the final
- * line break.
+ * <p>Tags in a case name: {@code [crlf]} uses CRLF line breaks, {@code [cr]} CR line breaks, {@code
+ * [noeol]} omits the final line break.
  */
 class ConstraintSplittingTest {
 
@@ -96,7 +99,7 @@ class ConstraintSplittingTest {
     while (!lines.isEmpty() && lines.get(lines.size() - 1).isEmpty()) {
       lines.remove(lines.size() - 1); // the blank separator line before the next case
     }
-    String lineBreak = name.contains("[crlf]") ? "\r\n" : "\n";
+    String lineBreak = name.contains("[crlf]") ? "\r\n" : name.contains("[cr]") ? "\r" : "\n";
     String content = String.join(lineBreak, lines) + (name.contains("[noeol]") ? "" : lineBreak);
     cases.add(Arguments.of(name, content, expected));
   }
@@ -142,9 +145,7 @@ class ConstraintSplittingTest {
     assertEquals(expected, actual);
 
     assertTextLinesMatch(split.units());
-    if (!name.contains("[fix]")) {
-      assertEquals(files, split.units().stream().map(ConstraintUnit::text).toList(), "files");
-    }
+    assertEquals(files, split.units().stream().map(ConstraintUnit::text).toList(), "files");
     assertReproducesChecker(invariants, checkerErrors, split);
   }
 

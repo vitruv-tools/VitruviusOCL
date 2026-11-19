@@ -40,6 +40,7 @@ import tools.vitruv.dsls.vitruvocl.compiler.DependencyAnalyzer;
 import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
 import tools.vitruv.dsls.vitruvocl.result.FileError;
 import tools.vitruv.dsls.vitruvocl.result.Violation;
+import tools.vitruv.dsls.vitruvocl.source.OclSourceSplitter;
 import tools.vitruv.dsls.vitruvocl.vitruv.OclInvariantParser.ParsedInvariant;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
 import tools.vitruv.framework.vsum.constraints.ConstraintChecker;
@@ -336,7 +337,7 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
   private static void typeCheck(String source) {
     tools.vitruv.dsls.vitruvocl.result.ConstraintResult result =
         VitruvOclEngine.forModel(new VsumWrapper(EmptyCheckContext.INSTANCE))
-            .evaluate(OclInvariantParser.withoutImports(source));
+            .evaluate(OclSourceSplitter.withoutImports(source));
     if (!result.getCompilerErrors().isEmpty()) {
       List<ConstraintDiagnostic> diagnostics = new ArrayList<>();
       for (CompileError error : result.getCompilerErrors()) {

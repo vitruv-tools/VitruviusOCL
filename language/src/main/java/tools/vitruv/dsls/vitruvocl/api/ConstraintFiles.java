@@ -16,11 +16,10 @@ package tools.vitruv.dsls.vitruvocl.api;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import tools.vitruv.dsls.vitruvocl.source.ConstraintUnit;
+import tools.vitruv.dsls.vitruvocl.source.OclSourceSplitter;
 
 /**
  * Reading {@code .ocl} constraint files and the conventional project layout ({@code
@@ -28,56 +27,20 @@ import java.util.stream.Stream;
  */
 public final class ConstraintFiles {
 
-  /** A constraint keyword at a word boundary, not the {@code pre} of the {@code @pre} operator. */
-  private static final Pattern CONSTRAINT_KEYWORD = Pattern.compile("(?<!@)\\b(?:inv|pre|post)\\b");
-
   private ConstraintFiles() {}
 
   /**
    * Reads the constraints of an {@code .ocl} file, one unit per {@code inv}/{@code pre}/{@code
-   * post} block, each prefixed with its {@code context} header. Comment lines ({@code --}), import
-   * declarations and blank lines are dropped.
+   * post} block (and per context without blocks), each prefixed with its {@code context} header and
+   * without blank, comment and import lines; see {@link OclSourceSplitter}. Text before the first
+   * {@code context} is ignored; syntax errors are not reported here but when compiling the units.
    *
    * @throws IOException if the file cannot be read
    */
   public static List<String> read(Path oclFile) throws IOException {
-    String content = Files.readString(oclFile);
-    StringBuilder cleaned = new StringBuilder();
-    for (String line : content.split("\n")) {
-      String trimmed = line.trim();
-      if (!trimmed.startsWith("--") && !trimmed.startsWith("import ") && !trimmed.isEmpty()) {
-        cleaned.append(line).append("\n");
-      }
-    }
-    List<String> constraints = new ArrayList<>();
-    for (String part : cleaned.toString().split("(?=context\\s)")) {
-      String trimmed = part.trim();
-      if (!trimmed.isEmpty() && trimmed.startsWith("context")) {
-        constraints.addAll(splitByConstraintKeyword(trimmed));
-      }
-    }
-    return constraints;
-  }
-
-  /**
-   * Splits a {@code context ...} block on its {@code inv}/{@code pre}/{@code post} boundaries, so
-   * that a shared header followed by several blocks yields independent units, each re-prefixed with
-   * the header. The lookbehind keeps {@code self.mass@pre} from being split mid-token.
-   */
-  private static List<String> splitByConstraintKeyword(String contextBlock) {
-    Matcher headerMatcher = CONSTRAINT_KEYWORD.matcher(contextBlock);
-    if (!headerMatcher.find()) {
-      return List.of(contextBlock);
-    }
-    String header = contextBlock.substring(0, headerMatcher.start()).trim();
-    List<String> result = new ArrayList<>();
-    for (String segment : contextBlock.split("(?<!@)(?=\\b(?:inv|pre|post)\\b)")) {
-      String trimmed = segment.trim();
-      if (!trimmed.isEmpty() && !trimmed.startsWith("context")) {
-        result.add(header + "\n" + trimmed);
-      }
-    }
-    return result.isEmpty() ? List.of(contextBlock) : result;
+    return OclSourceSplitter.split(Files.readString(oclFile)).units().stream()
+        .map(ConstraintUnit::text)
+        .toList();
   }
 
   /** The constraints file of a project: {@code model/src/main/constraints.ocl}. */

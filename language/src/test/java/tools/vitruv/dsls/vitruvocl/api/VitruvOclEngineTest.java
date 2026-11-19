@@ -182,6 +182,32 @@ class VitruvOclEngineTest {
   }
 
   @Test
+  void evaluateFileKeepsCommentsAndKeywordsInsideTheirConstraint() throws IOException {
+    // each of these used to break the regex-based split: a trailing comment ended up as an
+    // operator at the end of the unit, keywords inside a string or comment started a new unit
+    Path oclFile =
+        Files.writeString(
+            dir.resolve("constraints.ocl"),
+            """
+            context spaceMission::Spacecraft
+              inv trailing: self.mass >= 0 -- context spaceMission::Mission
+              inv quoted: self.name != "inv b: context x"
+              inv atEnd: self.mass >= 0 -- the end""");
+
+    BatchValidationResult result = files().evaluateFile(oclFile);
+
+    assertThat(result.getResults())
+        .extracting(ConstraintResult::getConstraint)
+        .containsExactly(
+            "context spaceMission::Spacecraft\ninv trailing: self.mass >= 0",
+            "context spaceMission::Spacecraft\ninv quoted: self.name != \"inv b: context x\"",
+            "context spaceMission::Spacecraft\ninv atEnd: self.mass >= 0");
+    assertThat(result.getResults())
+        .allSatisfy(r -> assertThat(r.isSuccess()).as(describe(r)).isTrue())
+        .allSatisfy(r -> assertThat(r.isSatisfied()).as(describe(r)).isTrue());
+  }
+
+  @Test
   void missingConstraintsFileThrows() {
     assertThatThrownBy(() -> files().evaluateFile(dir.resolve("missing.ocl")))
         .isInstanceOf(IOException.class);

@@ -16,23 +16,15 @@ package tools.vitruv.dsls.vitruvocl.vitruv;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.antlr.v4.runtime.BaseErrorListener;
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.RecognitionException;
-import org.antlr.v4.runtime.Recognizer;
-import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.misc.Interval;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.source.ConstraintUnit;
+import tools.vitruv.dsls.vitruvocl.source.OclSourceSplitter;
 import tools.vitruv.framework.vsum.constraints.ConstraintDiagnostic;
 import tools.vitruv.framework.vsum.constraints.ConstraintSeverity;
 import tools.vitruv.framework.vsum.constraints.InvalidConstraintException;
 
 /**
  * Splits the content of a {@code .ocl} file into single invariants, each of which can be evaluated
- * on its own.
+ * on its own, using {@link OclSourceSplitter}; {@code pre} and {@code post} blocks are skipped.
  */
 final class OclInvariantParser {
 
@@ -52,114 +44,54 @@ final class OclInvariantParser {
   /**
    * Parses the given constraints.
    *
-   * @param content the content of a {@code .ocl} file
-   * @return the invariants in declaration order
+   * @param content the content of an {@code .ocl} file
+   * @return the invariants in declaration order; {@code pre} and {@code post} blocks are skipped,
+   *     since the checker evaluates states, not transactions
    * @throws InvalidConstraintException if the content contains syntax errors or unknown severities
    */
   static List<ParsedInvariant> parse(String content) {
-    CharStream input = CharStreams.fromString(withoutImports(content));
-    VitruvOCLLexer lexer = new VitruvOCLLexer(input);
-    List<ConstraintDiagnostic> syntaxErrors = new ArrayList<>();
-    BaseErrorListener collector =
-        new BaseErrorListener() {
-          @Override
-          public void syntaxError(
-              Recognizer<?, ?> recognizer,
-              Object offendingSymbol,
-              int line,
-              int column,
-              String message,
-              RecognitionException exception) {
-            syntaxErrors.add(new ConstraintDiagnostic(line, column, message));
-          }
-        };
-    lexer.removeErrorListeners();
-    lexer.addErrorListener(collector);
-    CommonTokenStream tokens = new CommonTokenStream(lexer);
-    if (tokens.LT(1).getType() == Token.EOF && syntaxErrors.isEmpty()) {
-      // empty or comment-only content
-      return List.of();
+    OclSourceSplitter.SplitResult split = OclSourceSplitter.split(content);
+    if (!split.syntaxErrors().isEmpty()) {
+      throw new InvalidConstraintException(
+          split.syntaxErrors().stream()
+              .map(
+                  error ->
+                      new ConstraintDiagnostic(
+                          error.position().line(), error.position().column(), error.message()))
+              .toList());
     }
-    VitruvOCLParser parser = new VitruvOCLParser(tokens);
-    parser.removeErrorListeners();
-    parser.addErrorListener(collector);
-
-    VitruvOCLParser.ContextDeclCSContext tree = parser.contextDeclCS();
-    // the grammar does not require EOF, so the parser silently stops before unparsable input
-    Token next = tokens.LT(1);
-    if (next.getType() != Token.EOF) {
-      syntaxErrors.add(
-          new ConstraintDiagnostic(
-              next.getLine(),
-              next.getCharPositionInLine(),
-              "unexpected input '" + next.getText() + "'"));
-    }
-    if (!syntaxErrors.isEmpty()) {
-      throw new InvalidConstraintException(syntaxErrors);
-    }
-
     List<ParsedInvariant> invariants = new ArrayList<>();
-    for (VitruvOCLParser.ClassifierContextCSContext context : tree.classifierContextCS()) {
-      List<VitruvOCLParser.InvCSContext> invs = context.invCS();
-      if (invs.isEmpty()) {
-        continue;
-      }
-      String header =
-          text(input, context.start.getStartIndex(), invs.get(0).start.getStartIndex());
-      String contextType = contextType(context);
-      for (VitruvOCLParser.InvCSContext inv : invs) {
-        String invariant = text(input, inv.start.getStartIndex(), inv.stop.getStopIndex() + 1);
-        String name = inv.ID() != null ? inv.ID().getText() : null;
+    for (ConstraintUnit unit : split.units()) {
+      if (unit.kind() == ConstraintUnit.Kind.INV) {
         invariants.add(
             new ParsedInvariant(
-                name, contextType, severity(inv), header.strip() + "\n  " + invariant.strip()));
+                unit.name(),
+                unit.contextType(),
+                severity(unit),
+                unit.header() + "\n  " + unit.body()));
       }
     }
     return invariants;
   }
 
-  /** Removes import declarations, keeping the line count so that positions stay valid. */
-  static String withoutImports(String content) {
-    StringBuilder result = new StringBuilder();
-    for (String line : content.split("\\R", -1)) {
-      // keep the line count so that positions in error messages match the original content
-      result.append(line.strip().startsWith("import ") ? "" : line).append('\n');
+  private static ConstraintSeverity severity(ConstraintUnit unit) {
+    if (unit.severity() == null) {
+      return ConstraintSeverity.WARNING;
     }
-    return result.toString();
-  }
-
-  private static String text(CharStream input, int start, int endExclusive) {
-    return input.getText(Interval.of(start, endExclusive - 1));
-  }
-
-  private static String contextType(VitruvOCLParser.ClassifierContextCSContext context) {
-    if (context.metamodel != null && context.className != null) {
-      return context.metamodel.getText() + "::" + context.className.getText();
+    try {
+      // the type checker accepts exactly the upper-case names of the severity levels
+      return ConstraintSeverity.valueOf(unit.severity());
+    } catch (IllegalArgumentException unknownSeverity) {
+      throw new InvalidConstraintException(
+          List.of(
+              new ConstraintDiagnostic(
+                  unit.severityPosition().line(),
+                  unit.severityPosition().column(),
+                  "unknown severity '"
+                      + unit.severity()
+                      + "', valid values are "
+                      + Arrays.toString(ConstraintSeverity.values()))));
     }
-    return context.contextName != null ? context.contextName.getText() : null;
-  }
-
-  private static ConstraintSeverity severity(VitruvOCLParser.InvCSContext inv) {
-    for (VitruvOCLParser.AnnotationCSContext annotation : inv.annotationCS()) {
-      if (annotation instanceof VitruvOCLParser.SeverityAnnotationContext severity) {
-        String value = severity.severityValue.getText();
-        try {
-          // the type checker accepts exactly the upper-case names of the severity levels
-          return ConstraintSeverity.valueOf(value);
-        } catch (IllegalArgumentException unknownSeverity) {
-          throw new InvalidConstraintException(
-              List.of(
-                  new ConstraintDiagnostic(
-                      severity.start.getLine(),
-                      severity.start.getCharPositionInLine(),
-                      "unknown severity '"
-                          + value
-                          + "', valid values are "
-                          + Arrays.toString(ConstraintSeverity.values()))));
-        }
-      }
-    }
-    return ConstraintSeverity.WARNING;
   }
 
   /**

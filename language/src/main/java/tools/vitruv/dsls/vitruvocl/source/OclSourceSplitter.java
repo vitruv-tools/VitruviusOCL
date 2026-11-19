@@ -39,6 +39,8 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
  */
 public final class OclSourceSplitter {
 
+  private static final String BYTE_ORDER_MARK = "\uFEFF";
+
   private static final int INV = literalType("'inv'");
   private static final int PRE = literalType("'pre'");
   private static final int POST = literalType("'post'");
@@ -116,16 +118,17 @@ public final class OclSourceSplitter {
   }
 
   /**
-   * Removes import declarations, keeping the line count so that positions stay valid; line breaks
-   * ({@code \r\n}, {@code \r}, {@code \n}) become {@code \n}, other Unicode line separators stay
-   * part of their line, as for the lexer.
+   * Removes a byte order mark at the start and import declarations, keeping the line count so that
+   * positions stay valid; line breaks (any Unicode line break, including form feeds and line
+   * separators) become {@code \n}, which the lexer counts and skips as whitespace.
    *
    * @param content the content of an {@code .ocl} file
    * @return the content with every import line emptied
    */
   public static String withoutImports(String content) {
+    String text = content.startsWith(BYTE_ORDER_MARK) ? content.substring(1) : content;
     StringBuilder result = new StringBuilder();
-    for (String line : content.split("\r\n|\r|\n", -1)) {
+    for (String line : text.split("\\R", -1)) {
       result.append(line.strip().startsWith("import ") ? "" : line).append('\n');
     }
     return result.toString();
