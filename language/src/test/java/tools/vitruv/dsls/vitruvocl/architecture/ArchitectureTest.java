@@ -57,6 +57,7 @@ class ArchitectureTest {
       List.of(
           new Layer("Parser", ""), // ANTLR-generated lexer and parser in the root package
           new Layer("Common", "common"),
+          new Layer("Source", "source"),
           new Layer("Model", "model"),
           new Layer("Types", "types"),
           new Layer("SymbolTable", "symboltable"),
