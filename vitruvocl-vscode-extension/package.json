@@ -126,7 +126,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "tsc -p tsconfig.test.json && cd target/test-js && node --test"
   },
   "dependencies": {
     "vscode-languageclient": "^11.0.0"
