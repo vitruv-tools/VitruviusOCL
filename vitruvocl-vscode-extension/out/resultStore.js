@@ -9,9 +9,13 @@ class ResultStore {
     constructor() {
         this.results = new Map();
     }
-    /** Records that the constraint ran, and whether it passed. */
-    record(name, passed) {
-        this.results.set(name, { name, passed, ran: true });
+    /**
+     * Records that the constraint ran, whether it passed, and its violations. They are kept until
+     * the constraint runs again or the store is cleared, so that they still show while the
+     * document is edited.
+     */
+    record(name, passed, violations = []) {
+        this.results.set(name, { name, passed, ran: true, violations: passed ? [] : [...violations] });
     }
     get(name) {
         return this.results.get(name);
@@ -27,6 +31,10 @@ class ResultStore {
     /** Whether the constraint ran and failed. */
     hasFailed(name) {
         return this.stateOf(name) === 'failed';
+    }
+    /** The violations of a failed constraint; empty if it has none or did not fail. */
+    violationsOf(name) {
+        return this.results.get(name)?.violations ?? [];
     }
     clear() {
         this.results.clear();

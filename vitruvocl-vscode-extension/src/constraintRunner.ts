@@ -11,6 +11,7 @@ import { findCompilerJar, findEcoreFiles, findInstanceFiles } from './discovery'
 import { logStderr, showEvalResult, showSkipNotice, showSummaryResult } from './output';
 import { ResultStore } from './resultStore';
 import { extractConstraint } from './units';
+import { violationsOf } from './violations';
 import { containsVsum } from './vsumFiles';
 
 /** What the CLI needs besides the constraint file. */
@@ -69,7 +70,7 @@ export class ConstraintRunner {
         this.results.clear();
         this.diagnosticCollection.clear();
         this.codeLensProvider.refresh();
-        this.decorations.update(editor);
+        this.decorations.updateVisible();
 
         try {
             const inputs = await this.findCliInputs(document.uri);
@@ -93,24 +94,19 @@ export class ConstraintRunner {
 
             let passed = 0;
             let failed = 0;
-            const constraintDetails = new Map<string, string[]>();
-
             for (const constraint of result.constraints) {
-                this.results.record(constraint.name, constraint.satisfied);
+                this.results.record(constraint.name, constraint.satisfied, violationsOf(constraint.warnings));
                 updateDiagnosticsForConstraintBatch(this.diagnosticCollection, document, constraint);
 
                 if (constraint.satisfied) {
                     passed++;
                 } else {
                     failed++;
-                    if (constraint.warnings) {
-                        constraintDetails.set(constraint.name, constraint.warnings);
-                    }
                 }
             }
 
             this.codeLensProvider.refresh();
-            this.decorations.update(editor, constraintDetails);
+            this.decorations.updateVisible();
 
             showSummaryResult(passed, failed, result.constraints);
 
@@ -122,7 +118,6 @@ export class ConstraintRunner {
     /** Runs one constraint of the document with `eval`, from a temporary file holding only it. */
     async runConstraint(constraintName: string, documentUri: vscode.Uri): Promise<void> {
         const document = await vscode.workspace.openTextDocument(documentUri);
-        const editor = vscode.window.visibleTextEditors.find(e => e.document === document);
 
         try {
             const inputs = await this.findCliInputs(documentUri);
@@ -152,17 +147,11 @@ export class ConstraintRunner {
 
             const result = JSON.parse(stdout) as EvalResult;
 
-            this.results.record(constraintName, result.satisfied);
+            this.results.record(constraintName, result.satisfied, violationsOf(result.warnings));
             updateDiagnosticsForConstraint(this.diagnosticCollection, document, constraintName, result);
 
             this.codeLensProvider.refresh();
-            if (editor) {
-                const details = new Map<string, string[]>();
-                if (!result.satisfied && result.warnings) {
-                    details.set(constraintName, result.warnings);
-                }
-                this.decorations.update(editor, details);
-            }
+            this.decorations.updateVisible();
 
             showEvalResult(constraintName, result);
             showSkipNotice(constraintName, result.warnings);
@@ -173,9 +162,7 @@ export class ConstraintRunner {
             vscode.window.showErrorMessage(`Run failed: ${error.message}`);
             this.results.record(constraintName, false);
             this.codeLensProvider.refresh();
-            if (editor) {
-                this.decorations.update(editor);
-            }
+            this.decorations.updateVisible();
         }
     }
 }

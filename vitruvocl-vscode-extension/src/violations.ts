@@ -22,6 +22,11 @@ export function styleOf(severity: string): ViolationStyle {
     return SEVERITY_STYLE[severity] ?? SEVERITY_STYLE['WARNING'];
 }
 
+/** The note for a failed constraint whose violations are not known. */
+export function genericViolation(constraintName: string): string {
+    return `${constraintName} violated`;
+}
+
 /** The severity and message of a violation block the CLI reports as a warning. */
 export function parseViolationBlock(block: string): { severity: string; message: string } {
     // Extract severity from line: [SEVERITY] constraintName
@@ -37,14 +42,14 @@ export function parseViolationBlock(block: string): { severity: string; message:
  * The text shown at the end of a violated constraint's header line and its color: the first
  * violation and how many more there are, or a generic note if no details are known.
  */
-export function inlineSummary(constraintName: string, details: string[] | undefined): { text: string; color: string } {
-    if (details && details.length > 0) {
+export function inlineSummary(constraintName: string, details: readonly string[]): { text: string; color: string } {
+    if (details.length > 0) {
         const { severity, message } = parseViolationBlock(details[0]);
         const style = styleOf(severity);
         const suffix = details.length > 1 ? ` (+${details.length - 1} more)` : '';
         return { text: ` ◀ ${style.symbol} ${severity}: ${message}${suffix}`, color: style.color };
     }
-    return { text: ` ◀ ⚠ WARNING: ${constraintName} violated`, color: SEVERITY_STYLE['WARNING'].color };
+    return { text: ` ◀ ⚠ WARNING: ${genericViolation(constraintName)}`, color: SEVERITY_STYLE['WARNING'].color };
 }
 
 /**
@@ -60,4 +65,9 @@ export const PRE_POST_SKIPPED_PREFIX = 'PRE/POST SKIPPED:';
 /** Whether a warning is a pre/post skip notice rather than a violation. */
 export function isSkipNotice(warning: string): boolean {
     return warning.startsWith(PRE_POST_SKIPPED_PREFIX);
+}
+
+/** The violations among a constraint's warnings: all but the pre/post skip notices. */
+export function violationsOf(warnings: string[] | undefined): string[] {
+    return (warnings ?? []).filter(w => !isSkipNotice(w));
 }

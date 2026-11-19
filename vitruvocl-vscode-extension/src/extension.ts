@@ -7,7 +7,6 @@ import { ResultStore } from './resultStore';
 import { ConstraintRunner } from './constraintRunner';
 import { triggerSuggestAfterInvNewline } from './suggest';
 
-let decorations: ConstraintDecorations | undefined;
 let languageClient: LanguageClient | undefined;
 
 async function applyThemeOnFirstInstall(context: vscode.ExtensionContext): Promise<void> {
@@ -40,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
     const results = new ResultStore();
     const codeLensProvider = new OCLCodeLensProvider();
     const constraintDecorations = new ConstraintDecorations(results);
-    decorations = constraintDecorations;
+    context.subscriptions.push(constraintDecorations);
     const runner = new ConstraintRunner(results, constraintDecorations, codeLensProvider, diagnosticCollection);
 
     context.subscriptions.push(
@@ -63,31 +62,27 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.window.onDidChangeActiveTextEditor(editor => {
-            if (editor && editor.document.languageId === 'vitruvocl') {
-                constraintDecorations.update(editor);
-            }
-        })
+        vscode.window.onDidChangeVisibleTextEditors(() => constraintDecorations.updateVisible())
     );
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.document.languageId !== 'vitruvocl') {
+                return;
+            }
+            constraintDecorations.updateVisible(event.document);
             const editor = vscode.window.activeTextEditor;
-            if (editor && editor.document === event.document && editor.document.languageId === 'vitruvocl') {
-                constraintDecorations.update(editor);
+            if (editor && editor.document === event.document) {
                 triggerSuggestAfterInvNewline(editor, event);
             }
         })
     );
 
-    if (vscode.window.activeTextEditor?.document.languageId === 'vitruvocl') {
-        constraintDecorations.update(vscode.window.activeTextEditor);
-    }
+    constraintDecorations.updateVisible();
 
     languageClient = startLanguageClient(context);
 }
 
 export function deactivate(): Thenable<void> | undefined {
-    decorations?.dispose();
     return languageClient?.stop();
 }

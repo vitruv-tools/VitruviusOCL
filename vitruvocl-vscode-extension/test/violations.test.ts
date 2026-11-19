@@ -7,6 +7,7 @@ import {
     PRE_POST_SKIPPED_PREFIX,
     SEVERITY_STYLE,
     styleOf,
+    violationsOf,
 } from '../src/violations';
 
 const BLOCK = [
@@ -45,7 +46,6 @@ test('inlineSummary shows the first violation and how many more', () => {
 
 test('inlineSummary without details is a generic warning', () => {
     const expected = { text: ' ◀ ⚠ WARNING: namesSet violated', color: '#e0b84a' };
-    assert.deepEqual(inlineSummary('namesSet', undefined), expected);
     assert.deepEqual(inlineSummary('namesSet', []), expected);
 });
 
@@ -54,4 +54,9 @@ test('isSkipNotice recognizes the Java prefix', () => {
     assert.equal(isSkipNotice('PRE/POST SKIPPED: post done'), true);
     assert.equal(isSkipNotice(' PRE/POST SKIPPED: post done'), false);
     assert.equal(isSkipNotice(BLOCK), false);
+});
+
+test('violationsOf drops the skip notices', () => {
+    assert.deepEqual(violationsOf(['PRE/POST SKIPPED: post done', BLOCK]), [BLOCK]);
+    assert.deepEqual(violationsOf(undefined), []);
 });

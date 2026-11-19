@@ -4,7 +4,7 @@
  */
 import { ResultStore } from './resultStore';
 import { findConstraintHeaders } from './units';
-import { inlineSummary, parseViolationBlock, styleOf } from './violations';
+import { genericViolation, inlineSummary, parseViolationBlock, styleOf } from './violations';
 
 /** One entry of a failed constraint's hover: a violation, or a generic note without any. */
 export interface HoverEntry {
@@ -32,9 +32,9 @@ export interface DecorationPlan {
 }
 
 /** The hover of a failed constraint: all violations, or a generic note if none are known. */
-function hoverEntries(constraintName: string, violations: string[]): HoverEntry[] {
+function hoverEntries(constraintName: string, violations: readonly string[]): HoverEntry[] {
     if (violations.length === 0) {
-        return [{ symbol: '⚠', severity: 'WARNING', message: `${constraintName} violated` }];
+        return [{ symbol: styleOf('WARNING').symbol, severity: 'WARNING', message: genericViolation(constraintName) }];
     }
     return violations.map(block => {
         const { severity, message } = parseViolationBlock(block);
@@ -44,11 +44,11 @@ function hoverEntries(constraintName: string, violations: string[]): HoverEntry[
 
 /** The marks of every constraint header in the text. */
 export function planDecorations(text: string, results: ResultStore): DecorationPlan {
-    const lines = text.split('\n');
+    const lines = text.split(/\r?\n/);
     const plan: DecorationPlan = { notRun: [], passed: [], failed: [], inline: [] };
     for (const header of findConstraintHeaders(text)) {
         const state = results.stateOf(header.name);
-        plan[state].push(header.line);
+        plan[state].push(header.line); // the states name the gutter lists of the plan
         if (state !== 'failed') {
             continue;
         }

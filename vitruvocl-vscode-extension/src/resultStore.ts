@@ -9,7 +9,7 @@ export interface ConstraintStatus {
     passed: boolean;
     ran: boolean;
     /** The violation blocks the CLI reported; empty if it passed or reported none. */
-    violations: string[];
+    violations: readonly string[];
 }
 
 /** How a constraint's header is marked: not run yet, passed, or failed. */
@@ -23,7 +23,7 @@ export class ResultStore {
      * the constraint runs again or the store is cleared, so that they still show while the
      * document is edited.
      */
-    record(name: string, passed: boolean, violations: string[] = []): void {
+    record(name: string, passed: boolean, violations: readonly string[] = []): void {
         this.results.set(name, { name, passed, ran: true, violations: passed ? [] : [...violations] });
     }
 
@@ -46,7 +46,7 @@ export class ResultStore {
     }
 
     /** The violations of a failed constraint; empty if it has none or did not fail. */
-    violationsOf(name: string): string[] {
+    violationsOf(name: string): readonly string[] {
         return this.results.get(name)?.violations ?? [];
     }
 

@@ -42,7 +42,6 @@ const languageClient_1 = require("./languageClient");
 const resultStore_1 = require("./resultStore");
 const constraintRunner_1 = require("./constraintRunner");
 const suggest_1 = require("./suggest");
-let decorations;
 let languageClient;
 async function applyThemeOnFirstInstall(context) {
     const THEME_KEY = 'vitruvocl.themeApplied';
@@ -69,7 +68,7 @@ function activate(context) {
     const results = new resultStore_1.ResultStore();
     const codeLensProvider = new codeLens_1.OCLCodeLensProvider();
     const constraintDecorations = new decorations_1.ConstraintDecorations(results);
-    decorations = constraintDecorations;
+    context.subscriptions.push(constraintDecorations);
     const runner = new constraintRunner_1.ConstraintRunner(results, constraintDecorations, codeLensProvider, diagnosticCollection);
     context.subscriptions.push(vscode.languages.registerCodeLensProvider({ language: 'vitruvocl' }, codeLensProvider));
     context.subscriptions.push(vscode.commands.registerCommand('vitruvocl.runConstraint', async (constraintName, documentUri) => {
@@ -78,25 +77,21 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('vitruvocl.runAllConstraints', async () => {
         await runner.runAllConstraints();
     }));
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
-        if (editor && editor.document.languageId === 'vitruvocl') {
-            constraintDecorations.update(editor);
-        }
-    }));
+    context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors(() => constraintDecorations.updateVisible()));
     context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
+        if (event.document.languageId !== 'vitruvocl') {
+            return;
+        }
+        constraintDecorations.updateVisible(event.document);
         const editor = vscode.window.activeTextEditor;
-        if (editor && editor.document === event.document && editor.document.languageId === 'vitruvocl') {
-            constraintDecorations.update(editor);
+        if (editor && editor.document === event.document) {
             (0, suggest_1.triggerSuggestAfterInvNewline)(editor, event);
         }
     }));
-    if (vscode.window.activeTextEditor?.document.languageId === 'vitruvocl') {
-        constraintDecorations.update(vscode.window.activeTextEditor);
-    }
+    constraintDecorations.updateVisible();
     languageClient = (0, languageClient_1.startLanguageClient)(context);
 }
 function deactivate() {
-    decorations?.dispose();
     return languageClient?.stop();
 }
 //# sourceMappingURL=extension.js.map

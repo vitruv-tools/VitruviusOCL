@@ -44,6 +44,7 @@ const diagnostics_1 = require("./diagnostics");
 const discovery_1 = require("./discovery");
 const output_1 = require("./output");
 const units_1 = require("./units");
+const violations_1 = require("./violations");
 const vsumFiles_1 = require("./vsumFiles");
 class ConstraintRunner {
     constructor(results, decorations, codeLensProvider, diagnosticCollection) {
@@ -86,7 +87,7 @@ class ConstraintRunner {
         this.results.clear();
         this.diagnosticCollection.clear();
         this.codeLensProvider.refresh();
-        this.decorations.update(editor);
+        this.decorations.updateVisible();
         try {
             const inputs = await this.findCliInputs(document.uri);
             if (!inputs) {
@@ -103,22 +104,18 @@ class ConstraintRunner {
             }
             let passed = 0;
             let failed = 0;
-            const constraintDetails = new Map();
             for (const constraint of result.constraints) {
-                this.results.record(constraint.name, constraint.satisfied);
+                this.results.record(constraint.name, constraint.satisfied, (0, violations_1.violationsOf)(constraint.warnings));
                 (0, diagnostics_1.updateDiagnosticsForConstraintBatch)(this.diagnosticCollection, document, constraint);
                 if (constraint.satisfied) {
                     passed++;
                 }
                 else {
                     failed++;
-                    if (constraint.warnings) {
-                        constraintDetails.set(constraint.name, constraint.warnings);
-                    }
                 }
             }
             this.codeLensProvider.refresh();
-            this.decorations.update(editor, constraintDetails);
+            this.decorations.updateVisible();
             (0, output_1.showSummaryResult)(passed, failed, result.constraints);
         }
         catch (error) {
@@ -128,7 +125,6 @@ class ConstraintRunner {
     /** Runs one constraint of the document with `eval`, from a temporary file holding only it. */
     async runConstraint(constraintName, documentUri) {
         const document = await vscode.workspace.openTextDocument(documentUri);
-        const editor = vscode.window.visibleTextEditors.find(e => e.document === document);
         try {
             const inputs = await this.findCliInputs(documentUri);
             if (!inputs) {
@@ -148,16 +144,10 @@ class ConstraintRunner {
                 throw new Error(`Java process produced no output.${hint}`);
             }
             const result = JSON.parse(stdout);
-            this.results.record(constraintName, result.satisfied);
+            this.results.record(constraintName, result.satisfied, (0, violations_1.violationsOf)(result.warnings));
             (0, diagnostics_1.updateDiagnosticsForConstraint)(this.diagnosticCollection, document, constraintName, result);
             this.codeLensProvider.refresh();
-            if (editor) {
-                const details = new Map();
-                if (!result.satisfied && result.warnings) {
-                    details.set(constraintName, result.warnings);
-                }
-                this.decorations.update(editor, details);
-            }
+            this.decorations.updateVisible();
             (0, output_1.showEvalResult)(constraintName, result);
             (0, output_1.showSkipNotice)(constraintName, result.warnings);
             fs.unlinkSync(tempFile);
@@ -166,9 +156,7 @@ class ConstraintRunner {
             vscode.window.showErrorMessage(`Run failed: ${error.message}`);
             this.results.record(constraintName, false);
             this.codeLensProvider.refresh();
-            if (editor) {
-                this.decorations.update(editor);
-            }
+            this.decorations.updateVisible();
         }
     }
 }

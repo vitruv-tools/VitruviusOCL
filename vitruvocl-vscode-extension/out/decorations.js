@@ -37,127 +37,97 @@ exports.ConstraintDecorations = void 0;
 /**
  * The marks on constraint headers: a gutter icon for whether the constraint has run and passed,
  * and the first violation at the end of a failed constraint's header line.
+ *
+ * The decoration types are created once and reused: an update only sets new ranges, so typing
+ * does not create and dispose of decoration types on every keystroke.
  */
 const vscode = __importStar(require("vscode"));
-const units_1 = require("./units");
-const violations_1 = require("./violations");
+const decorationPlan_1 = require("./decorationPlan");
 function svgIcon(svg) {
     return vscode.Uri.parse('data:image/svg+xml;utf8,' + encodeURIComponent(svg));
 }
-function createRunIcon() {
-    return svgIcon(`
+const RUN_ICON = svgIcon(`
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
             <circle cx="8" cy="8" r="7" fill="none" stroke="#858585" stroke-width="1.5"/>
             <path d="M 6 5 L 6 11 L 11 8 Z" fill="#858585"/>
         </svg>
     `);
-}
-function createPassIcon() {
-    return svgIcon(`
+const PASS_ICON = svgIcon(`
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
             <circle cx="8" cy="8" r="7" fill="#73C991"/>
             <path d="M 5 8 L 7 10 L 11 6" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
     `);
-}
-function createFailIcon() {
-    return svgIcon(`
+const FAIL_ICON = svgIcon(`
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
             <circle cx="8" cy="8" r="7" fill="#F48771"/>
             <path d="M 5.5 5.5 L 10.5 10.5 M 10.5 5.5 L 5.5 10.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
         </svg>
     `);
-}
-function iconFor(state) {
-    switch (state) {
-        case 'notRun': return createRunIcon();
-        case 'passed': return createPassIcon();
-        case 'failed': return createFailIcon();
-    }
+function gutterType(icon) {
+    return vscode.window.createTextEditorDecorationType({ gutterIconPath: icon, gutterIconSize: 'contain' });
 }
 /**
- * The hover of a failed constraint, listing all violations. Messages can contain model data, so
- * they are appended as plain text and the hover is neither trusted nor allowed to render HTML:
- * no command links, no markup injection.
+ * The hover of a failed constraint. Messages can contain model data, so they are appended as
+ * plain text and the hover is neither trusted nor allowed to render HTML: no command links, no
+ * markup injection.
  */
-function violationHover(constraintName, details) {
+function hoverOf(entries) {
     const hover = new vscode.MarkdownString();
-    if (details && details.length > 0) {
-        for (const d of details) {
-            const { severity, message } = (0, violations_1.parseViolationBlock)(d);
-            hover.appendMarkdown(`${(0, violations_1.styleOf)(severity).symbol} **${severity}:** `);
-            hover.appendText(message);
-            hover.appendMarkdown('\n\n');
-        }
-    }
-    else {
-        hover.appendMarkdown('⚠ **WARNING:** ');
-        hover.appendText(`${constraintName} violated`);
+    for (const entry of entries) {
+        hover.appendMarkdown(`${entry.symbol} **${entry.severity}:** `);
+        hover.appendText(entry.message);
+        hover.appendMarkdown('\n\n');
     }
     return hover;
 }
-/** The decoration types currently set, so that they can be disposed of when replaced. */
+function lineRanges(lines) {
+    return lines.map(line => new vscode.Range(line, 0, line, 0));
+}
+/** Owns the four decoration types; an update only sets their ranges. */
 class ConstraintDecorations {
     constructor(results) {
         this.results = results;
-        this.current = new Map();
-    }
-    /** Sets the gutter icon of every constraint header. */
-    updateGutterIcons(editor) {
-        this.current.forEach((decoration, key) => {
-            if (key.startsWith('constraint_')) {
-                decoration.dispose();
-            }
-        });
-        for (const header of (0, units_1.findConstraintHeaders)(editor.document.getText())) {
-            const decoration = vscode.window.createTextEditorDecorationType({
-                gutterIconPath: iconFor(this.results.stateOf(header.name)),
-                gutterIconSize: 'contain'
-            });
-            editor.setDecorations(decoration, [new vscode.Range(header.line, 0, header.line, 0)]);
-            this.current.set(`constraint_${header.line}`, decoration);
-        }
+        this.notRun = gutterType(RUN_ICON);
+        this.passed = gutterType(PASS_ICON);
+        this.failed = gutterType(FAIL_ICON);
+        this.inline = vscode.window.createTextEditorDecorationType({});
     }
     /**
-     * Shows the first violation at the end of every failed constraint's header line, and all of
-     * them on hover.
-     *
-     * @param constraintDetails the violations by constraint name; without them, a generic note
+     * Sets the gutter icon of every constraint header, and shows the first violation at the end
+     * of every failed constraint's header line, all of them on hover.
      */
-    updateInlineErrors(editor, constraintDetails) {
-        this.current.get('inline_errors')?.dispose();
-        const lines = editor.document.getText().split('\n');
-        const inlineDecorations = [];
-        for (const header of (0, units_1.findConstraintHeaders)(editor.document.getText())) {
-            if (!this.results.hasFailed(header.name)) {
-                continue;
-            }
-            const lineLength = lines[header.line].length;
-            const details = constraintDetails?.get(header.name);
-            const inline = (0, violations_1.inlineSummary)(header.name, details);
-            inlineDecorations.push({
-                range: new vscode.Range(header.line, lineLength, header.line, lineLength),
-                hoverMessage: violationHover(header.name, details),
-                renderOptions: {
-                    after: {
-                        contentText: inline.text,
-                        color: inline.color,
-                        margin: '0 0 0 20px'
-                    }
+    update(editor) {
+        const plan = (0, decorationPlan_1.planDecorations)(editor.document.getText(), this.results);
+        editor.setDecorations(this.notRun, lineRanges(plan.notRun));
+        editor.setDecorations(this.passed, lineRanges(plan.passed));
+        editor.setDecorations(this.failed, lineRanges(plan.failed));
+        editor.setDecorations(this.inline, plan.inline.map(mark => ({
+            range: new vscode.Range(mark.line, mark.column, mark.line, mark.column),
+            hoverMessage: hoverOf(mark.hover),
+            renderOptions: {
+                after: {
+                    contentText: mark.text,
+                    color: mark.color,
+                    margin: '0 0 0 20px'
                 }
-            });
-        }
-        const inlineDecorationType = vscode.window.createTextEditorDecorationType({});
-        editor.setDecorations(inlineDecorationType, inlineDecorations);
-        this.current.set('inline_errors', inlineDecorationType);
+            }
+        })));
     }
-    /** Updates both the gutter icons and the inline violations. */
-    update(editor, constraintDetails) {
-        this.updateGutterIcons(editor);
-        this.updateInlineErrors(editor, constraintDetails);
+    /**
+     * Updates every visible `.ocl` editor, so that editors beside the active one, or a second
+     * editor of the same document, do not keep stale marks.
+     *
+     * @param document if given, only the editors showing it
+     */
+    updateVisible(document) {
+        vscode.window.visibleTextEditors
+            .filter(editor => editor.document.languageId === 'vitruvocl')
+            .filter(editor => !document || editor.document === document)
+            .forEach(editor => this.update(editor));
     }
     dispose() {
-        this.current.forEach(decoration => decoration.dispose());
+        [this.notRun, this.passed, this.failed, this.inline].forEach(type => type.dispose());
     }
 }
 exports.ConstraintDecorations = ConstraintDecorations;

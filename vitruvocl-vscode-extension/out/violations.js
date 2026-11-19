@@ -6,9 +6,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PRE_POST_SKIPPED_PREFIX = exports.SEVERITY_STYLE = void 0;
 exports.styleOf = styleOf;
+exports.genericViolation = genericViolation;
 exports.parseViolationBlock = parseViolationBlock;
 exports.inlineSummary = inlineSummary;
 exports.isSkipNotice = isSkipNotice;
+exports.violationsOf = violationsOf;
 exports.SEVERITY_STYLE = {
     CRITICAL: { symbol: '✖', color: '#e05252' },
     WARNING: { symbol: '⚠', color: '#e0b84a' },
@@ -19,6 +21,10 @@ exports.SEVERITY_STYLE = {
 /** The style of a severity; unknown severities are shown as warnings. */
 function styleOf(severity) {
     return exports.SEVERITY_STYLE[severity] ?? exports.SEVERITY_STYLE['WARNING'];
+}
+/** The note for a failed constraint whose violations are not known. */
+function genericViolation(constraintName) {
+    return `${constraintName} violated`;
 }
 /** The severity and message of a violation block the CLI reports as a warning. */
 function parseViolationBlock(block) {
@@ -35,13 +41,13 @@ function parseViolationBlock(block) {
  * violation and how many more there are, or a generic note if no details are known.
  */
 function inlineSummary(constraintName, details) {
-    if (details && details.length > 0) {
+    if (details.length > 0) {
         const { severity, message } = parseViolationBlock(details[0]);
         const style = styleOf(severity);
         const suffix = details.length > 1 ? ` (+${details.length - 1} more)` : '';
         return { text: ` ◀ ${style.symbol} ${severity}: ${message}${suffix}`, color: style.color };
     }
-    return { text: ` ◀ ⚠ WARNING: ${constraintName} violated`, color: exports.SEVERITY_STYLE['WARNING'].color };
+    return { text: ` ◀ ⚠ WARNING: ${genericViolation(constraintName)}`, color: exports.SEVERITY_STYLE['WARNING'].color };
 }
 /**
  * Stable prefix identifying a pre/post-skip notice among a constraint's plain-string warnings —
@@ -55,5 +61,9 @@ exports.PRE_POST_SKIPPED_PREFIX = 'PRE/POST SKIPPED:';
 /** Whether a warning is a pre/post skip notice rather than a violation. */
 function isSkipNotice(warning) {
     return warning.startsWith(exports.PRE_POST_SKIPPED_PREFIX);
+}
+/** The violations among a constraint's warnings: all but the pre/post skip notices. */
+function violationsOf(warnings) {
+    return (warnings ?? []).filter(w => !isSkipNotice(w));
 }
 //# sourceMappingURL=violations.js.map
