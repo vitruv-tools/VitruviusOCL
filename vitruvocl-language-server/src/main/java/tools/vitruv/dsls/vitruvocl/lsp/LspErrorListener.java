@@ -14,24 +14,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.logging.Logger;
-import org.antlr.v4.runtime.BaseErrorListener;
-import org.antlr.v4.runtime.RecognitionException;
-import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.Token;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalysis;
+import tools.vitruv.dsls.vitruvocl.analysis.SyntaxError;
 import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 
 /**
- * ANTLR error listener that converts parser/lexer errors to LSP {@link Diagnostic} objects.
- *
- * <p>Installed on both the {@code VitruvOCLLexer} and {@code VitruvOCLParser} so that all syntax
- * errors are captured in one place. ANTLR reports 1-based lines; LSP uses 0-based — the conversion
- * is applied here.
+ * Converts the lexer and parser errors of an {@link OclAnalysis} to LSP {@link Diagnostic} objects,
+ * suggesting a keyword where the offending token looks like a misspelled one. ANTLR reports 1-based
+ * lines; LSP uses 0-based — the conversion is applied here.
  */
-final class LspErrorListener extends BaseErrorListener {
+final class LspErrorListener {
 
   private static final Logger LOG = Logger.getLogger(LspErrorListener.class.getName());
 
@@ -43,15 +40,17 @@ final class LspErrorListener extends BaseErrorListener {
 
   private final List<Diagnostic> diagnostics = new ArrayList<>();
 
-  @Override
+  /**
+   * Adds the diagnostic for a lexer or parser error.
+   *
+   * @param error the error
+   */
   @SuppressWarnings("java:S3776")
-  public void syntaxError(
-      Recognizer<?, ?> recognizer,
-      Object offendingSymbol,
-      int line,
-      int charPositionInLine,
-      String msg,
-      RecognitionException e) {
+  void add(SyntaxError error) {
+    Token offendingSymbol = error.offendingToken();
+    int line = error.line();
+    int charPositionInLine = error.column();
+    String msg = error.message();
 
     // ANTLR: line is 1-based → LSP: 0-based.
     int lspLine = Math.max(0, line - 1);
@@ -61,7 +60,8 @@ final class LspErrorListener extends BaseErrorListener {
     String suggestion = null;
     int lspEnd = lspStart + 1;
 
-    if (offendingSymbol instanceof Token tok) {
+    if (offendingSymbol != null) {
+      Token tok = offendingSymbol;
       String text = tok.getText();
       lspEnd = lspStart + Math.max(1, text.length());
 
@@ -76,7 +76,8 @@ final class LspErrorListener extends BaseErrorListener {
         int dist = best == null ? Integer.MAX_VALUE : EditDistance.damerauLevenshtein(lower, best);
         int threshold = EditDistance.editThreshold(text.length());
 
-        if (dist <= threshold) {
+        // dist 0: the token is the keyword itself, just in the wrong place
+        if (dist > 0 && dist <= threshold) {
           msg = "Unknown keyword '" + text + "' — did you mean '" + best + "'?";
           suggestion = best;
         }

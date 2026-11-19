@@ -75,28 +75,37 @@ public record OclAnalysis(
   }
 
   /**
-   * The syntax errors as compile errors (source {@code "lexer"} or {@code "parser"}, spanning the
-   * offending token or character), followed by the errors and warnings of passes 1 and 2. Trailing
-   * input at the position of a pass error is left out: the type checker's error recovery explains
-   * it better, e.g. {@code Missing right-hand operand for '>='} instead of {@code unexpected input
-   * '>='}.
+   * The syntax errors to report: all of them, except trailing input at the position of a pass
+   * error, which the type checker's error recovery explains better, e.g. {@code Missing right-hand
+   * operand for '>='} instead of {@code unexpected input '>='}.
+   *
+   * @return the syntax errors in the order they were found
+   */
+  public List<SyntaxError> reportedSyntaxErrors() {
+    return syntaxErrors.stream()
+        .filter(
+            error ->
+                error.kind() != SyntaxError.Kind.TRAILING_INPUT
+                    || errors.stream()
+                        .noneMatch(
+                            e ->
+                                e.getSeverity() == ErrorSeverity.ERROR
+                                    && e.getLine() == error.line()
+                                    && e.getColumn() == error.column()))
+        .toList();
+  }
+
+  /**
+   * The {@linkplain #reportedSyntaxErrors() reported syntax errors} as compile errors (source
+   * {@code "lexer"} or {@code "parser"}, spanning the offending token or character), followed by
+   * the errors and warnings of passes 1 and 2.
    *
    * @return all errors in the order they were found
    */
   public List<CompileError> allErrors() {
     List<CompileError> all = new ArrayList<>();
-    for (SyntaxError error : syntaxErrors) {
-      boolean explained =
-          error.kind() == SyntaxError.Kind.TRAILING_INPUT
-              && errors.stream()
-                  .anyMatch(
-                      e ->
-                          e.getSeverity() == ErrorSeverity.ERROR
-                              && e.getLine() == error.line()
-                              && e.getColumn() == error.column());
-      if (!explained) {
-        all.add(toCompileError(error));
-      }
+    for (SyntaxError error : reportedSyntaxErrors()) {
+      all.add(toCompileError(error));
     }
     all.addAll(errors);
     return all;
