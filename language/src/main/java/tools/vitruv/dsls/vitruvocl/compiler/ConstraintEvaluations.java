@@ -26,6 +26,8 @@ import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.result.Violation;
 import tools.vitruv.dsls.vitruvocl.result.Warning;
+import tools.vitruv.dsls.vitruvocl.source.ConstraintUnit;
+import tools.vitruv.dsls.vitruvocl.source.OclSourceSplitter;
 
 /**
  * The two halves of evaluating a single constraint text: {@link #evaluateFresh} (compile and
@@ -96,7 +98,8 @@ public final class ConstraintEvaluations {
    * Renders {@code outcome} into the user-facing result: failures become a non-successful result
    * carrying the errors (a parser failure, which reports no errors, becomes a generic syntax
    * error); successes carry one {@code PRE_POST_SKIPPED} warning per skipped block and one {@code
-   * CONSTRAINT_VIOLATION} warning per violation record, in record order.
+   * CONSTRAINT_VIOLATION} warning per violation record, in record order, headed by the name of the
+   * constraint's first block (or "unnamed").
    *
    * <p>Instance labels and source files are computed from the instances' <em>current</em> state,
    * i.e. at render time.
@@ -124,7 +127,11 @@ public final class ConstraintEvaluations {
 
     List<EvaluationVisitor.ViolationRecord> records = outcome.records();
     boolean satisfied = records.isEmpty();
-    String constraintName = extractConstraintName(constraint);
+    // read from the tokens only when a violation message needs it
+    String constraintName =
+        satisfied
+            ? null
+            : OclSourceSplitter.firstBlock(constraint).map(ConstraintUnit::name).orElse("unnamed");
     List<Violation> violations = new ArrayList<>();
     for (EvaluationVisitor.ViolationRecord violation : records) {
       String sourceFile = wrapper.getSourceFileForInstance(violation.instance());
@@ -153,14 +160,6 @@ public final class ConstraintEvaluations {
         List.of(
             new Warning(
                 Warning.WarningType.DUPLICATE_CONSTRAINT, "Constraint specified multiple times")));
-  }
-
-  /** Extracts the name of the first {@code inv}/{@code pre}/{@code post} block, or "unnamed". */
-  public static String extractConstraintName(String constraint) {
-    java.util.regex.Matcher m =
-        java.util.regex.Pattern.compile("(?<!@)\\b(?:inv|pre|post)\\s+(\\w+)\\s*:")
-            .matcher(constraint);
-    return m.find() ? m.group(1) : "unnamed";
   }
 
   private static String describeInstance(EObject instance) {

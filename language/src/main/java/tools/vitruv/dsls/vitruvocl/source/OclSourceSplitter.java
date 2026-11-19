@@ -15,6 +15,8 @@ package tools.vitruv.dsls.vitruvocl.source;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -40,6 +42,13 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 public final class OclSourceSplitter {
 
   private static final String BYTE_ORDER_MARK = "\uFEFF";
+
+  /**
+   * The text of an identifier. A block name is read by its text rather than its token type, so that
+   * a name which is a reserved word of the expression language ({@code inv count: ...}, a syntax
+   * error) is still reported as the block's name.
+   */
+  private static final Pattern IDENTIFIER = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
 
   private static final int INV = literalType("'inv'");
   private static final int PRE = literalType("'pre'");
@@ -73,6 +82,10 @@ public final class OclSourceSplitter {
    * @return its constraint blocks and syntax errors
    */
   public static SplitResult split(String content) {
+    return split(content, true);
+  }
+
+  private static SplitResult split(String content, boolean collectSyntaxErrors) {
     CharStream input = CharStreams.fromString(withoutImports(content));
     List<SourceDiagnostic> syntaxErrors = new ArrayList<>();
     BaseErrorListener collector =
@@ -108,13 +121,28 @@ public final class OclSourceSplitter {
     lexer.addErrorListener(collector);
     lexer.addErrorListener(unlexableCollector);
     CommonTokenStream tokens = new CommonTokenStream(lexer);
-    if (tokens.LT(1).getType() != Token.EOF || !syntaxErrors.isEmpty()) {
+    if (collectSyntaxErrors && (tokens.LT(1).getType() != Token.EOF || !syntaxErrors.isEmpty())) {
       collectParseErrors(tokens, collector, syntaxErrors);
     }
     // the rest of the document, after where the parser stopped, is tokenized without reporting
     lexer.removeErrorListener(collector);
     tokens.fill();
     return new SplitResult(units(input, tokens.getTokens(), unlexable), syntaxErrors);
+  }
+
+  /**
+   * The first constraint block of a constraint text, e.g. the one a single compiled unit consists
+   * of; contexts without blocks are skipped.
+   *
+   * @param constraint a constraint text, e.g. a {@link ConstraintUnit#text()}
+   * @return the first block, with positions relative to {@code constraint}, or empty if there is
+   *     none
+   */
+  public static Optional<ConstraintUnit> firstBlock(String constraint) {
+    // only the tokens are needed: the parse for syntax errors is skipped
+    return split(constraint, false).units().stream()
+        .filter(unit -> unit.kind() != ConstraintUnit.Kind.EMPTY_CONTEXT)
+        .findFirst();
   }
 
   /**
@@ -210,7 +238,7 @@ public final class OclSourceSplitter {
     int afterName = first + 1;
     String name = null;
     if (afterName + 1 < end
-        && tokens.get(afterName).getType() == VitruvOCLLexer.ID
+        && IDENTIFIER.matcher(tokens.get(afterName).getText()).matches()
         && (tokens.get(afterName + 1).getType() == COLON
             || tokens.get(afterName + 1).getType() == LPAREN)) {
       name = tokens.get(afterName).getText();

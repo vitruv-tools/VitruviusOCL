@@ -13,9 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.cli;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -482,7 +480,9 @@ class VitruvOclCliTest {
           "--xmi", SPACECRAFT_VOYAGER.toString()
         });
 
-    assertTrue(output().contains("unknown"), "Unnamed constraint should use 'unknown' as name");
+    assertTrue(
+        output().contains("\"name\":\"unknown\""),
+        "Unnamed constraint should use 'unknown' as name");
   }
 
   /** Tests that eval-batch output contains name, success and satisfied fields per constraint. */
@@ -729,60 +729,5 @@ class VitruvOclCliTest {
     assertTrue(
         out.contains("does-not-exist.ecore"),
         "The error message should name the missing file, not leave \"errors\" empty: " + out);
-  }
-
-  // ══════════════════════════════════════════════════════════════
-  // extractConstraintName (unit tests)
-  // ══════════════════════════════════════════════════════════════
-
-  /** Tests extraction of named invariant from multiline constraint. */
-  @Test
-  void testExtractNamedConstraint() {
-    String constraint = "context spaceMission::Spacecraft inv myInvariant:\n  self.mass > 0";
-    assertEquals("myInvariant", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests that unnamed invariant returns 'unknown'. */
-  @Test
-  void testExtractUnnamedConstraint() {
-    String constraint = "context spaceMission::Spacecraft inv:\n  self.mass > 0";
-    assertEquals("unknown", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction with whitespace around constraint name. */
-  @Test
-  void testExtractConstraintNameWithWhitespace() {
-    String constraint = "context spaceMission::Spacecraft inv  myName  :\n  self.mass > 0";
-    assertEquals("myName", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction from single-line constraint. */
-  @Test
-  void testExtractConstraintNameSingleLine() {
-    String constraint = "context spaceMission::Spacecraft inv singleLine: self.mass > 0";
-    assertEquals("singleLine", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction from qualified context name. */
-  @Test
-  void testExtractConstraintNameQualifiedContext() {
-    String constraint = "context brakesystem::BrakeDisk inv overlapping:\n  self.radius > 0";
-    assertEquals("overlapping", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction returns 'unknown' when no inv keyword present. */
-  @Test
-  void testExtractConstraintNameNoInv() {
-    String constraint = "context spaceMission::Spacecraft\n  self.mass > 0";
-    assertEquals("unknown", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction from constraint with parenthesized name. */
-  @Test
-  void testExtractConstraintNameWithParenthesizedSpec() {
-    String constraint = "context spaceMission::Spacecraft inv myName(self.mass > 0): true";
-    // The method extracts up to the colon — parenthesized form may not be standard
-    // but the fallback should still not crash
-    assertNotNull(VitruvOclCli.extractConstraintName(constraint));
   }
 }

@@ -182,6 +182,16 @@ class VitruvOclEngineTest {
   }
 
   @Test
+  void violationMessagesAreHeadedByTheConstraintName() {
+    ConstraintResult named =
+        files().evaluate("context spaceMission::Spacecraft inv heavy: self.mass < 0");
+    ConstraintResult unnamed = files().evaluate(VIOLATED);
+
+    assertThat(warningMessages(named)).isNotEmpty().allMatch(m -> m.contains("] heavy\n"));
+    assertThat(warningMessages(unnamed)).isNotEmpty().allMatch(m -> m.contains("] unnamed\n"));
+  }
+
+  @Test
   void evaluateFileKeepsCommentsAndKeywordsInsideTheirConstraint() throws IOException {
     // each of these used to break the regex-based split: a trailing comment ended up as an
     // operator at the end of the unit, keywords inside a string or comment started a new unit

@@ -16,7 +16,10 @@ package tools.vitruv.dsls.vitruvocl.result;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.source.ConstraintUnit;
+import tools.vitruv.dsls.vitruvocl.source.OclSourceSplitter;
 
 /**
  * Result of evaluating a single VitruvOCL constraint.
@@ -140,6 +143,27 @@ public class ConstraintResult {
    */
   public String getConstraint() {
     return constraint;
+  }
+
+  /**
+   * Returns the first constraint block of the evaluated text, read from its tokens; computed on
+   * every call.
+   *
+   * @return the block, with lines relative to {@link #getConstraint()} (a leading byte order mark
+   *     is not counted in the columns), or empty if the text has none
+   */
+  public Optional<ConstraintUnit> getUnit() {
+    return OclSourceSplitter.firstBlock(constraint);
+  }
+
+  /**
+   * Returns the name of the first constraint block of the evaluated text ({@code a} in {@code inv
+   * a: ...}).
+   *
+   * @return the name, or empty if the block is unnamed or the text has none
+   */
+  public Optional<String> getName() {
+    return getUnit().map(ConstraintUnit::name);
   }
 
   /**

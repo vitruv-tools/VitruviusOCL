@@ -148,8 +148,7 @@ public class VitruvOclCli {
 
     List<String> constraintResults = new ArrayList<>();
     for (ConstraintResult result : batch.getResults()) {
-      // Extract constraint name from "context X inv NAME:"
-      String name = extractConstraintName(result.getConstraint());
+      String name = result.getName().orElse("unknown");
 
       StringBuilder constraintJson = new StringBuilder();
       constraintJson.append("{");
@@ -236,23 +235,6 @@ public class VitruvOclCli {
     }
     String fromProperty = System.getProperty(IncrementalConfig.PROP_LEVEL);
     return fromProperty == null ? null : IncrementalLevel.parse(fromProperty);
-  }
-
-  /**
-   * Extracts the constraint name from an {@code inv}/{@code pre}/{@code post} {@code NAME:}
-   * declaration.
-   *
-   * @param constraint the OCL constraint source
-   * @return the extracted name, or a fallback value if none is found
-   */
-  public static String extractConstraintName(String constraint) {
-    java.util.regex.Matcher matcher =
-        java.util.regex.Pattern.compile("(?<!@)\\b(?:inv|pre|post)\\s+(\\w+)\\s*:")
-            .matcher(constraint);
-    if (matcher.find()) {
-      return matcher.group(1);
-    }
-    return "unknown";
   }
 
   /**

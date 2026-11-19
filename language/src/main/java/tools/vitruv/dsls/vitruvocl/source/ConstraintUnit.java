@@ -20,7 +20,8 @@ import java.util.List;
  * it can be compiled and evaluated on its own.
  *
  * @param kind the kind of block
- * @param name the block's name ({@code a} in {@code inv a: ...}), or {@code null} if unnamed
+ * @param name the block's name ({@code a} in {@code inv a: ...}; also a reserved word such as
+ *     {@code count}, which the grammar rejects), or {@code null} if unnamed
  * @param contextType the context type as written, e.g. {@code shop::Item} for {@code context
  *     shop::Item::setPrice(p : Integer)}, or {@code null} if the declaration is malformed
  * @param header the context declaration as written, from {@code context} up to the first block of
