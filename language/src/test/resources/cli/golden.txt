@@ -9,81 +9,82 @@
 ### noArguments
 $
 => exit 1
-=> out VitruvOCL Command Line Interface
-=> out
-=> out Usage:
-=> out   vitruvocl check <constraint-file> --ecore <files>
-=> out       Type-check constraint syntax and semantics
-=> out
-=> out   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
-=> out       Evaluate single constraint against model instances
-=> out
-=> out   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
-=> out                        [--incremental-level <0-3>]
-=> out       Evaluate all constraints (in parallel) and return individual results
-=> out
-=> out   vitruvocl version
-=> out       Print version information
-=> out
-=> out Arguments:
-=> out   <constraint-file>     Path to .ocl/.vocl file with single constraint
-=> out   <constraints-file>    Path to .ocl file with multiple constraints
-=> out   --ecore <files>       Comma-separated .ecore metamodel files
-=> out   --xmi <files>         Comma-separated model instance files
-=> out   --threads <N>         eval-batch only: worker threads for constraint evaluation
-=> out                          (default: number of available processors)
-=> out   --incremental-level <0-3>
-=> out                         eval-batch only: incremental evaluation level (default 0, or the
-=> out                          system property vitruvocl.incremental.level). The CLI has no
-=> out                          transaction, so every level reports the result of the initial
-=> out                          full evaluation.
-=> out
-=> out Examples:
-=> out   vitruvocl check constraints.ocl --ecore spacemission.ecore
-=> out   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
-=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
-=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
-=> out
+=> out {"success":false,"error":"Missing command"}
+=> err VitruvOCL Command Line Interface
+=> err
+=> err Usage:
+=> err   vitruvocl check <constraint-file> --ecore <files>
+=> err       Type-check constraint syntax and semantics
+=> err
+=> err   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
+=> err       Evaluate single constraint against model instances
+=> err
+=> err   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
+=> err                        [--incremental-level <0-3>]
+=> err       Evaluate all constraints (in parallel) and return individual results
+=> err
+=> err   vitruvocl version
+=> err       Print version information
+=> err
+=> err Arguments:
+=> err   <constraint-file>     Path to .ocl/.vocl file with single constraint
+=> err   <constraints-file>    Path to .ocl file with multiple constraints
+=> err   --ecore <files>       Comma-separated .ecore metamodel files
+=> err   --xmi <files>         Comma-separated model instance files
+=> err   --threads <N>         eval-batch only: worker threads for constraint evaluation
+=> err                          (default: number of available processors)
+=> err   --incremental-level <0-3>
+=> err                         eval-batch only: incremental evaluation level (default 0, or the
+=> err                          system property vitruvocl.incremental.level). The CLI has no
+=> err                          transaction, so every level reports the result of the initial
+=> err                          full evaluation.
+=> err
+=> err Examples:
+=> err   vitruvocl check constraints.ocl --ecore spacemission.ecore
+=> err   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> err   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> err   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
+=> err
 
 ### unknownCommand
 $ frobnicate
 => exit 1
-=> out VitruvOCL Command Line Interface
-=> out
-=> out Usage:
-=> out   vitruvocl check <constraint-file> --ecore <files>
-=> out       Type-check constraint syntax and semantics
-=> out
-=> out   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
-=> out       Evaluate single constraint against model instances
-=> out
-=> out   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
-=> out                        [--incremental-level <0-3>]
-=> out       Evaluate all constraints (in parallel) and return individual results
-=> out
-=> out   vitruvocl version
-=> out       Print version information
-=> out
-=> out Arguments:
-=> out   <constraint-file>     Path to .ocl/.vocl file with single constraint
-=> out   <constraints-file>    Path to .ocl file with multiple constraints
-=> out   --ecore <files>       Comma-separated .ecore metamodel files
-=> out   --xmi <files>         Comma-separated model instance files
-=> out   --threads <N>         eval-batch only: worker threads for constraint evaluation
-=> out                          (default: number of available processors)
-=> out   --incremental-level <0-3>
-=> out                         eval-batch only: incremental evaluation level (default 0, or the
-=> out                          system property vitruvocl.incremental.level). The CLI has no
-=> out                          transaction, so every level reports the result of the initial
-=> out                          full evaluation.
-=> out
-=> out Examples:
-=> out   vitruvocl check constraints.ocl --ecore spacemission.ecore
-=> out   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
-=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
-=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
-=> out
-=> err Unknown command: frobnicate
+=> out {"success":false,"error":"Unknown command: frobnicate"}
+=> err VitruvOCL Command Line Interface
+=> err
+=> err Usage:
+=> err   vitruvocl check <constraint-file> --ecore <files>
+=> err       Type-check constraint syntax and semantics
+=> err
+=> err   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
+=> err       Evaluate single constraint against model instances
+=> err
+=> err   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
+=> err                        [--incremental-level <0-3>]
+=> err       Evaluate all constraints (in parallel) and return individual results
+=> err
+=> err   vitruvocl version
+=> err       Print version information
+=> err
+=> err Arguments:
+=> err   <constraint-file>     Path to .ocl/.vocl file with single constraint
+=> err   <constraints-file>    Path to .ocl file with multiple constraints
+=> err   --ecore <files>       Comma-separated .ecore metamodel files
+=> err   --xmi <files>         Comma-separated model instance files
+=> err   --threads <N>         eval-batch only: worker threads for constraint evaluation
+=> err                          (default: number of available processors)
+=> err   --incremental-level <0-3>
+=> err                         eval-batch only: incremental evaluation level (default 0, or the
+=> err                          system property vitruvocl.incremental.level). The CLI has no
+=> err                          transaction, so every level reports the result of the initial
+=> err                          full evaluation.
+=> err
+=> err Examples:
+=> err   vitruvocl check constraints.ocl --ecore spacemission.ecore
+=> err   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> err   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> err   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
+=> err
 
 ### version
 $ version
@@ -93,42 +94,42 @@ $ version
 ### missingConstraintFile
 $ check
 => exit 1
-=> out VitruvOCL Command Line Interface
-=> out
-=> out Usage:
-=> out   vitruvocl check <constraint-file> --ecore <files>
-=> out       Type-check constraint syntax and semantics
-=> out
-=> out   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
-=> out       Evaluate single constraint against model instances
-=> out
-=> out   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
-=> out                        [--incremental-level <0-3>]
-=> out       Evaluate all constraints (in parallel) and return individual results
-=> out
-=> out   vitruvocl version
-=> out       Print version information
-=> out
-=> out Arguments:
-=> out   <constraint-file>     Path to .ocl/.vocl file with single constraint
-=> out   <constraints-file>    Path to .ocl file with multiple constraints
-=> out   --ecore <files>       Comma-separated .ecore metamodel files
-=> out   --xmi <files>         Comma-separated model instance files
-=> out   --threads <N>         eval-batch only: worker threads for constraint evaluation
-=> out                          (default: number of available processors)
-=> out   --incremental-level <0-3>
-=> out                         eval-batch only: incremental evaluation level (default 0, or the
-=> out                          system property vitruvocl.incremental.level). The CLI has no
-=> out                          transaction, so every level reports the result of the initial
-=> out                          full evaluation.
-=> out
-=> out Examples:
-=> out   vitruvocl check constraints.ocl --ecore spacemission.ecore
-=> out   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
-=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
-=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
-=> out
-=> err Missing constraint file
+=> out {"success":false,"error":"Missing constraint file"}
+=> err VitruvOCL Command Line Interface
+=> err
+=> err Usage:
+=> err   vitruvocl check <constraint-file> --ecore <files>
+=> err       Type-check constraint syntax and semantics
+=> err
+=> err   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
+=> err       Evaluate single constraint against model instances
+=> err
+=> err   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
+=> err                        [--incremental-level <0-3>]
+=> err       Evaluate all constraints (in parallel) and return individual results
+=> err
+=> err   vitruvocl version
+=> err       Print version information
+=> err
+=> err Arguments:
+=> err   <constraint-file>     Path to .ocl/.vocl file with single constraint
+=> err   <constraints-file>    Path to .ocl file with multiple constraints
+=> err   --ecore <files>       Comma-separated .ecore metamodel files
+=> err   --xmi <files>         Comma-separated model instance files
+=> err   --threads <N>         eval-batch only: worker threads for constraint evaluation
+=> err                          (default: number of available processors)
+=> err   --incremental-level <0-3>
+=> err                         eval-batch only: incremental evaluation level (default 0, or the
+=> err                          system property vitruvocl.incremental.level). The CLI has no
+=> err                          transaction, so every level reports the result of the initial
+=> err                          full evaluation.
+=> err
+=> err Examples:
+=> err   vitruvocl check constraints.ocl --ecore spacemission.ecore
+=> err   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> err   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> err   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
+=> err
 
 ### checkValid
 $ check {CLI}/valid.ocl --ecore {MM}
@@ -203,17 +204,17 @@ $ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --incremental-level 1
 ### batchInvalidThreads
 $ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --threads x
 => exit 1
-=> err Invalid --threads value: x (must be an integer)
+=> out {"success":false,"error":"Invalid --threads value: x (must be an integer)"}
 
 ### batchZeroThreads
 $ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --threads 0
 => exit 1
-=> err --threads must be at least 1, got: 0
+=> out {"success":false,"error":"--threads must be at least 1, got: 0"}
 
 ### batchInvalidLevel
 $ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --incremental-level 9
 => exit 1
-=> err Invalid --incremental-level value: 9 (must be 0-3)
+=> out {"success":false,"error":"Invalid --incremental-level value: 9 (must be 0-3)"}
 
 ### batchMissingEcore
 $ eval-batch {CLI}/batch.ocl --ecore missing.ecore --xmi {MODEL}

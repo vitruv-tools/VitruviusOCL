@@ -70,7 +70,7 @@ final class CliJson {
   /** The result of {@code eval-batch}. */
   record BatchOutput(boolean success, List<BatchEntry> constraints) {}
 
-  /** A command that failed with an exception. */
+  /** A command that failed with an exception or invalid arguments. */
   record FailureOutput(boolean success, String error) {}
 
   /** The JSON of {@code check}: success and every error, with severity. */
@@ -107,9 +107,12 @@ final class CliJson {
 
   /** The JSON of a command that failed with {@code exception}. */
   static String failure(Exception exception) {
-    return GSON.toJson(
-        new FailureOutput(
-            false, exception.getClass().getSimpleName() + ": " + exception.getMessage()));
+    return failure(exception.getClass().getSimpleName() + ": " + exception.getMessage());
+  }
+
+  /** The JSON of a command that failed, e.g. because of invalid arguments. */
+  static String failure(String error) {
+    return GSON.toJson(new FailureOutput(false, error));
   }
 
   /**

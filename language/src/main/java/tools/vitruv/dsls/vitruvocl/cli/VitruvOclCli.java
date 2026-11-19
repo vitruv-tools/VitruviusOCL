@@ -29,15 +29,17 @@ import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Command-line interface for VitruvOCL compiler. Outputs JSON for easy integration with IDEs and
- * tools; the documents are described by {@link CliJson}.
+ * tools; the documents are described by {@link CliJson}. Every command except {@code version}
+ * prints exactly one JSON document on standard output; a failure, including invalid arguments, is
+ * {@code {"success":false,"error":...}} with exit status 1.
  */
 @SuppressWarnings("java:S106")
 public class VitruvOclCli {
 
-  /** Standard output: results as JSON, usage text and version. */
+  /** Standard output: the JSON result or failure, and the version. */
   private final PrintStream out;
 
-  /** Standard error: messages about invalid arguments. */
+  /** Standard error: the usage text after invalid arguments. */
   private final PrintStream err;
 
   private VitruvOclCli(PrintStream out, PrintStream err) {
@@ -61,8 +63,8 @@ public class VitruvOclCli {
    * Runs a command.
    *
    * @param args command-line arguments; first argument selects the subcommand
-   * @param out where results, the usage text and the version are printed
-   * @param err where messages about invalid arguments are printed
+   * @param out where the JSON result or failure and the version are printed
+   * @param err where the usage text is printed after invalid arguments
    * @return the exit status: 0 on success, 1 on invalid arguments or a failed command
    */
   static int run(String[] args, PrintStream out, PrintStream err) {
@@ -77,8 +79,7 @@ public class VitruvOclCli {
 
   private void execute(String[] args) {
     if (args.length == 0) {
-      printUsage();
-      throw new ExitException(1);
+      throw invalidArguments("Missing command", true);
     }
 
     String command = args[0];
@@ -89,11 +90,7 @@ public class VitruvOclCli {
         case "eval" -> evalConstraint(args);
         case "eval-batch" -> evalBatch(args);
         case "version" -> printVersion();
-        default -> {
-          err.println("Unknown command: " + command);
-          printUsage();
-          throw new ExitException(1);
-        }
+        default -> throw invalidArguments("Unknown command: " + command, true);
       }
     } catch (ExitException exit) {
       throw exit;
@@ -192,13 +189,12 @@ public class VitruvOclCli {
         try {
           int threadPoolSize = Integer.parseInt(value);
           if (threadPoolSize < 1) {
-            err.println("--threads must be at least 1, got: " + value);
-            throw new ExitException(1);
+            throw invalidArguments("--threads must be at least 1, got: " + value, false);
           }
           return threadPoolSize;
         } catch (NumberFormatException e) {
-          err.println("Invalid --threads value: " + value + " (must be an integer)");
-          throw new ExitException(1);
+          throw invalidArguments(
+              "Invalid --threads value: " + value + " (must be an integer)", false);
         }
       }
     }
@@ -221,21 +217,32 @@ public class VitruvOclCli {
         try {
           return IncrementalLevel.parse(value);
         } catch (IllegalArgumentException e) {
-          err.println("Invalid --incremental-level value: " + value + " (must be 0-3)");
-          throw new ExitException(1);
+          throw invalidArguments(
+              "Invalid --incremental-level value: " + value + " (must be 0-3)", false);
         }
       }
     }
     String fromProperty = System.getProperty(IncrementalConfig.PROP_LEVEL);
-    return fromProperty == null ? null : IncrementalLevel.parse(fromProperty);
+    if (fromProperty == null) {
+      return null;
+    }
+    try {
+      return IncrementalLevel.parse(fromProperty);
+    } catch (IllegalArgumentException e) {
+      throw invalidArguments(
+          "Invalid system property "
+              + IncrementalConfig.PROP_LEVEL
+              + ": "
+              + fromProperty
+              + " (must be 0-3)",
+          false);
+    }
   }
 
   @SuppressWarnings("java:S127")
   private CLIArgs parseArgs(String[] args) {
     if (args.length < 2) {
-      err.println("Missing constraint file");
-      printUsage();
-      throw new ExitException(1);
+      throw invalidArguments("Missing constraint file", true);
     }
 
     Path constraintFile = Path.of(args[1]);
@@ -261,8 +268,24 @@ public class VitruvOclCli {
     return new CLIArgs(constraintFile, ecoreFiles, xmiFiles);
   }
 
+  /**
+   * Reports invalid arguments: the message as a JSON failure on standard output, so that a caller
+   * parsing it always gets JSON, and the usage text on standard error.
+   *
+   * @param message what is wrong
+   * @param withUsage whether to print the usage text
+   * @return the exception that ends the command with status 1
+   */
+  private ExitException invalidArguments(String message, boolean withUsage) {
+    out.println(CliJson.failure(message));
+    if (withUsage) {
+      printUsage();
+    }
+    return new ExitException(1);
+  }
+
   private void printUsage() {
-    out.println(
+    err.println(
         """
         VitruvOCL Command Line Interface
 
