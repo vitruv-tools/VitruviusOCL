@@ -100,7 +100,8 @@ class ConstraintRunner {
         }
         const instanceFiles = await (0, discovery_1.findInstanceFiles)(document, this.workspaceState);
         if (instanceFiles === undefined) {
-            vscode.window.showInformationMessage('VitruvOCL: no VSUM chosen, the constraints were not run.');
+            vscode.window.showInformationMessage('VitruvOCL: no VSUM chosen, the constraints were not run. Run them again to choose one, '
+                + 'or set "vitruvocl.vsumPath" to the VSUM folder.');
             return undefined;
         }
         if (!(0, vsumFiles_1.containsVsum)(instanceFiles)) {

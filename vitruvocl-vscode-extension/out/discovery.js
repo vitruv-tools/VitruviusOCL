@@ -107,7 +107,10 @@ async function findVsumCandidates(workspaceRoot) {
     const roots = [...new Set(correspondences
             .map(u => (0, vsumFiles_1.vsumRootOf)(u.fsPath))
             .filter((root) => root !== undefined))];
-    return roots.sort().map(root => ({ root, files: (0, vsumFiles_1.collectVsumFiles)(root) }));
+    // natural order, so that size-20 comes before size-150
+    return roots
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        .map(root => ({ root, files: (0, vsumFiles_1.collectVsumFiles)(root) }));
 }
 /**
  * Lets the user choose among VSUM folders that fit the constraints equally well, and remembers
@@ -123,7 +126,12 @@ async function chooseVsum(candidates, workspaceRoot, memento) {
         label: path.relative(workspaceRoot, candidate.root) || '.',
         description: `${candidate.files.length} model files`,
         candidate,
-    })), { placeHolder: 'Several VSUMs fit these constraints: which one should they be checked against?' });
+    })), {
+        title: 'VitruvOCL: choose the VSUM',
+        placeHolder: 'Several VSUMs fit these constraints: which one should they be checked against?',
+        // stays open when the focus moves, e.g. back to the editor the run was started from
+        ignoreFocusOut: true,
+    });
     if (picked) {
         await memento.update(key, picked.candidate.root);
     }
