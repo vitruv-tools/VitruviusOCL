@@ -1,0 +1,226 @@
+# Output of the CLI, byte for byte. Each case: "### name", the arguments ({CLI}, {MM} and {MODEL}
+# stand for the test inputs, the spaceMission metamodel and the voyager model), then "=> exit <status>"
+# and every line of standard output ("=> out ") and standard error ("=> err "). [fix] marks a case whose
+# output was corrected when the JSON moved to Gson (control characters used to be printed raw).
+# An empty output line is written as "=> out" without a trailing space. The expected warnings show the
+# attributes of test-models/spacecraft-voyager.spacemission. Change expectations only for intended
+# behaviour changes.
+
+### noArguments
+$
+=> exit 1
+=> out VitruvOCL Command Line Interface
+=> out
+=> out Usage:
+=> out   vitruvocl check <constraint-file> --ecore <files>
+=> out       Type-check constraint syntax and semantics
+=> out
+=> out   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
+=> out       Evaluate single constraint against model instances
+=> out
+=> out   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
+=> out                        [--incremental-level <0-3>]
+=> out       Evaluate all constraints (in parallel) and return individual results
+=> out
+=> out   vitruvocl version
+=> out       Print version information
+=> out
+=> out Arguments:
+=> out   <constraint-file>     Path to .ocl/.vocl file with single constraint
+=> out   <constraints-file>    Path to .ocl file with multiple constraints
+=> out   --ecore <files>       Comma-separated .ecore metamodel files
+=> out   --xmi <files>         Comma-separated model instance files
+=> out   --threads <N>         eval-batch only: worker threads for constraint evaluation
+=> out                          (default: number of available processors)
+=> out   --incremental-level <0-3>
+=> out                         eval-batch only: incremental evaluation level (default 0, or the
+=> out                          system property vitruvocl.incremental.level). The CLI has no
+=> out                          transaction, so every level reports the result of the initial
+=> out                          full evaluation.
+=> out
+=> out Examples:
+=> out   vitruvocl check constraints.ocl --ecore spacemission.ecore
+=> out   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
+=> out
+
+### unknownCommand
+$ frobnicate
+=> exit 1
+=> out VitruvOCL Command Line Interface
+=> out
+=> out Usage:
+=> out   vitruvocl check <constraint-file> --ecore <files>
+=> out       Type-check constraint syntax and semantics
+=> out
+=> out   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
+=> out       Evaluate single constraint against model instances
+=> out
+=> out   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
+=> out                        [--incremental-level <0-3>]
+=> out       Evaluate all constraints (in parallel) and return individual results
+=> out
+=> out   vitruvocl version
+=> out       Print version information
+=> out
+=> out Arguments:
+=> out   <constraint-file>     Path to .ocl/.vocl file with single constraint
+=> out   <constraints-file>    Path to .ocl file with multiple constraints
+=> out   --ecore <files>       Comma-separated .ecore metamodel files
+=> out   --xmi <files>         Comma-separated model instance files
+=> out   --threads <N>         eval-batch only: worker threads for constraint evaluation
+=> out                          (default: number of available processors)
+=> out   --incremental-level <0-3>
+=> out                         eval-batch only: incremental evaluation level (default 0, or the
+=> out                          system property vitruvocl.incremental.level). The CLI has no
+=> out                          transaction, so every level reports the result of the initial
+=> out                          full evaluation.
+=> out
+=> out Examples:
+=> out   vitruvocl check constraints.ocl --ecore spacemission.ecore
+=> out   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
+=> out
+=> err Unknown command: frobnicate
+
+### version
+$ version
+=> exit 0
+=> out VitruvOCL 1.0.0
+
+### missingConstraintFile
+$ check
+=> exit 1
+=> out VitruvOCL Command Line Interface
+=> out
+=> out Usage:
+=> out   vitruvocl check <constraint-file> --ecore <files>
+=> out       Type-check constraint syntax and semantics
+=> out
+=> out   vitruvocl eval <constraint-file> --ecore <files> --xmi <files>
+=> out       Evaluate single constraint against model instances
+=> out
+=> out   vitruvocl eval-batch <constraints-file> --ecore <files> --xmi <files> [--threads <N>]
+=> out                        [--incremental-level <0-3>]
+=> out       Evaluate all constraints (in parallel) and return individual results
+=> out
+=> out   vitruvocl version
+=> out       Print version information
+=> out
+=> out Arguments:
+=> out   <constraint-file>     Path to .ocl/.vocl file with single constraint
+=> out   <constraints-file>    Path to .ocl file with multiple constraints
+=> out   --ecore <files>       Comma-separated .ecore metamodel files
+=> out   --xmi <files>         Comma-separated model instance files
+=> out   --threads <N>         eval-batch only: worker threads for constraint evaluation
+=> out                          (default: number of available processors)
+=> out   --incremental-level <0-3>
+=> out                         eval-batch only: incremental evaluation level (default 0, or the
+=> out                          system property vitruvocl.incremental.level). The CLI has no
+=> out                          transaction, so every level reports the result of the initial
+=> out                          full evaluation.
+=> out
+=> out Examples:
+=> out   vitruvocl check constraints.ocl --ecore spacemission.ecore
+=> out   vitruvocl eval constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi
+=> out   vitruvocl eval-batch constraints.ocl --ecore model.ecore --xmi instance.xmi --threads 4
+=> out
+=> err Missing constraint file
+
+### checkValid
+$ check {CLI}/valid.ocl --ecore {MM}
+=> exit 0
+=> out {"success":true,"diagnostics":[]}
+
+### checkTypeError
+$ check {CLI}/type-error.ocl --ecore {MM}
+=> exit 0
+=> out {"success":false,"diagnostics":[{"line":1,"column":45,"message":"Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)","severity":"ERROR"}]}
+
+### checkSyntaxError
+$ check {CLI}/syntax-error.ocl --ecore {MM}
+=> exit 0
+=> out {"success":false,"diagnostics":[{"line":2,"column":0,"message":"extraneous input '<EOF>' expecting {'(', ')', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}","severity":"ERROR"}]}
+
+### checkMissingEcore
+$ check {CLI}/valid.ocl --ecore missing.ecore
+=> exit 0
+=> out {"success":false,"diagnostics":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.ecore - File does not exist","severity":"ERROR"}]}
+
+### checkNonexistentConstraintFile
+$ check does-not-exist.ocl --ecore {MM}
+=> exit 1
+=> out {"success":false,"error":"NoSuchFileException: does-not-exist.ocl"}
+
+### evalSatisfied
+$ eval {CLI}/valid.ocl --ecore {MM} --xmi {MODEL}
+=> exit 0
+=> out {"success":true,"satisfied":true,"errors":[],"warnings":[]}
+
+### evalViolated
+$ eval {CLI}/violated.ocl --ecore {MM} --xmi {MODEL}
+=> exit 0
+=> out {"success":true,"satisfied":false,"errors":[],"warnings":["---------------------------------------------------------\n[CRITICAL] tooHeavy\nModel   : spacecraft-voyager.spacemission\nObject  : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\nMessage : Spacecraft \"Voyager\" is \\\"heavy\\\"\t\\ x\n---------------------------------------------------------"]}
+
+### evalControlCharacters[fix]
+$ eval {CLI}/control-character.ocl --ecore {MM} --xmi {MODEL}
+=> exit 0
+=> out {"success":true,"satisfied":false,"errors":[],"warnings":["---------------------------------------------------------\n[WARNING] odd\nModel   : spacecraft-voyager.spacemission\nObject  : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\nMessage : bell \u0007 and \u0001\n---------------------------------------------------------"]}
+
+### evalTypeError
+$ eval {CLI}/type-error.ocl --ecore {MM} --xmi {MODEL}
+=> exit 0
+=> out {"success":false,"satisfied":false,"errors":[{"line":1,"column":45,"message":"Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)","severity":"ERROR"}],"warnings":[]}
+
+### evalMissingModel
+$ eval {CLI}/valid.ocl --ecore {MM} --xmi missing.spacemission
+=> exit 0
+=> out {"success":false,"satisfied":false,"errors":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.spacemission - File does not exist","severity":"ERROR"}],"warnings":[]}
+
+### evalNonexistentConstraintFile
+$ eval does-not-exist.ocl --ecore {MM} --xmi {MODEL}
+=> exit 1
+=> out {"success":false,"error":"NoSuchFileException: does-not-exist.ocl"}
+
+### batch
+$ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL}
+=> exit 0
+=> out {"success":true,"constraints":[{"name":"massPositive","success":true,"satisfied":true},{"name":"unknown","success":true,"satisfied":true},{"name":"tooHeavy","success":true,"satisfied":false,"warnings":["---------------------------------------------------------\n[MAJOR] tooHeavy\nModel   : spacecraft-voyager.spacemission\nObject  : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\nMessage : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\n---------------------------------------------------------"]},{"name":"broken","success":false,"satisfied":false,"errors":[{"line":2,"column":17,"message":"Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)"}]},{"name":"ready","success":true,"satisfied":true,"warnings":["PRE/POST SKIPPED: 'pre ready' block in context spaceMission::Spacecraft was not evaluated — pre/post constraints require a transaction, which this evaluation mode does not provide. Only invariants (inv) were checked."]}]}
+
+### batchThreads
+$ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --threads 2
+=> exit 0
+=> out {"success":true,"constraints":[{"name":"massPositive","success":true,"satisfied":true},{"name":"unknown","success":true,"satisfied":true},{"name":"tooHeavy","success":true,"satisfied":false,"warnings":["---------------------------------------------------------\n[MAJOR] tooHeavy\nModel   : spacecraft-voyager.spacemission\nObject  : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\nMessage : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\n---------------------------------------------------------"]},{"name":"broken","success":false,"satisfied":false,"errors":[{"line":2,"column":17,"message":"Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)"}]},{"name":"ready","success":true,"satisfied":true,"warnings":["PRE/POST SKIPPED: 'pre ready' block in context spaceMission::Spacecraft was not evaluated — pre/post constraints require a transaction, which this evaluation mode does not provide. Only invariants (inv) were checked."]}]}
+
+### batchIncremental
+$ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --incremental-level 1
+=> exit 0
+=> out {"success":true,"constraints":[{"name":"massPositive","success":true,"satisfied":true},{"name":"unknown","success":true,"satisfied":true},{"name":"tooHeavy","success":true,"satisfied":false,"warnings":["---------------------------------------------------------\n[MAJOR] tooHeavy\nModel   : spacecraft-voyager.spacemission\nObject  : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\nMessage : Spacecraft(name=\"Voyager\", serialNumber=\"SC-001\", mass=\"722\")\n---------------------------------------------------------"]},{"name":"broken","success":false,"satisfied":false,"errors":[{"line":2,"column":17,"message":"Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)"}]},{"name":"ready","success":true,"satisfied":true,"warnings":["PRE/POST SKIPPED: 'pre ready' block in context spaceMission::Spacecraft was not evaluated — pre/post constraints require a transaction, which this evaluation mode does not provide. Only invariants (inv) were checked."]}]}
+
+### batchInvalidThreads
+$ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --threads x
+=> exit 1
+=> err Invalid --threads value: x (must be an integer)
+
+### batchZeroThreads
+$ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --threads 0
+=> exit 1
+=> err --threads must be at least 1, got: 0
+
+### batchInvalidLevel
+$ eval-batch {CLI}/batch.ocl --ecore {MM} --xmi {MODEL} --incremental-level 9
+=> exit 1
+=> err Invalid --incremental-level value: 9 (must be 0-3)
+
+### batchMissingEcore
+$ eval-batch {CLI}/batch.ocl --ecore missing.ecore --xmi {MODEL}
+=> exit 0
+=> out {"success":true,"constraints":[{"name":"massPositive","success":false,"satisfied":false,"errors":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.ecore - File does not exist"}]},{"name":"unknown","success":false,"satisfied":false,"errors":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.ecore - File does not exist"}]},{"name":"tooHeavy","success":false,"satisfied":false,"errors":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.ecore - File does not exist"}]},{"name":"broken","success":false,"satisfied":false,"errors":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.ecore - File does not exist"}]},{"name":"ready","success":false,"satisfied":false,"errors":[{"line":0,"column":0,"message":"File not found: {CWD}/missing.ecore - File does not exist"}]}]}
+
+### batchNonexistentFile
+$ eval-batch does-not-exist.ocl --ecore {MM} --xmi {MODEL}
+=> exit 1
+=> out {"success":false,"error":"NoSuchFileException: does-not-exist.ocl"}

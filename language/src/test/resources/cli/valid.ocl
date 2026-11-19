@@ -1,0 +1,1 @@
+context spaceMission::Spacecraft inv massPositive: self.mass > 0

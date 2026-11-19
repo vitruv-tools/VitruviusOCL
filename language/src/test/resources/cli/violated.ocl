@@ -1,0 +1,4 @@
+context spaceMission::Spacecraft inv tooHeavy:
+  @severity CRITICAL
+  @message "Spacecraft {self.name} is \"heavy\"	\ x"
+  self.mass < 0

@@ -1,0 +1,1 @@
+context spaceMission::Spacecraft inv a: self.noSuch > 0

@@ -1,0 +1,9 @@
+import "spaceMission.ecore"
+-- constraints of the CLI golden test
+context spaceMission::Spacecraft
+  inv massPositive: self.mass > 0 -- trailing comment
+  inv: self.mass >= 0
+  inv tooHeavy: @severity MAJOR self.mass < 0
+  inv broken: self.noSuch > 0
+context spaceMission::Spacecraft::launch(p : Integer)
+  pre ready: p > 0
