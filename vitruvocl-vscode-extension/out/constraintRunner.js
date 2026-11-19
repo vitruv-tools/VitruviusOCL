@@ -51,12 +51,16 @@ const vsumFiles_1 = require("./vsumFiles");
  */
 const LAYOUT_ATTEMPTS = 2;
 class ConstraintRunner {
-    constructor(results, decorations, codeLensProvider, diagnosticCollection, units) {
+    constructor(results, decorations, codeLensProvider, diagnosticCollection, units, 
+    /** Where the choice among several equally fitting VSUM folders is remembered. */
+    workspaceState, projectMetamodels) {
         this.results = results;
         this.decorations = decorations;
         this.codeLensProvider = codeLensProvider;
         this.diagnosticCollection = diagnosticCollection;
         this.units = units;
+        this.workspaceState = workspaceState;
+        this.projectMetamodels = projectMetamodels;
     }
     /**
      * The layout of the document as it is now. If it keeps changing while the language server
@@ -88,20 +92,29 @@ class ConstraintRunner {
      *
      * @returns the inputs, or `undefined` if one is missing
      */
-    async findCliInputs(documentUri) {
+    async findCliInputs(document) {
         const compilerPath = await (0, discovery_1.findCompilerJar)();
         if (!compilerPath) {
             vscode.window.showErrorMessage('vitruvocl.jar not found');
             return undefined;
         }
-        const ecoreFiles = await (0, discovery_1.findEcoreFiles)(documentUri);
-        const instanceFiles = await (0, discovery_1.findInstanceFiles)(documentUri);
-        if (ecoreFiles.length === 0) {
-            vscode.window.showWarningMessage('No .ecore metamodel files found in workspace.');
+        const instanceFiles = await (0, discovery_1.findInstanceFiles)(document, this.workspaceState);
+        if (instanceFiles === undefined) {
+            vscode.window.showInformationMessage('VitruvOCL: no VSUM chosen, the constraints were not run.');
             return undefined;
         }
         if (!(0, vsumFiles_1.containsVsum)(instanceFiles)) {
             vscode.window.showErrorMessage('No VSUM found. Run VSUMExample.main() from your IDE to create one, then try again.');
+            return undefined;
+        }
+        const workspaceEcores = await (0, discovery_1.findEcoreFiles)(document.uri);
+        // the metamodels the project gets from its Maven dependencies, e.g. PCM
+        const ecoreFiles = [
+            ...workspaceEcores,
+            ...await this.projectMetamodels.forRun(document, workspaceEcores, instanceFiles),
+        ];
+        if (ecoreFiles.length === 0) {
+            vscode.window.showWarningMessage('No .ecore metamodel files found in workspace.');
             return undefined;
         }
         return { compilerPath, ecoreFiles, instanceFiles };
@@ -119,7 +132,7 @@ class ConstraintRunner {
         this.codeLensProvider.refresh();
         void this.decorations.updateVisible();
         try {
-            const inputs = await this.findCliInputs(document.uri);
+            const inputs = await this.findCliInputs(document);
             if (!inputs) {
                 return;
             }
@@ -171,7 +184,7 @@ class ConstraintRunner {
     async runConstraint(constraintName, documentUri) {
         const document = await vscode.workspace.openTextDocument(documentUri);
         try {
-            const inputs = await this.findCliInputs(documentUri);
+            const inputs = await this.findCliInputs(document);
             if (!inputs) {
                 return;
             }

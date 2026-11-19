@@ -58,3 +58,29 @@ export function unitSourceOf(client: LanguageClient): UnitSource {
             { uri: client.code2ProtocolConverter.asUri(document.uri as vscode.Uri) }),
     };
 }
+
+/** The JSON-RPC method of the language server's notification that adds metamodels. */
+const ADD_METAMODELS_METHOD = 'vitruvocl/addMetamodels';
+
+/**
+ * Passes metamodels to the language server, each once; without a language server, or with an
+ * older one that does not know the notification, nothing happens.
+ */
+export function metamodelNotifier(client: LanguageClient | undefined): (paths: string[]) => Promise<void> {
+    const sent = new Set<string>();
+    // a restarted language server knows none of them
+    client?.onDidChangeState(event => {
+        if (event.newState === State.Running) sent.clear();
+    });
+    return async paths => {
+        const fresh = paths.filter(p => !sent.has(p));
+        if (!client || fresh.length === 0) return;
+        fresh.forEach(p => sent.add(p));
+        try {
+            await client.sendNotification(ADD_METAMODELS_METHOD, { paths: fresh });
+        } catch (error: unknown) {
+            fresh.forEach(p => sent.delete(p));
+            logLine(`[OCL-LS] could not pass metamodels: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    };
+}

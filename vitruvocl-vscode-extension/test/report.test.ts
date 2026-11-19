@@ -86,3 +86,21 @@ test('countSkipNotices counts the skip notices', () => {
     assert.equal(countSkipNotices([SKIP, 'v', SKIP]), 2);
     assert.equal(countSkipNotices(undefined), 0);
 });
+
+test('summaryReport shows why a constraint could not be evaluated before its warnings', () => {
+    const report = summaryReport(0, 1, [{
+        name: 'b', success: false, satisfied: false,
+        errors: [
+            { line: 0, column: 0, message: "Required metamodel 'allocation' not found" },
+            { line: 2, column: 4, message: 'Unknown type' },
+        ],
+        warnings: ["No instances for 'allocation'"],
+    }]);
+    assert.deepEqual(report.lines.slice(-5), [
+        '  ❌ b',
+        "     ✖ Required metamodel 'allocation' not found",
+        '     ✖ Line 2: Unknown type',
+        "     No instances for 'allocation'",
+        '',
+    ]);
+});

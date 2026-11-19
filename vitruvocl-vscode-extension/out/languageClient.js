@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startLanguageClient = startLanguageClient;
 exports.unitSourceOf = unitSourceOf;
+exports.metamodelNotifier = metamodelNotifier;
 /**
  * The client of the VitruvOCL language server (`language-server.jar`).
  */
@@ -74,6 +75,33 @@ function unitSourceOf(client) {
     return {
         ready: () => client.state === node_1.State.Running,
         request: document => client.sendRequest(constraintLayout_1.CONSTRAINT_UNITS_METHOD, { uri: client.code2ProtocolConverter.asUri(document.uri) }),
+    };
+}
+/** The JSON-RPC method of the language server's notification that adds metamodels. */
+const ADD_METAMODELS_METHOD = 'vitruvocl/addMetamodels';
+/**
+ * Passes metamodels to the language server, each once; without a language server, or with an
+ * older one that does not know the notification, nothing happens.
+ */
+function metamodelNotifier(client) {
+    const sent = new Set();
+    // a restarted language server knows none of them
+    client?.onDidChangeState(event => {
+        if (event.newState === node_1.State.Running)
+            sent.clear();
+    });
+    return async (paths) => {
+        const fresh = paths.filter(p => !sent.has(p));
+        if (!client || fresh.length === 0)
+            return;
+        fresh.forEach(p => sent.add(p));
+        try {
+            await client.sendNotification(ADD_METAMODELS_METHOD, { paths: fresh });
+        }
+        catch (error) {
+            fresh.forEach(p => sent.delete(p));
+            (0, output_1.logLine)(`[OCL-LS] could not pass metamodels: ${error instanceof Error ? error.message : String(error)}`);
+        }
     };
 }
 //# sourceMappingURL=languageClient.js.map

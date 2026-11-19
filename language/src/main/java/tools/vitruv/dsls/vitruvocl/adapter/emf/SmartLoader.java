@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,14 @@ import tools.vitruv.dsls.vitruvocl.result.Warning;
 public class SmartLoader {
 
   private static final String PKG_CORRESPONDENCE = "correspondence";
+
+  /**
+   * Packages EMF and Vitruvius have built in, whose generated implementation a copy of their {@code
+   * .ecore} must not replace just because a model declares them; constraints that name them still
+   * load them as before.
+   */
+  private static final Set<String> BUILT_IN_PACKAGES =
+      Set.of("ecore", "xml", "xmltype", "xmi", "xsi", PKG_CORRESPONDENCE);
 
   private SmartLoader() {}
 
@@ -271,7 +280,12 @@ public class SmartLoader {
     return new XmiIndex(occurrences, packageNames);
   }
 
-  /** Loads only required metamodels and the instances that match them. */
+  /**
+   * Loads only required metamodels and the instances that match them, together with the metamodels
+   * of every other package such an instance uses: an instance can only be loaded if all its
+   * packages are known, also those the constraints do not refer to (e.g. a PCM repository using the
+   * packages of an extension).
+   */
   private static void loadRequiredPackages(
       MetamodelWrapper wrapper,
       Set<String> requiredPackages,
@@ -280,9 +294,11 @@ public class SmartLoader {
       List<FileError> fileErrors,
       List<Warning> warnings) {
     boolean[] loaded = new boolean[xmiIndex.occurrences().size()];
+    MetamodelLoader metamodels = new MetamodelLoader(wrapper, availableEcores, fileErrors);
     for (String pkg : requiredPackages) {
-      loadMetamodelForPackage(wrapper, pkg, availableEcores, fileErrors);
-      boolean foundInstance = loadInstancesForPackage(wrapper, pkg, xmiIndex, loaded, fileErrors);
+      metamodels.loadRequired(pkg);
+      boolean foundInstance =
+          loadInstancesForPackage(wrapper, pkg, xmiIndex, loaded, metamodels, fileErrors);
 
       // Don't warn for correspondence package if it has no instances
       if (!foundInstance && !pkg.equals(PKG_CORRESPONDENCE)) {
@@ -292,30 +308,62 @@ public class SmartLoader {
     }
   }
 
-  private static void loadMetamodelForPackage(
-      MetamodelWrapper wrapper,
-      String pkg,
-      Map<String, Path> availableEcores,
-      List<FileError> fileErrors) {
-    if (!availableEcores.containsKey(pkg)) {
-      // PKG_CORRESPONDENCE ecore is embedded in the JAR and auto-registered — not an error.
-      if (!pkg.equals(PKG_CORRESPONDENCE)) {
+  /** Loads the metamodels of packages, each file once. */
+  private static final class MetamodelLoader {
+    private final MetamodelWrapper wrapper;
+    private final Map<String, Path> availableEcores;
+    private final List<FileError> fileErrors;
+    private final Set<Path> loadedEcores = new HashSet<>();
+
+    MetamodelLoader(
+        MetamodelWrapper wrapper, Map<String, Path> availableEcores, List<FileError> fileErrors) {
+      this.wrapper = wrapper;
+      this.availableEcores = availableEcores;
+      this.fileErrors = fileErrors;
+    }
+
+    /** Loads the metamodel of a package the constraints need; a missing one is an error. */
+    void loadRequired(String pkg) {
+      if (!availableEcores.containsKey(pkg)) {
+        // PKG_CORRESPONDENCE ecore is embedded in the JAR and auto-registered — not an error.
+        if (!pkg.equals(PKG_CORRESPONDENCE)) {
+          fileErrors.add(
+              new FileError(
+                  null,
+                  FileError.FileErrorType.NOT_FOUND,
+                  "Required metamodel '" + pkg + "' not found"));
+        }
+        return;
+      }
+      load(pkg);
+    }
+
+    /**
+     * Loads the metamodels of the packages an instance uses, as far as they are given; a missing
+     * one is reported when the instance fails to load.
+     */
+    void loadUsedBy(Set<String> packages) {
+      for (String pkg : packages) {
+        if (availableEcores.containsKey(pkg) && !BUILT_IN_PACKAGES.contains(pkg)) {
+          load(pkg);
+        }
+      }
+    }
+
+    private void load(String pkg) {
+      Path ecore = availableEcores.get(pkg);
+      if (!loadedEcores.add(ecore)) {
+        return;
+      }
+      try {
+        wrapper.loadMetamodel(pkg, ecore);
+      } catch (IOException e) {
         fileErrors.add(
             new FileError(
-                null,
-                FileError.FileErrorType.NOT_FOUND,
-                "Required metamodel '" + pkg + "' not found"));
+                ecore,
+                FileError.FileErrorType.PARSE_ERROR,
+                "Failed to load metamodel: " + e.getMessage()));
       }
-      return;
-    }
-    try {
-      wrapper.loadMetamodel(pkg, availableEcores.get(pkg));
-    } catch (IOException e) {
-      fileErrors.add(
-          new FileError(
-              availableEcores.get(pkg),
-              FileError.FileErrorType.PARSE_ERROR,
-              "Failed to load metamodel: " + e.getMessage()));
     }
   }
 
@@ -324,6 +372,7 @@ public class SmartLoader {
       String pkg,
       XmiIndex xmiIndex,
       boolean[] loaded,
+      MetamodelLoader metamodels,
       List<FileError> fileErrors) {
     boolean foundInstance = false;
     List<Path> occurrences = xmiIndex.occurrences();
@@ -337,6 +386,7 @@ public class SmartLoader {
         // Already loaded for a different package name found in the same occurrence
         // (e.g. a repository:Repository root with nested xsi:type="seff:..." elements).
         loaded[i] = true;
+        metamodels.loadUsedBy(packageNames.get(i));
         loadModelInstance(wrapper, occurrences.get(i), fileErrors);
       }
     }

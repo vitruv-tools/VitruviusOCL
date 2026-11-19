@@ -1,8 +1,13 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { OCLCodeLensProvider } from './codeLens';
 import { ConstraintDecorations } from './decorations';
-import { startLanguageClient, unitSourceOf } from './languageClient';
+import { DependencyEcores } from './dependencyEcores';
+import { forgetVsumChoices } from './discovery';
+import { metamodelNotifier, startLanguageClient, unitSourceOf } from './languageClient';
+import { stopMaven } from './mavenClasspath';
+import { ProjectMetamodels } from './projectMetamodels';
 import { logLine } from './output';
 import { ResultStore } from './resultStore';
 import { ConstraintRunner } from './constraintRunner';
@@ -45,11 +50,16 @@ export function activate(context: vscode.ExtensionContext) {
     languageClient = startLanguageClient(context);
     const units = new ConstraintUnitIndex(languageClient && unitSourceOf(languageClient), logLine);
 
+    const projectMetamodels = new ProjectMetamodels(
+        new DependencyEcores(path.join(context.globalStorageUri.fsPath, 'dependencies'), logLine),
+        metamodelNotifier(languageClient),
+        logLine);
+
     const results = new ResultStore();
     const codeLensProvider = new OCLCodeLensProvider(units);
     const constraintDecorations = new ConstraintDecorations(results, units);
     context.subscriptions.push(constraintDecorations);
-    const runner = new ConstraintRunner(results, constraintDecorations, codeLensProvider, diagnosticCollection, units);
+    const runner = new ConstraintRunner(results, constraintDecorations, codeLensProvider, diagnosticCollection, units, context.workspaceState, projectMetamodels);
 
     context.subscriptions.push(
         vscode.languages.registerCodeLensProvider(
@@ -61,6 +71,15 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('vitruvocl.runConstraint', async (constraintName, documentUri) => {
             await runner.runConstraint(constraintName, documentUri);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('vitruvocl.resetProjectChoices', async () => {
+            await forgetVsumChoices(context.workspaceState);
+            projectMetamodels.forget();
+            vscode.window.showInformationMessage(
+                'VitruvOCL: the next run chooses the VSUM again and resolves the Maven dependencies again.');
         })
     );
 
@@ -98,6 +117,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidCloseTextDocument(document => units.forget(document))
     );
 
+    // The language server knows only the workspace's metamodels; those of the Maven dependencies
+    // (e.g. PCM) are passed to it for every .ocl document opened
+    const addDependencyMetamodels = (document: vscode.TextDocument) =>
+        void projectMetamodels.forEditor(document).catch(error =>
+            logLine(`[Maven] ${error instanceof Error ? error.message : String(error)}`));
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(addDependencyMetamodels));
+    vscode.workspace.textDocuments.forEach(addDependencyMetamodels);
+
     // Found by the own scan until the language server runs, then from its units
     if (languageClient) {
         context.subscriptions.push(languageClient.onDidChangeState(() => {
@@ -110,5 +137,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate(): Thenable<void> | undefined {
+    stopMaven();
     return languageClient?.stop();
 }

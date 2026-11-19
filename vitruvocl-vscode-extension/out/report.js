@@ -51,6 +51,10 @@ function summaryReport(passed, failed, constraints) {
     for (const constraint of constraints) {
         const icon = constraint.satisfied ? '✅' : '❌';
         lines.push(`  ${icon} ${constraint.name}`);
+        // Why a constraint that could not be evaluated failed: compile errors, missing metamodels
+        // or models; without them its warnings (e.g. "No instances") would be the only clue
+        (constraint.success ? [] : constraint.errors ?? [])
+            .forEach(e => lines.push(e.line > 0 ? `     ✖ Line ${e.line}: ${e.message}` : `     ✖ ${e.message}`));
         const { skipNotices, others } = splitWarnings(constraint.warnings);
         if (!constraint.satisfied) {
             others.forEach(w => lines.push(`     ${w}`));

@@ -18,7 +18,9 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -36,6 +38,7 @@ import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.services.JsonNotification;
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageClientAware;
@@ -62,6 +65,14 @@ public class OCLLanguageServer implements LanguageServer, LanguageClientAware {
 
   private LanguageClient client;
   private final MetamodelWrapper wrapper = new MetamodelWrapper();
+
+  /**
+   * Every {@code .ecore} file known so far, from the workspace and added ones: their {@code
+   * platform:/plugin} references are resolved among all of them, also when a metamodel arrives
+   * after the one it refers to or after one that refers to it.
+   */
+  private final Set<Path> knownEcores = new LinkedHashSet<>();
+
   private final OCLTextDocumentService textDocumentService;
   private final OCLWorkspaceService workspaceService;
 
@@ -159,6 +170,48 @@ public class OCLLanguageServer implements LanguageServer, LanguageClientAware {
     return textDocumentService.constraintUnits(document);
   }
 
+  /** The JSON-RPC method of the notification that adds metamodels; see {@link #addMetamodels}. */
+  static final String ADD_METAMODELS = "vitruvocl/addMetamodels";
+
+  /**
+   * The parameter of {@value #ADD_METAMODELS}.
+   *
+   * @param paths the absolute paths of the {@code .ecore} files
+   */
+  public record MetamodelFiles(List<String> paths) {}
+
+  /**
+   * The custom notification {@value #ADD_METAMODELS}: loads metamodels that are not in the
+   * workspace, e.g. those the VS Code extension extracted from the project's Maven dependencies,
+   * and analyzes the open documents again with them.
+   */
+  @JsonNotification(ADD_METAMODELS)
+  public void addMetamodels(MetamodelFiles files) {
+    List<Path> ecoreFiles =
+        files == null || files.paths() == null
+            ? List.of()
+            : files.paths().stream().map(Path::of).toList();
+    if (ecoreFiles.isEmpty()) {
+      return;
+    }
+    List<Path> allKnown;
+    synchronized (knownEcores) {
+      knownEcores.addAll(ecoreFiles);
+      allKnown = List.copyOf(knownEcores);
+    }
+    // all known files, so that references between earlier and later metamodels resolve
+    wrapper.registerWorkspaceEcoresForPlatformResolution(allKnown);
+    for (Path ecoreFile : ecoreFiles) {
+      try {
+        wrapper.loadMetamodel(ecoreFile);
+        LOG.fine(() -> "[OCL-LS] Loaded metamodel: " + ecoreFile);
+      } catch (IOException | RuntimeException e) {
+        LOG.warning(() -> "[OCL-LS] Could not load " + ecoreFile + ": " + e.getMessage());
+      }
+    }
+    textDocumentService.reanalyzeAll();
+  }
+
   @Override
   public TextDocumentService getTextDocumentService() {
     return textDocumentService;
@@ -189,6 +242,9 @@ public class OCLLanguageServer implements LanguageServer, LanguageClientAware {
 
     // Before loading: register platform:/plugin/ → local-file mappings so cross-ecore
     // inheritance (e.g. PCMRandomVariable → stoex::RandomVariable) resolves automatically.
+    synchronized (knownEcores) {
+      knownEcores.addAll(ecoreFiles);
+    }
     wrapper.registerWorkspaceEcoresForPlatformResolution(ecoreFiles);
 
     for (Path ecoreFile : ecoreFiles) {

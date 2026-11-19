@@ -89,6 +89,10 @@
         "icon": "$(play-circle)"
       },
       {
+        "command": "vitruvocl.resetProjectChoices",
+        "title": "VitruvOCL: Forget the VSUM Choice and Resolve Maven Dependencies Again"
+      },
+      {
         "command": "vitruvocl.refreshExplorer",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -118,6 +122,17 @@
           "type": "string",
           "default": "",
           "description": "Path to your VSUM storage folder (absolute or relative to workspace root). E.g. 'vsumexample' or 'vsum/target/vsumtest'. Leave empty for auto-detection."
+        },
+        "vitruvocl.mavenDependencies": {
+          "type": "string",
+          "enum": ["online", "offline", "off"],
+          "enumDescriptions": [
+            "Resolve the metamodels of the project's Maven dependencies; a run may download what the local repository lacks. Opening a document only uses the local repository.",
+            "Resolve them from the local Maven repository only, never download.",
+            "Do not use Maven: only the workspace's own .ecore files are metamodels."
+          ],
+          "default": "online",
+          "description": "Whether metamodels that a Maven project only gets from its dependencies (e.g. PCM) are found by running Maven (mvn dependency:build-classpath)."
         }
       }
     }
