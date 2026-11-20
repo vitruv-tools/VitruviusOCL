@@ -424,8 +424,8 @@ public final class LazyOperations {
 
     /**
      * Emits the receiver's elements in receiver order, each only while the argument still has an
-     * unmatched occurrence of it (Bag result = min multiplicity). The argument is pulled only as far
-     * as needed to find the current receiver element; skipped argument elements are buffered.
+     * unmatched occurrence of it (Bag result = min multiplicity). The argument is pulled only as
+     * far as needed to find the current receiver element; skipped argument elements are buffered.
      */
     private void advance() {
       hasPending = false;

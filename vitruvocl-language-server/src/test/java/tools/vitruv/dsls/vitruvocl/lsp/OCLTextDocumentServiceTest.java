@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.lsp;
 
 import static org.assertj.core.api.Assertions.assertThat;

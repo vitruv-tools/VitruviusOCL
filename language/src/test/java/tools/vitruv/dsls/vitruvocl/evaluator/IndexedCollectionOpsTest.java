@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

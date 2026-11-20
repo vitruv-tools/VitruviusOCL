@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.adapter.emf;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;

@@ -69,7 +69,7 @@ class FeatureTypeMapperTest {
     pkg.setNsPrefix("ftm");
     pkg.setNsURI("http://vitruvocl.test/typechecker/ftm");
 
-    EClass holder = eClass(pkg, "Holder");
+    final EClass holder = eClass(pkg, "Holder");
     EClass base = eClass(pkg, "Base");
     base.setAbstract(true);
     EClass sub1 = eClass(pkg, "Sub1");

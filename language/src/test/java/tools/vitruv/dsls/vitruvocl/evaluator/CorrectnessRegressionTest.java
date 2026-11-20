@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -368,7 +369,8 @@ class CorrectnessRegressionTest extends DummyTestSpecification {
 
     @Test
     void oneWithUndefinedBodyIsFalse() {
-      assertSingleBool(compile("Sequence{1, 2}.one(x | Sequence{true}.select(b | false).first())"), false);
+      assertSingleBool(
+          compile("Sequence{1, 2}.one(x | Sequence{true}.select(b | false).first())"), false);
     }
   }
 

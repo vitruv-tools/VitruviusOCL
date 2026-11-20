@@ -46,7 +46,7 @@ public class ContainmentReachabilityAnalyzer {
    *
    * <p>Matches the paper's algorithm signature directly: iterate over every concrete EClass
    * reachable from {@code rootPackage}, and for each of its (inherited) containment references,
-   * decide via {@link #shouldBeTraversed} whether it must be kept.
+   * decide via {@link #canHoldAny} whether it must be kept.
    *
    * @param rootPackage the root of the metamodel to analyze (its classifiers and all classifiers
    *     of its transitively nested subpackages)

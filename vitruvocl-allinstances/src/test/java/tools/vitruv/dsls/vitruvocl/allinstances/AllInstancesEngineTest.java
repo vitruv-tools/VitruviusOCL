@@ -98,9 +98,9 @@ class AllInstancesEngineTest {
     EObject a1 = f.create(f.classA);
     EObject b1 = f.create(f.classB);
     EObject a2 = f.create(f.classA);
-    EObject b2 = f.create(f.classB);
+    final EObject b2 = f.create(f.classB);
     EObject c1 = f.create(f.classC);
-    EObject c2 = f.create(f.classC);
+    final EObject c2 = f.create(f.classC);
     a1.eSet(f.aToB, b1);
     addMany(b1, f.bToC, c1);
     b1.eSet(f.bToA, a2);
@@ -244,9 +244,9 @@ class AllInstancesEngineTest {
 
     AllInstancesEngine engine =
         new AllInstancesEngine(
-            p,
-            List.of(new AllInstancesCallSite(EcorePackage.Literals.EOBJECT, Kind.ALL_OF_KIND)));
+            p, List.of(new AllInstancesCallSite(EcorePackage.Literals.EOBJECT, Kind.ALL_OF_KIND)));
 
-    assertEquals(List.of(r, instance), engine.compute(List.of(r)).get(EcorePackage.Literals.EOBJECT));
+    assertEquals(
+        List.of(r, instance), engine.compute(List.of(r)).get(EcorePackage.Literals.EOBJECT));
   }
 }

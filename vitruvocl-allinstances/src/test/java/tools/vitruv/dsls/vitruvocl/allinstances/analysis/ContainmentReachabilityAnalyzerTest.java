@@ -184,7 +184,7 @@ class ContainmentReachabilityAnalyzerTest {
   void requestedTypeOutsideAnalyzedPackages_isStillReached() {
     org.eclipse.emf.ecore.EcoreFactory factory = org.eclipse.emf.ecore.EcoreFactory.eINSTANCE;
     org.eclipse.emf.ecore.EPackage analyzed = factory.createEPackage();
-    org.eclipse.emf.ecore.EPackage foreign = factory.createEPackage();
+    final org.eclipse.emf.ecore.EPackage foreign = factory.createEPackage();
     org.eclipse.emf.ecore.EClass root = factory.createEClass();
     root.setName("Root");
     analyzed.getEClassifiers().add(root);

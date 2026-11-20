@@ -295,7 +295,9 @@ public class OCLTextDocumentService implements TextDocumentService {
     } catch (StackOverflowError e) {
       LOG.log(Level.WARNING, "[OCL-LS] Document too deeply nested to analyze: " + uri);
       publishAnalysisFailure(
-          uri, text, "Expression is nested too deeply to be analyzed; split it into smaller parts.");
+          uri,
+          text,
+          "Expression is nested too deeply to be analyzed; split it into smaller parts.");
     } catch (Exception e) {
       LOG.log(Level.WARNING, "[OCL-LS] Analysis failed for " + uri, e);
     }

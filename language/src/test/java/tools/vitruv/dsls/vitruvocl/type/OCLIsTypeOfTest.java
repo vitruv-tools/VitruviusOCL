@@ -269,7 +269,7 @@ context satelliteSystem::Satellite inv typeOfSatellite:
   @Test
   void testSpacecraftIsNotTypeOfSatellite() {
     String constraint =
-"""
+        """
 context spaceMission::Spacecraft inv typeOfSatellite:
   spaceMission::Spacecraft.allInstances().oclIsTypeOf(satelliteSystem::Satellite).forAll(b | b)
         """;

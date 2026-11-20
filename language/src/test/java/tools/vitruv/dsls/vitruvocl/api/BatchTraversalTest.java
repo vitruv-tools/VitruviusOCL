@@ -56,7 +56,7 @@ class BatchTraversalTest {
         context edge::Other inv o: self.amount >= 0
         context edge::Item inv i: edge::Other.allInstances().notEmpty()
         """);
-    long before = modelReads(live);
+    final long before = modelReads(live);
     long preparationsBefore = PreparedConstraint.preparations();
 
     BatchValidationResult result =

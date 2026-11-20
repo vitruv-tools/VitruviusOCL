@@ -150,19 +150,19 @@ class DefinitionProviderTest {
   // ── Synthetic EClasses (resource edge cases) ──────────────────────────────
 
   @Test
-  void eClassWithoutResource_returnsNull() {
+  void ecoreClassWithoutResource_returnsNull() {
     assertThat(provider.getDefinition(at("self", 1), rootTypedAs(eClassIn("Free", null)))).isNull();
   }
 
   @Test
-  void eClassInNonFileResource_returnsNull() {
+  void ecoreClassInNonFileResource_returnsNull() {
     EClass eClass = eClassIn("Remote", URI.createURI("http://example.org/remote.ecore"));
 
     assertThat(provider.getDefinition(at("self", 1), rootTypedAs(eClass))).isNull();
   }
 
   @Test
-  void eClassInResourceWithoutUri_returnsNull() {
+  void ecoreClassInResourceWithoutUri_returnsNull() {
     EClass eClass = EcoreFactory.eINSTANCE.createEClass();
     eClass.setName("NoUri");
     new ResourceImpl().getContents().add(eClass);

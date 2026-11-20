@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -405,7 +406,8 @@ class AuditFollowUpRegressionTest extends DummyTestSpecification {
     @Test
     void emptyLiteralInsideABranchIsNotAccepted() {
       assertTypeError(
-          "let s : Sequence(Integer) = if false then Sequence{} else Sequence{1, \"a\"} endif in s");
+          "let s : Sequence(Integer) = if false then Sequence{} "
+              + "else Sequence{1, \"a\"} endif in s");
     }
 
     @Test

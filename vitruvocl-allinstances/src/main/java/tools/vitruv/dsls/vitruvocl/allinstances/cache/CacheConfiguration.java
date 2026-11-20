@@ -71,8 +71,8 @@ public final class CacheConfiguration {
   }
 
   /**
-   * Whether the pruning decision of {@link #traverse} covers instances of {@code type}; {@code true}
-   * for every type as long as no analysis has recorded its classes.
+   * Whether the pruning decision of {@link #traverse} covers instances of {@code type}; {@code
+   * true} for every type as long as no analysis has recorded its classes.
    */
   public boolean isAnalyzed(EClass type) {
     return analyzedClasses.isEmpty() || analyzedClasses.contains(type);

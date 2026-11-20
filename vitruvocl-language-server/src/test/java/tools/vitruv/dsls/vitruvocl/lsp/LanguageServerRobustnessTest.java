@@ -10,6 +10,7 @@
  * Contributors:
  *    Max Oesterle - initial API and implementation
  *******************************************************************************/
+
 package tools.vitruv.dsls.vitruvocl.lsp;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,7 +87,8 @@ class LanguageServerRobustnessTest {
     String uri = workspace.resolve("ok.ocl").toUri().toString();
     server
         .getTextDocumentService()
-        .didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(uri, "vitruvocl", 1, VALID_OCL)));
+        .didOpen(
+            new DidOpenTextDocumentParams(new TextDocumentItem(uri, "vitruvocl", 1, VALID_OCL)));
     verify(client, timeout(10_000))
         .publishDiagnostics(argThat(p -> uri.equals(p.getUri()) && p.getDiagnostics().isEmpty()));
   }
@@ -142,7 +144,8 @@ class LanguageServerRobustnessTest {
                 p ->
                     uri.equals(p.getUri())
                         && p.getDiagnostics().stream()
-                            .anyMatch(d -> d.getMessage().getLeft().contains("nested too deeply"))));
+                            .anyMatch(
+                                d -> d.getMessage().getLeft().contains("nested too deeply"))));
   }
 
   @Test

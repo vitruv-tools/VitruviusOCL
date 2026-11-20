@@ -193,7 +193,7 @@ class OCLAsTypeTest extends DummyTestSpecification {
   @Test
   void testSpacecraftAsTypeSpacecraft() {
     String constraint =
-"""
+        """
 context spaceMission::Spacecraft inv asTypeSpacecraft:
   spaceMission::Spacecraft.allInstances().oclAsType(spaceMission::Spacecraft).size()
     == spaceMission::Spacecraft.allInstances().size()
@@ -217,7 +217,7 @@ context spaceMission::Spacecraft inv asTypeSpacecraft:
   @Test
   void testSelectThenAsTypeInMetamodel() {
     String constraint =
-"""
+        """
 context spaceMission::Spacecraft inv selectThenAsType:
   spaceMission::Spacecraft.allInstances()
     .select(sc | sc.oclIsKindOf(spaceMission::Spacecraft))

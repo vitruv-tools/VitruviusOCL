@@ -53,7 +53,8 @@ class MetamodelWrapperCorrespondenceIndexTest {
     EObject satellite = wrapper.getContextObjects().get(1);
 
     assertTrue(wrapper.hasTaggedCorrespondenceLookup());
-    assertEquals(Optional.of(Set.of(spacecraft, satellite)), wrapper.getAllObjectsInACorrespondence());
+    assertEquals(
+        Optional.of(Set.of(spacecraft, satellite)), wrapper.getAllObjectsInACorrespondence());
     assertEquals(Map.of(TAG, Set.of(satellite)), wrapper.getCorrespondingObjectsByTag(spacecraft));
     assertEquals(Set.of(spacecraft), wrapper.getCorrespondingObjectsWithTag(satellite, TAG));
   }

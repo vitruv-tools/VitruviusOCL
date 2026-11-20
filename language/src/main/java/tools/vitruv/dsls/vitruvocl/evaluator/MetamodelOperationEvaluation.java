@@ -106,6 +106,36 @@ final class MetamodelOperationEvaluation {
     return Value.of(results, resultType != null ? resultType : Type.set(Type.BOOLEAN));
   }
 
+  /** Whether {@code elem} is of {@code targetType} or a subtype (Integer values are Reals). */
+  private static boolean isKindOf(OCLElement elem, Type targetType) {
+    if (targetType == Type.ANY) {
+      return true; // OclAny is the supertype of every value
+    }
+    if (targetType == Type.INTEGER) {
+      return elem.tryGetInt() != null;
+    } else if (targetType == Type.STRING) {
+      return elem.tryGetString() != null;
+    } else if (targetType == Type.BOOLEAN) {
+      return elem.tryGetBool() != null;
+    } else if (targetType == Type.DOUBLE) {
+      // Real: Integer and Float values are kinds of Real (OCL: Integer conforms to Real)
+      return elem.tryGetDouble() != null || elem.tryGetFloat() != null || elem.tryGetInt() != null;
+    } else if (targetType == Type.FLOAT) {
+      return elem.tryGetFloat() != null || elem.tryGetDouble() != null || elem.tryGetInt() != null;
+    }
+
+    if (targetType.isMetaclassType()) {
+      EClass targetEClass = targetType.getEClass();
+      EClass elemEClass = elem.getEClass();
+      if (elemEClass == null) {
+        return false;
+      }
+      return targetEClass.isSuperTypeOf(elemEClass) || elemEClass.equals(targetEClass);
+    }
+
+    return false;
+  }
+
   /**
    * Evaluates {@code oclIsTypeOf(T)}: whether each receiver element is exactly of type T.
    *
@@ -126,6 +156,32 @@ final class MetamodelOperationEvaluation {
 
     Type resultType = context.nodeType(ctx);
     return Value.of(results, resultType != null ? resultType : Type.set(Type.BOOLEAN));
+  }
+
+  /** Whether {@code elem} is exactly of {@code targetType}. */
+  private static boolean isTypeOf(OCLElement elem, Type targetType) {
+    if (targetType == Type.INTEGER) {
+      return elem.tryGetInt() != null;
+    } else if (targetType == Type.STRING) {
+      return elem.tryGetString() != null;
+    } else if (targetType == Type.BOOLEAN) {
+      return elem.tryGetBool() != null;
+    } else if (targetType == Type.DOUBLE) {
+      return elem.tryGetDouble() != null;
+    } else if (targetType == Type.FLOAT) {
+      return elem.tryGetFloat() != null;
+    }
+
+    if (targetType.isMetaclassType()) {
+      EClass targetEClass = targetType.getEClass();
+      EClass elemEClass = elem.getEClass();
+      if (elemEClass == null) {
+        return false;
+      }
+      return elemEClass.equals(targetEClass);
+    }
+
+    return false;
   }
 
   /**
@@ -194,59 +250,4 @@ final class MetamodelOperationEvaluation {
     return Value.of(results, resultType);
   }
 
-  /** Whether {@code elem} is of {@code targetType} or a subtype (Integer values are Reals). */
-  private static boolean isKindOf(OCLElement elem, Type targetType) {
-    if (targetType == Type.ANY) {
-      return true; // OclAny is the supertype of every value
-    }
-    if (targetType == Type.INTEGER) {
-      return elem.tryGetInt() != null;
-    } else if (targetType == Type.STRING) {
-      return elem.tryGetString() != null;
-    } else if (targetType == Type.BOOLEAN) {
-      return elem.tryGetBool() != null;
-    } else if (targetType == Type.DOUBLE) {
-      // Real: Integer and Float values are kinds of Real (OCL: Integer conforms to Real)
-      return elem.tryGetDouble() != null || elem.tryGetFloat() != null || elem.tryGetInt() != null;
-    } else if (targetType == Type.FLOAT) {
-      return elem.tryGetFloat() != null || elem.tryGetDouble() != null || elem.tryGetInt() != null;
-    }
-
-    if (targetType.isMetaclassType()) {
-      EClass targetEClass = targetType.getEClass();
-      EClass elemEClass = elem.getEClass();
-      if (elemEClass == null) {
-        return false;
-      }
-      return targetEClass.isSuperTypeOf(elemEClass) || elemEClass.equals(targetEClass);
-    }
-
-    return false;
-  }
-
-  /** Whether {@code elem} is exactly of {@code targetType}. */
-  private static boolean isTypeOf(OCLElement elem, Type targetType) {
-    if (targetType == Type.INTEGER) {
-      return elem.tryGetInt() != null;
-    } else if (targetType == Type.STRING) {
-      return elem.tryGetString() != null;
-    } else if (targetType == Type.BOOLEAN) {
-      return elem.tryGetBool() != null;
-    } else if (targetType == Type.DOUBLE) {
-      return elem.tryGetDouble() != null;
-    } else if (targetType == Type.FLOAT) {
-      return elem.tryGetFloat() != null;
-    }
-
-    if (targetType.isMetaclassType()) {
-      EClass targetEClass = targetType.getEClass();
-      EClass elemEClass = elem.getEClass();
-      if (elemEClass == null) {
-        return false;
-      }
-      return elemEClass.equals(targetEClass);
-    }
-
-    return false;
-  }
 }

@@ -182,26 +182,6 @@ public final class VitruvOclEngine {
     return evaluateAll(constraints, Objects.requireNonNull(transaction, "transaction"), true);
   }
 
-  /**
-   * Evaluates the constraints of an {@code .ocl} file (see {@link ConstraintFiles#read}).
-   *
-   * @throws IOException if the file cannot be read
-   */
-  public BatchValidationResult evaluateFile(Path oclFile) throws IOException {
-    return evaluateAll(ConstraintFiles.read(oclFile));
-  }
-
-  /**
-   * Same as {@link #evaluateFile(Path)}, with a transaction shared by all constraints.
-   *
-   * @throws IOException if the file cannot be read
-   */
-  public BatchValidationResult evaluateFile(Path oclFile, List<EChange<EObject>> transaction)
-      throws IOException {
-    Objects.requireNonNull(transaction, "transaction");
-    return evaluateAll(ConstraintFiles.read(oclFile), transaction);
-  }
-
   private BatchValidationResult evaluateAll(
       List<String> constraints, List<EChange<EObject>> transaction, boolean transactionSupported) {
     if (constraints.isEmpty()) {
@@ -251,6 +231,26 @@ public final class VitruvOclEngine {
       results.set(distinctIndices.get(i), evaluated.get(i));
     }
     return new BatchValidationResult(results);
+  }
+
+  /**
+   * Evaluates the constraints of an {@code .ocl} file (see {@link ConstraintFiles#read}).
+   *
+   * @throws IOException if the file cannot be read
+   */
+  public BatchValidationResult evaluateFile(Path oclFile) throws IOException {
+    return evaluateAll(ConstraintFiles.read(oclFile));
+  }
+
+  /**
+   * Same as {@link #evaluateFile(Path)}, with a transaction shared by all constraints.
+   *
+   * @throws IOException if the file cannot be read
+   */
+  public BatchValidationResult evaluateFile(Path oclFile, List<EChange<EObject>> transaction)
+      throws IOException {
+    Objects.requireNonNull(transaction, "transaction");
+    return evaluateAll(ConstraintFiles.read(oclFile), transaction);
   }
 
   // ------------------------------------------------------------------ incremental evaluation

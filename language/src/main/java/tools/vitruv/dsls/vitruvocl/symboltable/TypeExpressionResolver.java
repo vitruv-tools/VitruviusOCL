@@ -116,19 +116,23 @@ public final class TypeExpressionResolver {
       }
     }
 
-    Type collectionType =
-        switch (kind) {
-          case "Set", "Collection" -> Type.set(elementType);
-          case "Sequence" -> Type.sequence(elementType);
-          case "Bag" -> Type.bag(elementType);
-          case "OrderedSet" -> Type.orderedSet(elementType);
-          default -> null;
-        };
+    Type collectionType = collectionType(kind, elementType);
     if (collectionType == null) {
       return listener.unresolved(ctx, "Unknown collection type: " + kind);
     }
     listener.resolved(ctx, collectionType);
     return collectionType;
+  }
+
+  /** The collection type of the kind, or {@code null} for an unknown kind. */
+  private static Type collectionType(String kind, Type elementType) {
+    return switch (kind) {
+      case "Set", "Collection" -> Type.set(elementType);
+      case "Sequence" -> Type.sequence(elementType);
+      case "Bag" -> Type.bag(elementType);
+      case "OrderedSet" -> Type.orderedSet(elementType);
+      default -> null;
+    };
   }
 
   /**
