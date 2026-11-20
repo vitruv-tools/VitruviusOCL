@@ -19,8 +19,8 @@ import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -659,12 +659,12 @@ class CollectionNullaryOpsTypeTest extends DummyTestSpecification {
 
   @Test
   void testFloatFloor() {
-    assertSingleDouble(compile("2.7.floor()"), 2.0);
+    assertSingleInt(compile("2.7.floor()"), 2);
   }
 
   @Test
   void testDoubleFloor() {
-    assertSingleDouble(compile("2.9.floor()"), 2.0);
+    assertSingleInt(compile("2.9.floor()"), 2);
   }
 
   @Test
@@ -684,12 +684,12 @@ class CollectionNullaryOpsTypeTest extends DummyTestSpecification {
 
   @Test
   void testFloatCeil() {
-    assertSingleDouble(compile("2.3.ceil()"), 3.0);
+    assertSingleInt(compile("2.3.ceil()"), 3);
   }
 
   @Test
   void testDoubleCeil() {
-    assertSingleDouble(compile("2.1.ceil()"), 3.0);
+    assertSingleInt(compile("2.1.ceil()"), 3);
   }
 
   @Test
@@ -709,12 +709,12 @@ class CollectionNullaryOpsTypeTest extends DummyTestSpecification {
 
   @Test
   void testFloatCeiling() {
-    assertSingleDouble(compile("2.3.ceiling()"), 3.0);
+    assertSingleInt(compile("2.3.ceiling()"), 3);
   }
 
   @Test
   void testDoubleCeilingAlreadyWhole() {
-    assertSingleDouble(compile("3.0.ceiling()"), 3.0);
+    assertSingleInt(compile("3.0.ceiling()"), 3);
   }
 
   @Test
@@ -729,12 +729,12 @@ class CollectionNullaryOpsTypeTest extends DummyTestSpecification {
 
   @Test
   void testFloatRoundUp() {
-    assertSingleDouble(compile("2.5.round()"), 3.0);
+    assertSingleInt(compile("2.5.round()"), 3);
   }
 
   @Test
   void testDoubleRoundDown() {
-    assertSingleDouble(compile("2.4.round()"), 2.0);
+    assertSingleInt(compile("2.4.round()"), 2);
   }
 
   @Test
@@ -755,12 +755,12 @@ class CollectionNullaryOpsTypeTest extends DummyTestSpecification {
   //   ¡Float!.abs()   → ¡Float!    ← type preserved
   //   ¡Double!.abs()  → ¡Double!
   //
-  // floor() / ceil() / ceiling() / round() always promote:
+  // floor() / ceil() / ceiling() / round() always return Integer (OCL):
   //   ¡Integer!.floor() → ¡Integer!
-  //   ¡Float!.floor()   → ¡Double!  ← widening (lost precision info)
-  //   ¡Double!.floor()  → ¡Double!
+  //   ¡Float!.floor()   → ¡Integer!
+  //   ¡Double!.floor()  → ¡Integer!
   //
-  // These tests verify the promotion semantics explicitly.
+  // These tests verify the Integer result explicitly.
   // ══════════════════════════════════════════════════════════════
 
   // ── abs() on ¡Float! grammar literal (parsed as Double) ───────
@@ -780,45 +780,45 @@ class CollectionNullaryOpsTypeTest extends DummyTestSpecification {
     assertSingleDouble(compile("(0.0).abs()"), 0.0);
   }
 
-  // ── floor() on ¡Float! → ¡Double! (promotion documented) ──────
+  // ── floor() on ¡Float! → ¡Integer! ────────────────────────────
 
   @Test
   void testFloatFloorNegative() {
-    assertSingleDouble(compile("(-2.3).floor()"), -3.0);
+    assertSingleInt(compile("(-2.3).floor()"), -3);
   }
 
   @Test
   void testFloatFloorAlreadyWhole() {
-    assertSingleDouble(compile("(3.0).floor()"), 3.0);
+    assertSingleInt(compile("(3.0).floor()"), 3);
   }
 
-  // ── ceil() / ceiling() on ¡Float! → ¡Double! ──────────────────
+  // ── ceil() / ceiling() on ¡Float! → ¡Integer! ─────────────────
 
   @Test
   void testFloatCeilNegative() {
-    assertSingleDouble(compile("(-2.7).ceil()"), -2.0);
+    assertSingleInt(compile("(-2.7).ceil()"), -2);
   }
 
   @Test
   void testFloatCeilingNegative() {
-    assertSingleDouble(compile("(-2.7).ceiling()"), -2.0);
+    assertSingleInt(compile("(-2.7).ceiling()"), -2);
   }
 
-  // ── round() on ¡Float! → ¡Double! ─────────────────────────────
+  // ── round() on ¡Float! → ¡Integer! ────────────────────────────
 
   @Test
   void testFloatRoundDown() {
-    assertSingleDouble(compile("(2.3).round()"), 2.0);
+    assertSingleInt(compile("(2.3).round()"), 2);
   }
 
   @Test
   void testFloatRoundHalfUp() {
-    assertSingleDouble(compile("(2.5).round()"), 3.0);
+    assertSingleInt(compile("(2.5).round()"), 3);
   }
 
   @Test
   void testFloatRoundNegativeHalf() {
-    assertSingleDouble(compile("(-2.5).round()"), -2.0);
+    assertSingleInt(compile("(-2.5).round()"), -2);
   }
 
   // ── Contrast: Integer unary ops stay ¡Integer! ─────────────────

@@ -21,8 +21,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
+import tools.vitruv.dsls.vitruvocl.compiler.VitruvOCLCompiler;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
 
 /**
  * In {@code G and R} and {@code G implies R} with a correspondence guard {@code G}, the right side
@@ -77,10 +77,10 @@ class CorrespondenceFastPathTest {
 
   @Test
   void rightSideThatMayReportAnErrorIsAlwaysEvaluated() {
-    // i.refs is a collection: == on it can report "Comparison requires singleton operands"
+    // an invalid regular expression is only reported when matches() is evaluated
     String c =
-        "context edge::Other inv: edge::Item.allInstances().forAll(i | self ~ i implies i.refs =="
-            + " i.refs)";
+        "context edge::Other inv: edge::Item.allInstances().forAll(i | self ~ i implies"
+            + " i.name.matches(\"(\"))";
     VitruvOCLCompiler compiler =
         new VitruvOCLCompiler(correspondingA1AndX().model().wrapper(), null);
     compiler.compile(c);

@@ -12,31 +12,29 @@ package tools.vitruv.dsls.vitruvocl.lsp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalysis;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalyzer;
+import tools.vitruv.dsls.vitruvocl.analysis.SyntaxError;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
-import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
+import tools.vitruv.dsls.vitruvocl.common.EditDistance;
 import tools.vitruv.dsls.vitruvocl.common.ErrorSeverity;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
-import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
-import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
- * Runs the 2-pass analysis pipeline (symbol-table construction + type checking) on the current
- * document text and produces a {@link DocumentAnalysis}.
+ * Runs {@link OclAnalyzer} in tolerant mode (symbol-table construction + type checking, also after
+ * syntax errors) on the current document text and turns its result into a {@link DocumentAnalysis}
+ * with LSP diagnostics.
  *
  * <p>The evaluation pass (Pass 3) is intentionally omitted — the language server performs static
  * analysis only; constraint evaluation is handled separately by the CLI runner.
@@ -93,7 +91,6 @@ public class DocumentAnalyzer {
    * @param documentText the full document source
    * @return the analysis result, including any diagnostics
    */
-  @SuppressWarnings("java:S1141")
   public DocumentAnalysis analyze(String documentText) {
     List<Diagnostic> diagnostics = new ArrayList<>();
     VitruvOCLParser.ContextDeclCSContext tree = null;
@@ -107,61 +104,47 @@ public class DocumentAnalyzer {
     checkAnnotationKeywordTypos(documentText, diagnostics);
 
     try {
-      // -----------------------------------------------------------------------
-      // Lexer + Parser
-      // -----------------------------------------------------------------------
+      // Lexer, parser and both passes, which always run so that hover and completion get what the
+      // passes produce even for a document with syntax errors
+      OclAnalysis analysis =
+          OclAnalyzer.analyze(
+              documentText, wrapper, OclAnalyzer.Mode.TOLERANT, new OclErrorStrategy());
+      tree = analysis.tree();
+      nodeTypes = analysis.nodeTypes();
+
+      // Lexer and parser errors get keyword-typo suggestions; trailing input after the point where
+      // the parser stopped (always last) is reported as the analyzer words it
       LspErrorListener errorListener = new LspErrorListener();
-
-      VitruvOCLLexer lexer = new VitruvOCLLexer(CharStreams.fromString(documentText));
-      lexer.removeErrorListeners();
-      lexer.addErrorListener(errorListener);
-
-      CommonTokenStream tokens = new CommonTokenStream(lexer);
-
-      VitruvOCLParser parser = new VitruvOCLParser(tokens);
-      parser.removeErrorListeners();
-      parser.addErrorListener(errorListener);
-      parser.setErrorHandler(new OclErrorStrategy());
-
-      tree = parser.contextDeclCS();
-      List<Diagnostic> syntaxDiags = errorListener.getDiagnostics();
-      diagnostics.addAll(syntaxDiags);
-
-      // -----------------------------------------------------------------------
-      // Pass 1 – Symbol Table Construction
-      // -----------------------------------------------------------------------
-      ErrorCollector errors = new ErrorCollector();
-      SymbolTableImpl symbolTable = new SymbolTableImpl(wrapper);
-      ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
-
-      try {
-        SymbolTableBuilder builder =
-            new SymbolTableBuilder(symbolTable, wrapper, errors, scopeAnnotator);
-        builder.visit(tree);
-      } catch (Exception e) {
-        LOG.fine(() -> "[OCL-LS] SymbolTableBuilder error: " + e.getMessage());
+      for (SyntaxError error : analysis.reportedSyntaxErrors()) {
+        if (error.kind() != SyntaxError.Kind.TRAILING_INPUT) {
+          errorListener.add(error);
+        }
+      }
+      List<Diagnostic> parserDiags = errorListener.getDiagnostics();
+      diagnostics.addAll(parserDiags);
+      for (SyntaxError error : analysis.reportedSyntaxErrors()) {
+        if (error.kind() == SyntaxError.Kind.TRAILING_INPUT) {
+          diagnostics.add(toDiagnostic(error));
+        }
       }
 
-      // -----------------------------------------------------------------------
-      // Pass 2 – Type Checking (always run for hover/completion even with errors)
-      // -----------------------------------------------------------------------
-      try {
-        TypeCheckVisitor typeChecker =
-            new TypeCheckVisitor(symbolTable, wrapper, errors, scopeAnnotator);
-        typeChecker.setTokenStream(tokens);
-        typeChecker.visit(tree);
-        nodeTypes = typeChecker.getNodeTypes();
-      } catch (Exception e) {
-        LOG.fine(() -> "[OCL-LS] TypeCheckVisitor error: " + e.getMessage());
+      // A crashed pass: the diagnostics below are incomplete. One internal-error diagnostic per
+      // document is enough.
+      for (OclAnalysis.PassCrash crash : analysis.crashes()) {
+        LOG.log(Level.WARNING, "[OCL-LS] " + crash.pass() + " crashed", crash.exception());
       }
+      analysis.crashes().stream()
+          .findFirst()
+          .ifPresent(crash -> diagnostics.add(internalError(crash.pass(), crash.exception())));
 
       // -----------------------------------------------------------------------
-      // Convert ErrorCollector entries to LSP Diagnostics
-      // Type-checker errors for those orphaned nodes are suppressed to prevent
-      // squiggles bleeding into the previous constraint's invariant body.
+      // Convert the passes' errors to LSP Diagnostics. Pass errors inside invariants that ANTLR's
+      // error recovery mis-parented (see findOrphanedInvRanges) are suppressed, so that squiggles
+      // do not bleed into the previous constraint. Only the parser's own errors indicate such a
+      // recovery: trailing input lies after the parse tree.
       // -----------------------------------------------------------------------
-      List<int[]> orphanedRanges = findOrphanedInvRanges(tree, syntaxDiags);
-      for (CompileError error : errors.getErrors()) {
+      List<int[]> orphanedRanges = findOrphanedInvRanges(tree, parserDiags);
+      for (CompileError error : analysis.errors()) {
         int errLine = Math.max(0, error.getLine() - 1); // 0-based
         boolean orphaned = false;
         for (int[] r : orphanedRanges) {
@@ -189,21 +172,29 @@ public class DocumentAnalyzer {
 
     } catch (Exception e) {
       // Catch-all — return empty analysis with a single internal-error diagnostic.
-      LOG.fine(() -> "[OCL-LS] Unexpected analysis error: " + e.getMessage());
-      diagnostics.add(
-          new Diagnostic(
-              new Range(new Position(0, 0), new Position(0, 1)),
-              "Internal language server error: " + e.getMessage(),
-              DiagnosticSeverity.Error,
-              LANGUAGE_ID));
+      LOG.log(Level.WARNING, "[OCL-LS] Unexpected analysis error", e);
+      diagnostics.add(internalError("analysis", e));
     }
 
     return new DocumentAnalysis(tree, nodeTypes, diagnostics);
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
+  /**
+   * Builds the diagnostic for an analysis step that crashed, placed at the start of the document.
+   *
+   * @param step human-readable name of the step that failed
+   * @param e the exception it threw
+   */
+  private static Diagnostic internalError(String step, Exception e) {
+    return new Diagnostic(
+        new Range(new Position(0, 0), new Position(0, 1)),
+        "Internal language server error during "
+            + step
+            + " (diagnostics may be incomplete): "
+            + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()),
+        DiagnosticSeverity.Error,
+        LANGUAGE_ID);
+  }
 
   // ---------------------------------------------------------------------------
   // Annotation keyword typo detection
@@ -355,6 +346,18 @@ public class DocumentAnalyzer {
     if (invHasSyntaxError) {
       orphaned.add(new int[] {invStart, invStop});
     }
+  }
+
+  /** A syntax error reported by the analyzer itself, spanning its token. */
+  private static Diagnostic toDiagnostic(SyntaxError error) {
+    int line = Math.max(0, error.line() - 1);
+    int start = Math.max(0, error.column());
+    int end = start + Math.max(1, error.offendingToken().getText().length());
+    return new Diagnostic(
+        new Range(new Position(line, start), new Position(line, end)),
+        error.message(),
+        DiagnosticSeverity.Error,
+        LANGUAGE_ID);
   }
 
   private static Diagnostic toDiagnostic(CompileError error) {

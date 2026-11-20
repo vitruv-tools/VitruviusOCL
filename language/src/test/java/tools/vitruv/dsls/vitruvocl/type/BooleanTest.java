@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
 
 /**
  * Comprehensive test suite for boolean operations and logical expressions in VitruvOCL.
@@ -32,8 +31,8 @@ import tools.vitruv.dsls.vitruvocl.evaluator.Value;
  *   <li><b>Complex:</b> Nested expressions with precedence and parentheses
  * </ul>
  *
- * @see Value Runtime value representation (collections)
- * @see tools.vitruv.dsls.vitruvocl.evaluator.OCLElement.BoolValue Boolean element wrapper
+ * @see "Value: runtime value representation (collections)"
+ * @see tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement.BoolValue Boolean element wrapper
  * @see tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor Evaluates boolean expressions
  */
 class BooleanTest extends DummyTestSpecification {

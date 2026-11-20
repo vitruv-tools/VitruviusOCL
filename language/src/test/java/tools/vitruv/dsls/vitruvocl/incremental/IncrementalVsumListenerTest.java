@@ -29,19 +29,19 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.incremental.support.CorrespondingElementsSpecification;
 import tools.vitruv.dsls.vitruvocl.incremental.support.RealVsumFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * End-to-end: a session attached to a real VSUM via {@link VitruvOCL#attachIncrementalSession}, one
- * transaction per {@code commitChanges()}, with consistency preservation ({@link
- * CorrespondingElementsSpecification}) changing the second model and the correspondence model —
- * including a correspondence created without any event on its partner. Every transaction is checked
- * by the oracle.
+ * End-to-end: a session attached to a real VSUM via {@link
+ * VitruvOclEngine#attachIncrementalSession}, one transaction per {@code commitChanges()}, with
+ * consistency preservation ({@link CorrespondingElementsSpecification}) changing the second model
+ * and the correspondence model — including a correspondence created without any event on its
+ * partner. Every transaction is checked by the oracle.
  */
 class IncrementalVsumListenerTest {
 
@@ -63,7 +63,6 @@ class IncrementalVsumListenerTest {
     if (session != null) {
       session.close();
     }
-    VitruvOCL.clearVSUM();
     if (vsum != null) {
       vsum.dispose();
     }
@@ -111,12 +110,15 @@ class IncrementalVsumListenerTest {
   @MethodSource("levels")
   void everyCommitIsOneOracleCheckedTransaction(IncrementalLevel level) throws Exception {
     vsum = RealVsumFixture.build(storage, new CorrespondingElementsSpecification());
-    VitruvOCL.registerVSUM(vsum);
     List<IncrementalResult> results = new ArrayList<>();
     List<RuntimeException> failures = new ArrayList<>();
     session =
-        VitruvOCL.attachIncrementalSession(
-            CONSTRAINTS, IncrementalConfig.of(level).withVerify(true), results::add, failures::add);
+        VitruvOclEngine.forVsum(vsum)
+            .attachIncrementalSession(
+                CONSTRAINTS,
+                IncrementalConfig.of(level).withVerify(true),
+                results::add,
+                failures::add);
 
     commit(
         view ->

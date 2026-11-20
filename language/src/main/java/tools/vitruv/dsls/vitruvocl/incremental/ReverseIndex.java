@@ -19,11 +19,17 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
+import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.EChangeClassifier;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 
 /**
  * Inverse of non-containment references without {@code eOpposite} (level 3b): for an indexed
@@ -44,16 +50,28 @@ final class ReverseIndex {
   private final Supplier<List<EObject>> roots;
   private final Map<EReference, Map<EObject, Map<EObject, Integer>>> index = new HashMap<>();
 
+  /** References known to be needed; see {@link #declare}. */
+  private final Set<EReference> declared = new LinkedHashSet<>();
+
   ReverseIndex(Supplier<List<EObject>> roots) {
     this.roots = roots;
+  }
+
+  /**
+   * Declares references that will be needed (e.g. all inverse steps of the session's relevance
+   * plans), so that the first lookup indexes all of them in one walk over the model instead of one
+   * walk per reference.
+   */
+  void declare(Collection<EReference> references) {
+    declared.addAll(references);
   }
 
   /** The holders {@code x} with {@code target ∈ x.reference}; builds the index on first use. */
   List<EObject> holders(EReference reference, EObject target) {
     Map<EObject, Map<EObject, Integer>> byTarget = index.get(reference);
     if (byTarget == null) {
-      byTarget = build(reference);
-      index.put(reference, byTarget);
+      buildMissing(reference);
+      byTarget = index.get(reference);
     }
     Map<EObject, Integer> holders = byTarget.get(target);
     return holders == null ? List.of() : new ArrayList<>(holders.keySet());
@@ -68,9 +86,18 @@ final class ReverseIndex {
    * Updates the indexed references with the reference events of a transaction that has already
    * been applied to the model. Must be called before the transaction's relevant instances are
    * computed; references indexed for the first time afterwards are built from the post-state.
+   *
+   * <p>Replays the raw changes rather than the deduplicated {@link TransactionDelta#events()}: the
+   * counts are a +1/-1 balance, so an insertion repeated after a removal of the same link (e.g. a
+   * re-insert or a move in a non-unique list) must be counted again.
    */
   void apply(TransactionDelta delta) {
-    for (ModelEvent event : delta.events()) {
+    for (EChange<EObject> change : delta.changes()) {
+      ModelEvent event = EChangeClassifier.toEvent(change);
+      if (event.kind() == ModelEvent.Kind.UNKNOWN) {
+        index.clear(); // it may have changed any indexed reference: rebuild everything lazily
+        return;
+      }
       if (!(event.feature() instanceof EReference ref) || !index.containsKey(ref)) {
         continue;
       }
@@ -87,17 +114,30 @@ final class ReverseIndex {
     }
   }
 
-  private Map<EObject, Map<EObject, Integer>> build(EReference reference) {
-    Map<EObject, Map<EObject, Integer>> byTarget = new IdentityHashMap<>();
-    for (EObject holder : reachableObjects()) {
-      if (!reference.getEContainingClass().isSuperTypeOf(holder.eClass())) {
-        continue;
-      }
-      for (Object target : values(holder, reference)) {
-        add(byTarget, target, holder);
+  /** Indexes {@code reference} and every declared reference not indexed yet, in one walk. */
+  private void buildMissing(EReference reference) {
+    Set<EReference> missing = new LinkedHashSet<>();
+    missing.add(reference);
+    for (EReference declaredReference : declared) {
+      if (!index.containsKey(declaredReference)) {
+        missing.add(declaredReference);
       }
     }
-    return byTarget;
+    Map<EReference, Map<EObject, Map<EObject, Integer>>> built = new HashMap<>();
+    for (EReference r : missing) {
+      built.put(r, new IdentityHashMap<>());
+    }
+    for (EObject holder : reachableObjects()) {
+      for (EReference r : missing) {
+        if (r.getEContainingClass().isSuperTypeOf(holder.eClass())) {
+          Map<EObject, Map<EObject, Integer>> byTarget = built.get(r);
+          for (Object target : values(holder, r)) {
+            add(byTarget, target, holder);
+          }
+        }
+      }
+    }
+    index.putAll(built);
   }
 
   /** All objects reachable from the roots via containment and via (non-proxy) references. */

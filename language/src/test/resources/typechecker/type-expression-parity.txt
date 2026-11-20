@@ -1,0 +1,152 @@
+# Type expressions as resolved by SymbolTableBuilder (type of an operation parameter) and by
+# TypeCheckVisitor (type, recorded node types, errors). Each case: the type expression, then
+# "=> " lines. Regenerate only for intended behaviour changes.
+
+Integer
+=> builder Integer
+=> checker Integer
+=> node PrimitiveTypeCS 'Integer' Integer
+
+String
+=> builder String
+=> checker String
+=> node PrimitiveTypeCS 'String' String
+
+Boolean
+=> builder Boolean
+=> checker Boolean
+=> node PrimitiveTypeCS 'Boolean' Boolean
+
+Real
+=> builder Double
+=> checker Double
+=> node PrimitiveTypeCS 'Real' Double
+
+ID
+=> builder String
+=> checker String
+=> node PrimitiveTypeCS 'ID' String
+
+UnlimitedNatural
+=> builder Integer
+=> checker Integer
+=> node PrimitiveTypeCS 'UnlimitedNatural' Integer
+
+OclAny
+=> builder Any
+=> checker Any
+=> node PrimitiveTypeCS 'OclAny' Any
+
+Double
+=> builder Double
+=> checker Double
+=> node TypeNameExpCS 'Double' Double
+
+Float
+=> builder Float
+=> checker Float
+=> node TypeNameExpCS 'Float' Float
+
+family::Member
+=> builder family::Member
+=> checker family::Member
+=> node TypeNameExpCS 'family::Member' family::Member
+
+Member
+=> builder family::Member
+=> checker family::Member
+=> node TypeNameExpCS 'Member' family::Member
+
+persons::Person
+=> builder persons::Person
+=> checker persons::Person
+=> node TypeNameExpCS 'persons::Person' persons::Person
+
+family::Nope
+=> builder Any
+=> checker ERROR
+=> error 0--1 ERROR type-checker | Unknown type: family::Nope
+
+nope::Member
+=> builder Any
+=> checker ERROR
+=> error 0--1 ERROR type-checker | Unknown type: nope::Member
+
+Nope
+=> builder Any
+=> checker ERROR
+=> error 0--1 ERROR type-checker | Unknown type: Nope
+
+Set(Integer)
+=> builder {Integer}
+=> checker {Integer}
+=> node CollectionTypeCS 'Set(Integer)' {Integer}
+=> node PrimitiveTypeCS 'Integer' Integer
+
+Set<Integer>
+=> builder {Integer}
+=> checker {Integer}
+=> node CollectionTypeCS 'Set<Integer>' {Integer}
+=> node PrimitiveTypeCS 'Integer' Integer
+
+Sequence(String)
+=> builder [String]
+=> checker [String]
+=> node CollectionTypeCS 'Sequence(String)' [String]
+=> node PrimitiveTypeCS 'String' String
+
+Bag(Real)
+=> builder {{Double}}
+=> checker {{Double}}
+=> node CollectionTypeCS 'Bag(Real)' {{Double}}
+=> node PrimitiveTypeCS 'Real' Double
+
+OrderedSet(Boolean)
+=> builder <Boolean>
+=> checker <Boolean>
+=> node CollectionTypeCS 'OrderedSet(Boolean)' <Boolean>
+=> node PrimitiveTypeCS 'Boolean' Boolean
+
+Collection(Integer)
+=> builder {Integer}
+=> checker {Integer}
+=> node CollectionTypeCS 'Collection(Integer)' {Integer}
+=> node PrimitiveTypeCS 'Integer' Integer
+
+Set
+=> builder {Any}
+=> checker {Any}
+=> node CollectionTypeCS 'Set' {Any}
+
+Set(Set(Integer))
+=> builder {{Integer}}
+=> checker {{Integer}}
+=> node CollectionTypeCS 'Set(Set(Integer))' {{Integer}}
+=> node CollectionTypeCS 'Set(Integer)' {Integer}
+=> node PrimitiveTypeCS 'Integer' Integer
+
+Sequence(family::Member)
+=> builder [family::Member]
+=> checker [family::Member]
+=> node CollectionTypeCS 'Sequence(family::Member)' [family::Member]
+=> node TypeNameExpCS 'family::Member' family::Member
+
+Set(Nope)
+=> builder {Any}
+=> checker ERROR
+=> error 4--1 ERROR type-checker | Unknown type: Nope
+
+Set(family::Nope)
+=> builder {Any}
+=> checker ERROR
+=> error 4--1 ERROR type-checker | Unknown type: family::Nope
+
+Bag(Set(Nope))
+=> builder {{{Any}}}
+=> checker ERROR
+=> error 8--1 ERROR type-checker | Unknown type: Nope
+
+123
+=> builder Any
+=> checker ERROR
+=> error 0--1 ERROR type-checker | Invalid type expression

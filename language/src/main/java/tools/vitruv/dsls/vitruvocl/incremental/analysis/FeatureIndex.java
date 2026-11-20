@@ -25,8 +25,7 @@ import org.eclipse.emf.ecore.EClassifier;
 import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.EReference;
 import org.eclipse.emf.ecore.EStructuralFeature;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Feature name → every class (of the known metamodels) on which that name resolves, with the
@@ -67,20 +66,16 @@ public final class FeatureIndex {
 
   /**
    * Index over every {@link EPackage} instance in the global registry plus the metamodels the
-   * wrapper knows (for file-based wrappers, whose packages need not be registered globally).
+   * wrapper knows ({@link ModelAccess#metamodelPackages()}), which need not be registered globally.
    */
-  public static FeatureIndex forWrapper(MetamodelWrapperInterface wrapper) {
+  public static FeatureIndex forWrapper(ModelAccess wrapper) {
     List<EPackage> packages = new ArrayList<>();
     for (Object value : new ArrayList<>(EPackage.Registry.INSTANCE.values())) {
       if (value instanceof EPackage p) {
         packages.add(p);
       }
     }
-    if (wrapper instanceof MetamodelWrapper mw) {
-      for (String name : mw.getAvailableMetamodels()) {
-        packages.add(mw.getEPackage(name));
-      }
-    }
+    packages.addAll(wrapper.metamodelPackages());
     return new FeatureIndex(packages);
   }
 

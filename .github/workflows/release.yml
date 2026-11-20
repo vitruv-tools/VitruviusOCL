@@ -63,6 +63,7 @@ jobs:
     - name: Deploy to staging and release
       run: >
         ./mvnw clean deploy -P release
+        -Dmaven.repository.credentialScope=id
         --batch-mode
         --update-snapshots
         --no-transfer-progress

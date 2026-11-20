@@ -16,6 +16,7 @@ package tools.vitruv.dsls.vitruvocl.evaluator;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.antlr.v4.runtime.CharStreams;
@@ -34,7 +35,8 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -58,7 +60,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *
  * <p>Metamodel: {@code dummy3::Root} has a many-valued {@code EReference children} (to {@code
  * dummy3::Child}, exercising {@code navigateOne()}'s {@code EReference} path across two distinct
- * receiver elements per {@link EvaluationVisitor#visitPropertyAccessWithReceiver}'s outer {@code
+ * receiver elements per {@link NavigationEvaluation#property}'s outer {@code
  * flatMap}); each {@code dummy3::Child} has a many-valued {@code EAttribute liste} (exercising the
  * {@code EAttribute} path, the one actually changed by the streaming fix).
  *
@@ -145,8 +147,13 @@ class NavigationManyValuedShadowingTest {
     }
   }
 
-  private MetamodelWrapperInterface wrapperFor(EObject instance) {
-    return new MetamodelWrapperInterface() {
+  private ModelAccess wrapperFor(EObject instance) {
+    return new ModelAccess() {
+      @Override
+      public Collection<EPackage> metamodelPackages() {
+        return List.of();
+      }
+
       @Override
       public EClass resolveEClass(String metamodelName, String className) {
         if (!"dummy3".equals(metamodelName)) {
@@ -219,7 +226,7 @@ class NavigationManyValuedShadowingTest {
     };
   }
 
-  private boolean evaluateInvariant(String constraint, MetamodelWrapperInterface wrapper) {
+  private boolean evaluateInvariant(String constraint, ModelAccess wrapper) {
     VitruvOCLLexer lexer = new VitruvOCLLexer(CharStreams.fromString(constraint));
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     VitruvOCLParser parser = new VitruvOCLParser(tokens);

@@ -23,26 +23,25 @@ import java.util.stream.Stream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Comprehensive test suite for the {@code oclAsType} cast operation in VitruvOCL.
@@ -64,11 +63,6 @@ class OCLAsTypeTest extends DummyTestSpecification {
   private static final Path SPACECRAFT_VOYAGER = Path.of("spacecraft-voyager.spacemission");
   private static final Path SPACECRAFT_ATLAS = Path.of("spacecraft-atlas.spacemission");
   private static final Path SATELLITE_VOYAGER = Path.of("satellite-voyager.satellitesystem");
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   /** Tests casting Integer collection to Integer → same elements preserved. */
   @Test
@@ -138,7 +132,7 @@ class OCLAsTypeTest extends DummyTestSpecification {
   @Test
   void testTypeCheckReturnsInteger() {
     ParseTree tree = parse("Set{5}.oclAsType(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -159,7 +153,7 @@ class OCLAsTypeTest extends DummyTestSpecification {
   @Test
   void testTypeCheckPreservesCollectionKind() {
     ParseTree tree = parse("Sequence{1, 2}.oclAsType(Integer)");
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -206,10 +200,11 @@ context spaceMission::Spacecraft inv asTypeSpacecraft:
         """;
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
+                new Path[] {SPACECRAFT_VOYAGER, SATELLITE_VOYAGER})
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate(constraint);
 
     result
         .getCompilerErrors()
@@ -231,10 +226,11 @@ context spaceMission::Spacecraft inv selectThenAsType:
         """;
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            constraint,
-            new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
-            new Path[] {SPACECRAFT_VOYAGER, SPACECRAFT_ATLAS, SATELLITE_VOYAGER});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE, SATELLITE_ECORE},
+                new Path[] {SPACECRAFT_VOYAGER, SPACECRAFT_ATLAS, SATELLITE_VOYAGER})
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate(constraint);
 
     result
         .getCompilerErrors()

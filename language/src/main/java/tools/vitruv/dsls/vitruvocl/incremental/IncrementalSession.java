@@ -14,6 +14,10 @@
 package tools.vitruv.dsls.vitruvocl.incremental;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,15 +30,22 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import org.eclipse.emf.ecore.EObject;
 import tools.vitruv.change.atomic.EChange;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.EvaluationOutcome;
+import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ConstraintAnalysis;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.FeatureIndex;
+import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.ReadSet;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintEvaluations;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.EvaluationOutcome;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.incremental.analysis.RelevancePlan;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.EChangeClassifier;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.model.TransactionSource;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Stateful incremental evaluation of a fixed list of constraints against one model (VSUM or
@@ -65,14 +76,14 @@ public final class IncrementalSession implements AutoCloseable {
 
   private final List<String> constraints;
   private final List<String> distinctConstraints;
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
   private final IncrementalConfig config;
   private final Map<String, CompiledConstraint> compiled = new LinkedHashMap<>();
   private final ViolationSet violations = new ViolationSet();
   private final ExecutorService executor;
   private final ReverseIndex reverseIndex;
   private final RelevantInstanceResolver resolver;
-  private IncrementalResult latest;
+  private volatile IncrementalResult latest;
   private TransactionCollector attachedCollector;
 
   /**
@@ -90,10 +101,10 @@ public final class IncrementalSession implements AutoCloseable {
 
   /**
    * The wrapper the current transaction's evaluations use: a {@link SnapshotCorrespondenceWrapper}
-   * over the current snapshot if there is one, else the session's wrapper. Rebuilt
-   * whenever the snapshot is replaced.
+   * over the current snapshot if there is one, else the session's wrapper. Rebuilt whenever the
+   * snapshot is replaced.
    */
-  private MetamodelWrapperInterface evaluationWrapper;
+  private ModelAccess evaluationWrapper;
 
   /**
    * Set while a transaction is being processed and cleared only after it completed (including the
@@ -101,7 +112,20 @@ public final class IncrementalSession implements AutoCloseable {
    * next transaction re-evaluate every constraint, so that no constraint keeps a stale outcome.
    */
   private boolean forceFullEvaluation;
-  private VsumWrapper attachedWrapper;
+
+  private TransactionSource attachedSource;
+
+  /** A rendered result and the outcome it was rendered from. */
+  private record Rendered(EvaluationOutcome outcome, ConstraintResult result) {}
+
+  /** The last rendered result per (distinct) constraint; see {@link #render(Set, Set)}. */
+  private final Map<String, Rendered> renderedResults = new HashMap<>();
+
+  /**
+   * Set by {@link #openAttached}: commits delivered before the initialization finished are covered
+   * by it and skipped.
+   */
+  private boolean coveredByInitialization;
 
   /**
    * Creates a session; call {@link #initialize()} before the first transaction.
@@ -110,7 +134,7 @@ public final class IncrementalSession implements AutoCloseable {
    *     exactly as in a batch evaluation)
    */
   public IncrementalSession(
-      List<String> constraints, MetamodelWrapperInterface wrapper, IncrementalConfig config) {
+      List<String> constraints, ModelAccess wrapper, IncrementalConfig config) {
     if (constraints == null || wrapper == null || config == null) {
       throw new IllegalArgumentException("constraints, wrapper and config must not be null");
     }
@@ -118,9 +142,125 @@ public final class IncrementalSession implements AutoCloseable {
     this.distinctConstraints = List.copyOf(new LinkedHashSet<>(constraints));
     this.wrapper = wrapper;
     this.config = config;
-    this.executor = config.threads() > 1 ? Executors.newFixedThreadPool(config.threads()) : null;
+    this.executor =
+        config.threads() > 1
+            ? Executors.newFixedThreadPool(config.threads(), IncrementalSession::workerThread)
+            : null;
     this.reverseIndex = new ReverseIndex(wrapper::getAllRootObjects);
     this.resolver = new RelevantInstanceResolver(() -> evaluationWrapper, reverseIndex);
+  }
+
+  /**
+   * Creates a session and performs its initial evaluation ({@link #initialize()}). If that fails,
+   * the session is closed (its worker threads stopped) before the failure is rethrown.
+   *
+   * @return the initialised session; close it when done
+   */
+  public static IncrementalSession open(
+      List<String> constraints, ModelAccess wrapper, IncrementalConfig config) {
+    IncrementalSession session = new IncrementalSession(constraints, wrapper, config);
+    try {
+      session.initialize();
+      return session;
+    } catch (RuntimeException | Error e) {
+      try {
+        session.close();
+      } catch (RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Opens a session on {@code wrapper} and attaches it to the wrapper's transactions, so that every
+   * later commit is processed and reported to {@code onResult} (or {@code onFailure}).
+   *
+   * <p>The listener is registered <em>before</em> the initial evaluation, so no commit can slip in
+   * between the two: a commit delivered before the initialization started is covered by it (it
+   * reads the post-state), one delivered while it runs waits for it and is then processed.
+   *
+   * @return the initialised, attached session; close it to detach
+   */
+  public static <W extends ModelAccess & TransactionSource> IncrementalSession openAttached(
+      List<String> constraints,
+      W wrapper,
+      IncrementalConfig config,
+      Consumer<IncrementalResult> onResult,
+      Consumer<RuntimeException> onFailure) {
+    IncrementalSession session = new IncrementalSession(constraints, wrapper, config);
+    session.coveredByInitialization = true;
+    try {
+      session.attachTo(wrapper, onResult, onFailure);
+      session.initialize();
+      return session;
+    } catch (RuntimeException | Error e) {
+      try {
+        session.close();
+      } catch (RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * The references the relevance plans step backwards over that have neither containment nor an
+   * {@code eOpposite}, i.e. those inverted through the {@link ReverseIndex}.
+   */
+  private Set<org.eclipse.emf.ecore.EReference> reverseIndexedReferences() {
+    Set<org.eclipse.emf.ecore.EReference> references = new LinkedHashSet<>();
+    for (CompiledConstraint constraint : compiled.values()) {
+      ConstraintAnalysis analysis = constraint.analysis();
+      RelevancePlan plan = analysis == null ? null : analysis.relevancePlan();
+      if (plan == null) {
+        continue;
+      }
+      List<Origin> origins = new ArrayList<>();
+      plan.reads().forEach(read -> origins.add(read.origin()));
+      plan.correspondenceReads()
+          .forEach(
+              read -> {
+                origins.add(read.left());
+                origins.add(read.right());
+              });
+      for (Origin origin : origins) {
+        if (origin == null || origin.steps() == null) {
+          continue;
+        }
+        for (org.eclipse.emf.ecore.EReference step : origin.steps()) {
+          if (!step.isContainment() && step.getEOpposite() == null) {
+            references.add(step);
+          }
+        }
+      }
+    }
+    return references;
+  }
+
+  /**
+   * Requests the instances of the types of all constraints in one call, so that the initial full
+   * evaluation needs one traversal instead of one per newly requested type.
+   */
+  private void prefetchInstances(ModelAccess view) {
+    Set<org.eclipse.emf.ecore.EClass> types = new LinkedHashSet<>();
+    for (CompiledConstraint constraint : compiled.values()) {
+      types.addAll(constraint.requestedTypes());
+    }
+    if (types.size() > 1) {
+      try {
+        view.getAllInstances(types);
+      } catch (RuntimeException e) {
+        // only an optimization: the evaluation reports the failure where it matters
+      }
+    }
+  }
+
+  /** Daemon worker, so that a session that is never closed cannot keep the JVM alive. */
+  private static Thread workerThread(Runnable task) {
+    Thread thread = new Thread(task, "vitruvocl-incremental-worker");
+    thread.setDaemon(true);
+    return thread;
   }
 
   /** The configuration this session runs with. */
@@ -134,20 +274,26 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /** Compiles all constraints and performs the initial full evaluation. */
-  public IncrementalResult initialize() {
+  public synchronized IncrementalResult initialize() {
     final IncrementalStats.Builder stats =
         new IncrementalStats.Builder().constraints(distinctConstraints.size());
     FeatureIndex features = FeatureIndex.forWrapper(wrapper);
     for (String constraint : distinctConstraints) {
       compiled.put(constraint, CompiledConstraint.compile(constraint, wrapper, features));
     }
+    reverseIndex.declare(reverseIndexedReferences());
     observingCorrespondences = observesCorrespondences();
     correspondenceSnapshot = observingCorrespondences ? captureCorrespondences() : null;
     evaluationWrapper = viewOf(correspondenceSnapshot);
-    MetamodelWrapperInterface view = evaluationWrapper;
     List<EvaluationOutcome> outcomes =
-        evaluateAll(
-            distinctConstraints, c -> compiled.get(c).evaluate(view, List.of(), false, null));
+        wrapper.batch(
+            batchView -> {
+              // the initial full evaluation reads through the batch's caching view
+              ModelAccess view = viewOf(correspondenceSnapshot, batchView);
+              prefetchInstances(view);
+              return evaluateAll(
+                  distinctConstraints, c -> compiled.get(c).evaluate(view, List.of(), false, null));
+            });
     for (int i = 0; i < distinctConstraints.size(); i++) {
       violations.replaceAll(distinctConstraints.get(i), outcomes.get(i));
       stats.evaluated(true, outcomes.get(i).evaluatedInstances());
@@ -169,7 +315,7 @@ public final class IncrementalSession implements AutoCloseable {
    * @throws IncrementalMismatchException in oracle mode, if the result differs from a full
    *     evaluation
    */
-  public IncrementalResult onTransaction(List<EChange<EObject>> changes) {
+  public synchronized IncrementalResult onTransaction(List<EChange<EObject>> changes) {
     if (latest == null) {
       throw new IllegalStateException("initialize() must be called before onTransaction()");
     }
@@ -200,8 +346,14 @@ public final class IncrementalSession implements AutoCloseable {
       }
     }
 
+    // the selected constraints read the same post-state: one batch view shares the extensions
     List<EvaluationOutcome> outcomes =
-        evaluateAll(selected, c -> evaluateSelected(c, relevance.get(c), transaction));
+        wrapper.batch(
+            batchView -> {
+              ModelAccess view = viewOf(correspondenceSnapshot, batchView);
+              return evaluateAll(
+                  selected, c -> evaluateSelected(c, relevance.get(c), transaction, view));
+            });
     for (int i = 0; i < selected.size(); i++) {
       String constraint = selected.get(i);
       RelevantInstanceResolver.Relevance r = relevance.get(constraint);
@@ -227,8 +379,12 @@ public final class IncrementalSession implements AutoCloseable {
     if (config.verify()) {
       verify(transaction, true);
     }
-    forceFullEvaluation = false;
-    latest = new IncrementalResult(render(), stats.build());
+    BatchValidationResult rendered =
+        delta.hasUnknownChanges() || recovering
+            ? render()
+            : render(new HashSet<>(selected), touchedObjects(delta));
+    forceFullEvaluation = false; // only now: a failed render recovers with a full one
+    latest = new IncrementalResult(rendered, stats.build());
     return latest;
   }
 
@@ -271,14 +427,19 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /** The evaluation view for {@code snapshot}: answers correspondence queries from it. */
-  private MetamodelWrapperInterface viewOf(CorrespondenceSnapshot snapshot) {
+  private ModelAccess viewOf(CorrespondenceSnapshot snapshot) {
+    return viewOf(snapshot, wrapper);
+  }
+
+  /** {@link #viewOf(CorrespondenceSnapshot)} on top of {@code base} instead of the wrapper. */
+  private ModelAccess viewOf(CorrespondenceSnapshot snapshot, ModelAccess base) {
     // The snapshot answers correspondenceHasTag as the two-way tagged lookup, which is only the
     // wrapper's own answer under that contract.
     return snapshot == null
             || !sharedCorrespondenceLookup
             || !wrapper.hasTaggedCorrespondenceLookup()
-        ? wrapper
-        : new SnapshotCorrespondenceWrapper(wrapper, snapshot);
+        ? base
+        : new SnapshotCorrespondenceWrapper(base, snapshot);
   }
 
   /**
@@ -334,8 +495,10 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   private EvaluationOutcome evaluateSelected(
-      String constraint, RelevantInstanceResolver.Relevance relevance, List<EChange<EObject>> tx) {
-    MetamodelWrapperInterface view = evaluationWrapper;
+      String constraint,
+      RelevantInstanceResolver.Relevance relevance,
+      List<EChange<EObject>> tx,
+      ModelAccess view) {
     if (relevance.classEvent()) {
       return compiled.get(constraint).evaluate(view, tx, true, null);
     }
@@ -357,30 +520,42 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   /**
-   * Registers this session as change-propagation listener on {@code vsumWrapper}'s VSUM: after
-   * every {@code finishedChangePropagation} the transaction is processed and the result handed to
-   * {@code onResult}. Failures (including oracle mismatches) are handed to {@code onFailure}
-   * instead of being thrown into the propagation.
+   * Registers this session as change-propagation listener on {@code source}: after every {@code
+   * finishedChangePropagation} the transaction is processed and the result handed to {@code
+   * onResult}. Failures (including oracle mismatches) are handed to {@code onFailure} instead of
+   * being thrown into the propagation.
    */
   public void attachTo(
-      VsumWrapper vsumWrapper,
+      TransactionSource source,
       Consumer<IncrementalResult> onResult,
       Consumer<RuntimeException> onFailure) {
     if (attachedCollector != null) {
       throw new IllegalStateException("Session is already attached to a VSUM");
     }
-    attachedCollector = new TransactionCollector(this::onTransaction, onResult, onFailure);
-    attachedWrapper = vsumWrapper;
-    vsumWrapper.addTransactionListener(attachedCollector);
+    attachedCollector = new TransactionCollector(this::onAttachedTransaction, onResult, onFailure);
+    attachedSource = source;
+    source.addTransactionListener(attachedCollector);
+  }
+
+  /**
+   * Processes a commit delivered by the attached transaction source; {@code null} (nothing to
+   * report) if the session is not initialized yet, since the initialization then reads the commit's
+   * post-state.
+   */
+  private synchronized IncrementalResult onAttachedTransaction(List<EChange<EObject>> changes) {
+    if (latest == null && coveredByInitialization) {
+      return null;
+    }
+    return onTransaction(changes); // fails as before if attachTo was used without initialize()
   }
 
   /** Removes the listener registered by {@link #attachTo}, if any, and stops worker threads. */
   @Override
-  public void close() {
+  public synchronized void close() { // waits for a transaction in progress
     if (attachedCollector != null) {
-      attachedWrapper.removeTransactionListener(attachedCollector);
+      attachedSource.removeTransactionListener(attachedCollector);
       attachedCollector = null;
-      attachedWrapper = null;
+      attachedSource = null;
     }
     if (executor != null) {
       executor.shutdown();
@@ -413,18 +588,71 @@ public final class IncrementalSession implements AutoCloseable {
   }
 
   private BatchValidationResult render() {
+    renderedResults.clear();
+    return render(Set.of(), Collections.newSetFromMap(new IdentityHashMap<>()));
+  }
+
+  /**
+   * Renders the current results, reusing the previous result of every constraint whose outcome is
+   * the one it was rendered from, that was not re-evaluated ({@code reEvaluated}) and none of whose
+   * violations describes an object in {@code touched}: a result depends only on the outcome and on
+   * the current attributes and resource of the violating objects (labels and source files are read
+   * at render time). Not observed: a label attribute derived from other objects, and a model
+   * file renamed without a change event; such results stay as rendered until re-rendered.
+   */
+  private BatchValidationResult render(Set<String> reEvaluated, Set<EObject> touched) {
     List<ConstraintResult> results = new ArrayList<>(constraints.size());
     Set<String> seen = new LinkedHashSet<>();
     for (String constraint : constraints) {
       if (!seen.add(constraint)) {
         results.add(ConstraintEvaluations.duplicateResult(constraint));
-      } else {
-        results.add(
-            ConstraintEvaluations.render(
-                constraint, wrapper, List.of(), violations.currentOutcome(constraint)));
+        continue;
       }
+      EvaluationOutcome outcome = violations.currentOutcome(constraint);
+      Rendered cached = renderedResults.get(constraint);
+      if (cached == null
+          || cached.outcome() != outcome
+          || reEvaluated.contains(constraint)
+          || describesAny(outcome, touched)) {
+        cached =
+            new Rendered(
+                outcome, ConstraintEvaluations.render(constraint, wrapper, List.of(), outcome));
+        renderedResults.put(constraint, cached);
+      }
+      results.add(cached.result());
     }
     return new BatchValidationResult(results);
+  }
+
+  private static boolean describesAny(EvaluationOutcome outcome, Set<EObject> objects) {
+    if (objects.isEmpty()) {
+      return false;
+    }
+    for (EvaluationVisitor.ViolationRecord record : outcome.records()) {
+      if (record.instance() != null && objects.contains(record.instance())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Every object a transaction's events changed, added, removed or moved (identity set). */
+  private static Set<EObject> touchedObjects(TransactionDelta delta) {
+    Set<EObject> touched = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (ModelEvent event : delta.events()) {
+      addIfObject(event.object(), touched);
+      addIfObject(event.oldValue(), touched);
+      addIfObject(event.newValue(), touched);
+    }
+    touched.addAll(delta.structurallyInsertedObjects());
+    touched.addAll(delta.structurallyRemovedObjects());
+    return touched;
+  }
+
+  private static void addIfObject(Object value, Set<EObject> sink) {
+    if (value instanceof EObject object) {
+      sink.add(object);
+    }
   }
 
   /** Evaluates {@code selected} sequentially or on the session's pool; results in input order. */

@@ -1,0 +1,999 @@
+# Typing of correspondence operations, object-lifecycle predicates and metamodel operations.
+# Each case: "### name", a complete document, then "=> " lines: the type recorded for every
+# constraint body ("inv|pre|post <line> <type>"), every node with a recorded type
+# ("node <rule> <line>:<column> <type>") and every diagnostic. Recorded from the type checker;
+# change expectations only for intended behaviour changes.
+
+### correspondenceOperator
+context family::Member inv:
+  persons::Person.allInstances().exists(p | self ~ p)
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 Boolean
+=> node iteratorOpCS 2:33 Boolean
+=> node infixedExpCS 2:44 Boolean
+=> node prefixedExpCS 2:44 family::Member
+=> node selfExpCS 2:44 family::Member
+=> node prefixedExpCS 2:51 persons::Person
+=> node variableExpCS 2:51 persons::Person
+
+### correspondenceOperatorCollectionLeft
+context family::Family inv:
+  self.sons ~ self.father
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 <family::Member>
+=> node selfExpCS 2:2 family::Family
+=> node navigationTargetCS 2:7 <family::Member>
+=> node prefixedExpCS 2:14 ?family::Member?
+=> node selfExpCS 2:14 family::Family
+=> node navigationTargetCS 2:19 ?family::Member?
+=> 2:2--1:-1 ERROR type-checker fix=null | Correspondence operator ~ requires single object on left side, got collection: <family::Member>
+
+### correspondenceOperatorCollectionRight
+context family::Family inv:
+  self.father ~ self.sons
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ?family::Member?
+=> node selfExpCS 2:2 family::Family
+=> node navigationTargetCS 2:7 ?family::Member?
+=> node prefixedExpCS 2:16 <family::Member>
+=> node selfExpCS 2:16 family::Family
+=> node navigationTargetCS 2:21 <family::Member>
+=> 2:16--1:-1 ERROR type-checker fix=null | Correspondence operator ~ requires single object on right side, got collection: <family::Member>
+
+### correspondenceOperatorPrimitiveLeft
+context family::Member inv:
+  self.firstName ~ self
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 !String!
+=> node selfExpCS 2:2 family::Member
+=> node navigationTargetCS 2:7 !String!
+=> node prefixedExpCS 2:19 family::Member
+=> node selfExpCS 2:19 family::Member
+=> 2:2--1:-1 ERROR type-checker fix=null | Correspondence operator ~ requires object type on left side, got: String
+
+### correspondenceOperatorPrimitiveRight
+context family::Member inv:
+  self ~ 1
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 family::Member
+=> node selfExpCS 2:2 family::Member
+=> node prefixedExpCS 2:9 Integer
+=> node literalExpCS 2:9 Integer
+=> 2:9--1:-1 ERROR type-checker fix=null | Correspondence operator ~ requires object type on right side, got: Integer
+
+### selectCorrespondence
+context family::Member inv:
+  persons::Person.allInstances().select(~).notEmpty()
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 <persons::Person>
+=> node iteratorOpCS 2:33 <persons::Person>
+=> node correspondenceFilterCS 2:40 Any
+=> node navigationChainCS 2:42 Boolean
+=> node collectionOpCS 2:43 Boolean
+
+### selectCorrespondenceTypeFilter
+context family::Member inv:
+  family::Member.allInstances().select(~, Type = persons::Person, Tag = "x").size() == 1
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node infixedExpCS 2:2 Boolean
+=> node prefixedExpCS 2:2 family::Member
+=> node navigationChainCS 2:16 <family::Member>
+=> node collectionOpCS 2:17 <family::Member>
+=> node navigationChainCS 2:31 <persons::Person>
+=> node iteratorOpCS 2:32 <persons::Person>
+=> node correspondenceFilterCS 2:39 persons::Person
+=> node correspondenceOptions 2:42 persons::Person
+=> node correspondenceOption 2:42 persons::Person
+=> node prefixedExpCS 2:49 persons::Person
+=> node correspondenceOption 2:66 Any
+=> node prefixedExpCS 2:72 String
+=> node literalExpCS 2:72 String
+=> node navigationChainCS 2:76 Integer
+=> node collectionOpCS 2:77 Integer
+=> node prefixedExpCS 2:87 Integer
+=> node literalExpCS 2:87 Integer
+
+### selectCorrespondenceOnPrimitives
+context family::Member inv:
+  Sequence{1, 2}.select(~).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node collectionLiteralExpCS 2:2 [Integer]
+=> node collectionTypeCS 2:2 [Any]
+=> node prefixedExpCS 2:11 Integer
+=> node literalExpCS 2:11 Integer
+=> node prefixedExpCS 2:14 Integer
+=> node literalExpCS 2:14 Integer
+=> 2:17--1:-1 ERROR type-checker fix=null | select(~) requires collection of object types, got: Integer
+
+### correspondenceOnErroneousReceiver
+context family::Member inv:
+  nope.select(~).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node variableExpCS 2:2 ERROR
+=> 2:2-2:6 ERROR type-checker fix=null | Undefined variable: nope
+=> 2:7--1:-1 ERROR type-checker fix=null | Cannot determine receiver type for select(~)
+
+### rejectCorrespondence
+context family::Member inv:
+  persons::Person.allInstances().reject(~, Type = persons::Person).isEmpty()
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 <persons::Person>
+=> node iteratorOpCS 2:33 <persons::Person>
+=> node correspondenceFilterCS 2:40 persons::Person
+=> node correspondenceOptions 2:43 persons::Person
+=> node correspondenceOption 2:43 persons::Person
+=> node prefixedExpCS 2:50 persons::Person
+=> node navigationChainCS 2:66 Boolean
+=> node collectionOpCS 2:67 Boolean
+
+### rejectCorrespondenceOnPrimitives
+context family::Member inv:
+  Set{"a"}.reject(~).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node collectionLiteralExpCS 2:2 {String}
+=> node collectionTypeCS 2:2 {Any}
+=> node prefixedExpCS 2:6 String
+=> node literalExpCS 2:6 String
+=> 2:11--1:-1 ERROR type-checker fix=null | reject(~) requires collection of object types, got: String
+
+### existsCorrespondence
+context family::Member inv:
+  persons::Person.allInstances().exists(~, Tag = "x")
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 Boolean
+=> node iteratorOpCS 2:33 Boolean
+=> node correspondenceFilterCS 2:40 Any
+=> node correspondenceOptions 2:43 Any
+=> node correspondenceOption 2:43 Any
+=> node prefixedExpCS 2:49 String
+=> node literalExpCS 2:49 String
+
+### existsCorrespondenceOnPrimitives
+context family::Member inv:
+  Bag{1.5}.exists(~)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node collectionLiteralExpCS 2:2 {{Double}}
+=> node collectionTypeCS 2:2 {{Any}}
+=> node prefixedExpCS 2:6 Double
+=> node literalExpCS 2:6 Double
+=> 2:11--1:-1 ERROR type-checker fix=null | exists(~) requires collection of object types, got: Double
+
+### existsCorrespondenceOnSingleObject
+context family::Family inv:
+  self.father.exists(~)
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node prefixedExpCS 2:2 Boolean
+=> node selfExpCS 2:2 family::Family
+=> node navigationTargetCS 2:7 ?family::Member?
+=> node iteratorOpCS 2:14 Boolean
+=> node correspondenceFilterCS 2:21 Any
+
+### correspondenceFilterTypeNotMetaclass
+context family::Member inv:
+  persons::Person.allInstances().select(~, Type = Integer).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 ERROR
+=> node correspondenceOptions 2:43 ERROR
+=> node prefixedExpCS 2:50 Integer
+=> node primitiveTypeCS 2:50 Integer
+=> node navigationChainCS 2:58 ERROR
+=> 2:43-2:57 ERROR type-checker fix=null | Type filter must be a metaclass (e.g. persons::Person), got: Integer
+
+### correspondenceFilterTypeUnknown
+context family::Member inv:
+  persons::Person.allInstances().select(~, Type = persons::Nope).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 ERROR
+=> node correspondenceOptions 2:43 ERROR
+=> node navigationChainCS 2:64 ERROR
+=> 2:59-2:63 ERROR type-checker fix=null | Unknown class 'Nope' in metamodel 'persons'
+
+### correspondenceFilterDuplicateType
+context family::Member inv:
+  persons::Person.allInstances().select(~, Type = persons::Person, Type = family::Member).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 family::Member
+=> node correspondenceOptions 2:43 family::Member
+=> node correspondenceOption 2:43 persons::Person
+=> node prefixedExpCS 2:50 persons::Person
+=> node correspondenceOption 2:67 family::Member
+=> node prefixedExpCS 2:74 family::Member
+=> node navigationChainCS 2:89 ERROR
+=> 2:67--1:-1 WARNING type-checker fix=null | Duplicate Type filter in correspondence — only one Type filter allowed
+
+### correspondenceFilterTagNotString
+context family::Member inv:
+  persons::Person.allInstances().exists(~, Tag = 1)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 Any
+=> node correspondenceOptions 2:43 Any
+=> node correspondenceOption 2:43 Any
+=> node prefixedExpCS 2:49 Integer
+=> node literalExpCS 2:49 Integer
+=> 2:43-2:50 ERROR type-checker fix=null | Tag filter value must be String, got Integer
+
+### correspondenceFilterUnknownOption
+context family::Member inv:
+  persons::Person.allInstances().exists(~, Typ = persons::Person)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 ERROR
+=> node correspondenceOptions 2:43 ERROR
+=> node correspondenceOption 2:43 ERROR
+=> node prefixedExpCS 2:49 persons::Person
+=> 2:43-2:46 ERROR type-checker fix=Type | Unknown filter option 'Typ' — did you mean 'Type'?
+
+### correspondenceFilterInvalidArgument
+context family::Member inv:
+  persons::Person.allInstances().exists(~, persons)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 ERROR
+=> node correspondenceOptions 2:43 ERROR
+=> 2:43-2:50 ERROR type-checker fix=null | Invalid filter argument 'persons' — expected 'Type = <type>' or 'Tag = <string>'
+
+### correspondenceFilterExtraCommas
+context family::Member inv:
+  persons::Person.allInstances().reject(~, , Tag = "x").isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 Any
+=> node correspondenceOptions 2:43 Any
+=> node correspondenceOption 2:43 Any
+=> node prefixedExpCS 2:51 String
+=> node literalExpCS 2:51 String
+=> node navigationChainCS 2:55 ERROR
+=> 2:33-2:55 ERROR type-checker fix=null | 'reject(~, ...)' has invalid arguments — check for extra or misplaced commas
+
+### unknownCorrespondenceOperation
+context family::Member inv:
+  persons::Person.allInstances().selct(~).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node operationCall 2:33 ERROR
+=> node correspondenceFilterCS 2:39 Any
+=> node navigationChainCS 2:41 ERROR
+=> 2:33-2:38 ERROR type-checker fix=select | Unknown operation 'selct' — did you mean 'select'?
+
+### atPreInPost
+context family::Member::rename(n : String)
+  post: self.firstName@pre != self.firstName or true
+=> post 2 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 Boolean
+=> node infixedExpCS 2:8 Boolean
+=> node infixedExpCS 2:8 Boolean
+=> node prefixedExpCS 2:8 !String!
+=> node selfExpCS 2:8 family::Member
+=> node navigationTargetCS 2:13 !String!
+=> node navigationChainCS 2:22 !String!
+=> node prefixedExpCS 2:30 !String!
+=> node selfExpCS 2:30 family::Member
+=> node navigationTargetCS 2:35 !String!
+=> node prefixedExpCS 2:48 Boolean
+=> node literalExpCS 2:48 Boolean
+
+### atPreInPostComparison
+context family::Member::rename(n : String)
+  post: self.firstName@pre == n
+=> post 2 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 Boolean
+=> node infixedExpCS 2:8 Boolean
+=> node prefixedExpCS 2:8 !String!
+=> node selfExpCS 2:8 family::Member
+=> node navigationTargetCS 2:13 !String!
+=> node navigationChainCS 2:22 !String!
+=> node prefixedExpCS 2:30 String
+=> node variableExpCS 2:30 String
+
+### atPreInInv
+context family::Member inv:
+  self.firstName@pre == "a"
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node infixedExpCS 2:2 Boolean
+=> node prefixedExpCS 2:2 ERROR
+=> node selfExpCS 2:2 family::Member
+=> node navigationTargetCS 2:7 !String!
+=> node navigationChainCS 2:16 ERROR
+=> node prefixedExpCS 2:24 String
+=> node literalExpCS 2:24 String
+=> 2:16-2:20 ERROR type-checker fix=null | '@pre' is only valid inside 'post' blocks
+
+### atPreInPre
+context family::Member::rename(n : String)
+  pre: self.firstName@pre == n
+=> pre 2 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node preCS 2:2 Boolean
+=> node specificationCS 2:7 Boolean
+=> node infixedExpCS 2:7 Boolean
+=> node prefixedExpCS 2:7 ERROR
+=> node selfExpCS 2:7 family::Member
+=> node navigationTargetCS 2:12 !String!
+=> node navigationChainCS 2:21 ERROR
+=> node prefixedExpCS 2:29 String
+=> node variableExpCS 2:29 String
+=> 2:21-2:25 ERROR type-checker fix=null | '@pre' is only valid inside 'post' blocks
+
+### atPreWithoutPropertyAccess
+context family::Member::rename(n : String)
+  post: self@pre == self
+=> post 2 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 Boolean
+=> node infixedExpCS 2:8 Boolean
+=> node prefixedExpCS 2:8 ERROR
+=> node selfExpCS 2:8 family::Member
+=> node navigationChainCS 2:12 ERROR
+=> node prefixedExpCS 2:20 family::Member
+=> node selfExpCS 2:20 family::Member
+=> 2:12-2:16 ERROR type-checker fix=null | '@pre' must directly follow a property access, e.g. 'self.attr@pre'
+
+### lifecyclePredicatesInPost
+context family::Family::addSon(n : String)
+  post: self.OCLisModified and self.father.OCLisNew
+=> post 2 Boolean
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 Boolean
+=> node infixedExpCS 2:8 Boolean
+=> node prefixedExpCS 2:8 !Boolean!
+=> node selfExpCS 2:8 family::Family
+=> node lifecyclePredicateCS 2:13 !Boolean!
+=> node prefixedExpCS 2:31 !Boolean!
+=> node selfExpCS 2:31 family::Family
+=> node navigationTargetCS 2:36 ?family::Member?
+=> node lifecyclePredicateCS 2:43 !Boolean!
+
+### lifecyclePredicateOnCollection
+context family::Family::addSon(n : String)
+  post: self.sons.OCLisNew
+=> post 2 <Boolean>
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 <Boolean>
+=> node prefixedExpCS 2:8 <Boolean>
+=> node selfExpCS 2:8 family::Family
+=> node navigationTargetCS 2:13 <family::Member>
+=> node lifecyclePredicateCS 2:18 <Boolean>
+
+### lifecycleDeletedOnCollection
+context family::Family::addSon(n : String)
+  post: self.sons.OCLisDeleted
+=> post 2 <Boolean>
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 <Boolean>
+=> node prefixedExpCS 2:8 <Boolean>
+=> node selfExpCS 2:8 family::Family
+=> node navigationTargetCS 2:13 <family::Member>
+=> node lifecyclePredicateCS 2:18 <Boolean>
+
+### lifecycleAggregate
+context family::Family::rename(n : String)
+  post: self.OCLisModified(lastName => n) and self.father.OCLisNew(firstName => "x")
+=> post 2 Boolean
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 Boolean
+=> node infixedExpCS 2:8 Boolean
+=> node prefixedExpCS 2:8 !Boolean!
+=> node selfExpCS 2:8 family::Family
+=> node lifecyclePredicateCS 2:13 !Boolean!
+=> node prefixedExpCS 2:39 String
+=> node variableExpCS 2:39 String
+=> node prefixedExpCS 2:46 !Boolean!
+=> node selfExpCS 2:46 family::Family
+=> node navigationTargetCS 2:51 ?family::Member?
+=> node lifecyclePredicateCS 2:58 !Boolean!
+=> node prefixedExpCS 2:80 String
+=> node literalExpCS 2:80 String
+
+### lifecycleAggregateUnknownAttribute
+context family::Family::rename(n : String)
+  post: self.OCLisModified(lastNam => n)
+=> post 2 !Boolean!
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 !Boolean!
+=> node prefixedExpCS 2:8 !Boolean!
+=> node selfExpCS 2:8 family::Family
+=> node lifecyclePredicateCS 2:13 !Boolean!
+=> node prefixedExpCS 2:38 String
+=> node variableExpCS 2:38 String
+=> 2:27-2:34 ERROR type-checker fix=null | Unknown property 'lastNam' on type 'Family' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### lifecycleAggregateTypeMismatch
+context family::Family::rename(n : String)
+  post: self.OCLisModified(lastName => 1)
+=> post 2 !Boolean!
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 !Boolean!
+=> node prefixedExpCS 2:8 !Boolean!
+=> node selfExpCS 2:8 family::Family
+=> node lifecyclePredicateCS 2:13 !Boolean!
+=> node prefixedExpCS 2:39 Integer
+=> node literalExpCS 2:39 Integer
+=> 2:39--1:-1 ERROR type-checker fix=null | Type mismatch: attribute 'lastName' expects !String!, got Integer
+
+### lifecycleAggregateSubtypeAttribute
+context family::Family::rename(n : String)
+  post: self.father.OCLisNew(firstName => n, lastName => n)
+=> post 2 !Boolean!
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 !Boolean!
+=> node prefixedExpCS 2:8 !Boolean!
+=> node selfExpCS 2:8 family::Family
+=> node navigationTargetCS 2:13 ?family::Member?
+=> node lifecyclePredicateCS 2:20 !Boolean!
+=> node prefixedExpCS 2:42 String
+=> node variableExpCS 2:42 String
+=> node prefixedExpCS 2:57 String
+=> node variableExpCS 2:57 String
+=> 2:45-2:53 ERROR type-checker fix=null | Unknown property 'lastName' on type 'Member' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### lifecyclePredicateInInv
+context family::Member inv:
+  self.OCLisNew
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node selfExpCS 2:2 family::Member
+=> node lifecyclePredicateCS 2:7 ERROR
+=> 2:7--1:-1 ERROR type-checker fix=null | 'OCLisNew' is only valid inside 'post' blocks
+
+### lifecyclePredicateInPre
+context family::Member::rename(n : String)
+  pre: self.OCLisDeleted
+=> pre 2 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node preCS 2:2 Boolean
+=> node specificationCS 2:7 ERROR
+=> node prefixedExpCS 2:7 ERROR
+=> node selfExpCS 2:7 family::Member
+=> node lifecyclePredicateCS 2:12 ERROR
+=> 2:12--1:-1 ERROR type-checker fix=null | 'OCLisDeleted' is only valid inside 'post' blocks
+
+### lifecyclePredicateOnPrimitive
+context family::Member::rename(n : String)
+  post: self.firstName.OCLisModified
+=> post 2 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 ERROR
+=> node prefixedExpCS 2:8 ERROR
+=> node selfExpCS 2:8 family::Member
+=> node navigationTargetCS 2:13 !String!
+=> node lifecyclePredicateCS 2:23 ERROR
+=> 2:23--1:-1 ERROR type-checker fix=null | 'OCLisModified' requires an object receiver, got !String!
+
+### allInstances
+context family::Member inv:
+  family::Member.allInstances().size() > 0
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node infixedExpCS 2:2 Boolean
+=> node prefixedExpCS 2:2 family::Member
+=> node navigationChainCS 2:16 <family::Member>
+=> node collectionOpCS 2:17 <family::Member>
+=> node navigationChainCS 2:31 Integer
+=> node collectionOpCS 2:32 Integer
+=> node prefixedExpCS 2:41 Integer
+=> node literalExpCS 2:41 Integer
+
+### allInstancesOnObject
+context family::Member inv:
+  self.allInstances().size() > 0
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node infixedExpCS 2:2 Boolean
+=> node prefixedExpCS 2:2 Integer
+=> node selfExpCS 2:2 family::Member
+=> node collectionOpCS 2:7 <family::Member>
+=> node collectionOpCS 2:22 Integer
+=> node prefixedExpCS 2:31 Integer
+=> node literalExpCS 2:31 Integer
+
+### allInstancesOnPrimitive
+context family::Member inv:
+  self.firstName.allInstances().size() > 0
+=> inv 1 Boolean
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 Boolean
+=> node infixedExpCS 2:2 Boolean
+=> node prefixedExpCS 2:2 ERROR
+=> node selfExpCS 2:2 family::Member
+=> node navigationTargetCS 2:7 !String!
+=> node prefixedExpCS 2:41 Integer
+=> node literalExpCS 2:41 Integer
+=> 2:17--1:-1 ERROR type-checker fix=null | allInstances() requires metaclass receiver
+
+### messageOperator
+context family::Member inv:
+  self ^ self
+=> inv 1 family::Member
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 family::Member
+=> node infixedExpCS 2:2 family::Member
+=> node prefixedExpCS 2:2 family::Member
+=> node selfExpCS 2:2 family::Member
+=> 2:2--1:-1 WARNING type-checker fix=null | Message operator '^' not yet implemented
+
+### oclIsKindOfSingle
+context family::Member inv:
+  self.oclIsKindOf(family::Member)
+=> inv 1 !Boolean!
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 !Boolean!
+=> node prefixedExpCS 2:2 !Boolean!
+=> node selfExpCS 2:2 family::Member
+=> node typeOpCS 2:7 !Boolean!
+=> node typeExpCS 2:19 family::Member
+=> node typeNameExpCS 2:19 family::Member
+
+### oclIsKindOfCollection
+context family::Family inv:
+  self.sons.oclIsKindOf(family::Member)
+=> inv 1 <Boolean>
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 <Boolean>
+=> node prefixedExpCS 2:2 <Boolean>
+=> node selfExpCS 2:2 family::Family
+=> node navigationTargetCS 2:7 <family::Member>
+=> node typeOpCS 2:12 <Boolean>
+=> node typeExpCS 2:24 family::Member
+=> node typeNameExpCS 2:24 family::Member
+
+### oclIsTypeOfCollection
+context family::Family inv:
+  self.sons.oclIsTypeOf(persons::Person)
+=> inv 1 <Boolean>
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 <Boolean>
+=> node prefixedExpCS 2:2 <Boolean>
+=> node selfExpCS 2:2 family::Family
+=> node navigationTargetCS 2:7 <family::Member>
+=> node typeOpCS 2:12 <Boolean>
+=> node typeExpCS 2:24 persons::Person
+=> node typeNameExpCS 2:24 persons::Person
+
+### oclIsKindOfOnError
+context family::Member inv:
+  nope.oclIsKindOf(family::Member)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node variableExpCS 2:2 ERROR
+=> 2:2-2:6 ERROR type-checker fix=null | Undefined variable: nope
+
+### oclAsTypeSingle
+context family::Member inv:
+  self.oclAsType(persons::Person)
+=> inv 1 !persons::Person!
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 ERROR
+=> node specificationCS 2:2 !persons::Person!
+=> node prefixedExpCS 2:2 !persons::Person!
+=> node selfExpCS 2:2 family::Member
+=> node typeOpCS 2:7 !persons::Person!
+=> node typeExpCS 2:17 persons::Person
+=> node typeNameExpCS 2:17 persons::Person
+=> 1:23--1:-1 ERROR type-checker fix=null | Invariant must be Boolean, got !persons::Person!
+
+### oclAsTypeCollection
+context family::Family inv:
+  self.sons.oclAsType(family::Member)
+=> inv 1 <family::Member>
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node invCS 1:23 ERROR
+=> node specificationCS 2:2 <family::Member>
+=> node prefixedExpCS 2:2 <family::Member>
+=> node selfExpCS 2:2 family::Family
+=> node navigationTargetCS 2:7 <family::Member>
+=> node typeOpCS 2:12 <family::Member>
+=> node typeExpCS 2:22 family::Member
+=> node typeNameExpCS 2:22 family::Member
+=> 1:23--1:-1 ERROR type-checker fix=null | Invariant must be Boolean, got <family::Member>
+
+### oclAsTypeCollectionTarget
+context family::Member inv:
+  self.firstName.oclAsType(Set(String))
+=> inv 1 !String!
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 ERROR
+=> node specificationCS 2:2 !String!
+=> node prefixedExpCS 2:2 !String!
+=> node selfExpCS 2:2 family::Member
+=> node navigationTargetCS 2:7 !String!
+=> node typeOpCS 2:17 !String!
+=> node typeExpCS 2:27 String
+=> node collectionTypeCS 2:27 {String}
+=> node primitiveTypeCS 2:31 String
+=> 1:23--1:-1 ERROR type-checker fix=null | Invariant must be Boolean, got !String!
+
+### oclAsTypeUnrelatedPrimitive
+context family::Member inv:
+  self.firstName.oclAsType(Integer)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node selfExpCS 2:2 family::Member
+=> node navigationTargetCS 2:7 !String!
+=> node typeOpCS 2:17 ERROR
+=> node primitiveTypeCS 2:27 Integer
+=> 2:17--1:-1 ERROR type-checker fix=null | Cannot cast !String! to unrelated type Integer
+
+### oclAsTypeObjectToPrimitive
+context family::Member inv:
+  self.oclAsType(String)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node selfExpCS 2:2 family::Member
+=> node typeOpCS 2:7 ERROR
+=> node primitiveTypeCS 2:17 String
+=> 2:7--1:-1 ERROR type-checker fix=null | Cannot cast family::Member to unrelated type String
+
+### oclAsTypeUnknownType
+context family::Member inv:
+  self.oclAsType(Nope)
+=> inv 1 !ERROR!
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 !ERROR!
+=> node prefixedExpCS 2:2 !ERROR!
+=> node selfExpCS 2:2 family::Member
+=> node typeOpCS 2:7 !ERROR!
+=> node typeExpCS 2:17 ERROR
+=> 2:17--1:-1 ERROR type-checker fix=null | Unknown type: Nope
+
+### oclAsTypeOnError
+context family::Member inv:
+  nope.oclAsType(Integer)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node variableExpCS 2:2 ERROR
+=> 2:2-2:6 ERROR type-checker fix=null | Undefined variable: nope
+
+### unknownCorrespondenceOperationFarAway
+context family::Member inv:
+  persons::Person.allInstances().xyzzy(~).isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node operationCall 2:33 ERROR
+=> node correspondenceFilterCS 2:39 Any
+=> node navigationChainCS 2:41 ERROR
+=> 2:33-2:38 ERROR type-checker fix=exists | Unknown operation 'xyzzy' — this operation does not exist (valid correspondence ops: select, reject, exists)
+
+### correspondenceFilterUnknownOptionFarAway
+context family::Member inv:
+  persons::Person.allInstances().exists(~, Foobar = 1)
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 ERROR
+=> node correspondenceOptions 2:43 ERROR
+=> node correspondenceOption 2:43 ERROR
+=> node prefixedExpCS 2:52 Integer
+=> node literalExpCS 2:52 Integer
+=> 2:43-2:49 ERROR type-checker fix=Tag | Unknown filter option 'Foobar' — valid options are 'Tag' and 'Type'
+
+### correspondenceFilterExtraCommasSelect
+context family::Member inv:
+  persons::Person.allInstances().select(~, , Tag = "x").isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 Any
+=> node correspondenceOptions 2:43 Any
+=> node correspondenceOption 2:43 Any
+=> node prefixedExpCS 2:51 String
+=> node literalExpCS 2:51 String
+=> node navigationChainCS 2:55 ERROR
+=> 2:33-2:55 ERROR type-checker fix=null | 'select(~, ...)' has invalid arguments — check for extra or misplaced commas
+
+### correspondenceFilterExtraCommasExists
+context family::Member inv:
+  persons::Person.allInstances().exists(~, , Tag = "x")
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 persons::Person
+=> node navigationChainCS 2:17 <persons::Person>
+=> node collectionOpCS 2:18 <persons::Person>
+=> node navigationChainCS 2:32 ERROR
+=> node correspondenceFilterCS 2:40 Any
+=> node correspondenceOptions 2:43 Any
+=> node correspondenceOption 2:43 Any
+=> node prefixedExpCS 2:51 String
+=> node literalExpCS 2:51 String
+=> 2:33-2:55 ERROR type-checker fix=null | 'exists(~, ...)' has invalid arguments — check for extra or misplaced commas
+
+### correspondenceOperatorUntypedOperand
+context family::Member inv:
+  let x = Set{}.any(e | true) in self ~ x
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> node prefixedExpCS 2:2 ERROR
+=> node letExpCS 2:2 ERROR
+=> node variableDeclaration 2:6 ?Any?
+=> node prefixedExpCS 2:10 ?Any?
+=> node collectionLiteralExpCS 2:10 {Any}
+=> node collectionTypeCS 2:10 {Any}
+=> node iteratorOpCS 2:16 ?Any?
+=> node prefixedExpCS 2:24 Boolean
+=> node literalExpCS 2:24 Boolean
+=> node prefixedExpCS 2:33 family::Member
+=> node selfExpCS 2:33 family::Member
+=> node prefixedExpCS 2:40 ?Any?
+=> node variableExpCS 2:40 ?Any?
+=> 2:40--1:-1 ERROR type-checker fix=null | Correspondence operator ~ requires object type on right side, got: ?Any?
+
+### lifecycleAggregateOnCollection
+context family::Family::addSon(n : String)
+  post: self.sons.OCLisNew(firstName => n)
+=> post 2 <Boolean>
+=> node contextDeclCS 1:0 family::Family
+=> node classifierContextCS 1:0 family::Family
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 <Boolean>
+=> node prefixedExpCS 2:8 <Boolean>
+=> node selfExpCS 2:8 family::Family
+=> node navigationTargetCS 2:13 <family::Member>
+=> node lifecyclePredicateCS 2:18 <Boolean>
+=> node prefixedExpCS 2:40 String
+=> node variableExpCS 2:40 String
+
+### oclIsTypeOfSingle
+context family::Member inv:
+  self.oclIsTypeOf(family::Member)
+=> inv 1 !Boolean!
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 !Boolean!
+=> node prefixedExpCS 2:2 !Boolean!
+=> node selfExpCS 2:2 family::Member
+=> node typeOpCS 2:7 !Boolean!
+=> node typeExpCS 2:19 family::Member
+=> node typeNameExpCS 2:19 family::Member
+
+### atPreInPrefixedQualifiedChain
+context family::Member::rename(n : String)
+  post: family::Member.allInstances()@pre.isEmpty()
+=> post 2 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node postCS 2:2 Boolean
+=> node specificationCS 2:8 ERROR
+=> node prefixedExpCS 2:8 family::Member
+=> node navigationChainCS 2:22 <family::Member>
+=> node collectionOpCS 2:23 <family::Member>
+=> node navigationChainCS 2:37 ERROR
+=> node navigationChainCS 2:41 ERROR
+=> 2:37-2:41 ERROR type-checker fix=null | '@pre' must directly follow a property access, e.g. 'self.attr@pre'
+
+### allInstancesUnknownClass
+context family::Member inv:
+  family::Nope.allInstances().isEmpty()
+=> inv 1 ERROR
+=> node contextDeclCS 1:0 family::Member
+=> node classifierContextCS 1:0 family::Member
+=> node invCS 1:23 Boolean
+=> node specificationCS 2:2 ERROR
+=> 2:10-2:14 ERROR type-checker fix=null | Unknown class 'Nope' in metamodel 'family'

@@ -20,18 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.IntStream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
-import tools.vitruv.dsls.vitruvocl.pipeline.Warning;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
+import tools.vitruv.dsls.vitruvocl.result.Warning;
 
 /**
- * End-to-end tests for the {@code threadPoolSize}-configurable batch evaluation entry points on
- * {@link VitruvOCL}, which distribute {@link VitruvOCL#evaluateConstraints(List, Path[], Path[],
- * int) constraint-list evaluation} across an {@code ExecutorService}.
+ * End-to-end tests for the {@code threadPoolSize}-configurable batch evaluation of {@link
+ * VitruvOclEngine}, which distributes {@link VitruvOclEngine#evaluateAll(List) constraint-list
+ * evaluation} across an {@code ExecutorService}.
  *
  * <p>Covers the three properties this parallelization must preserve relative to the previous
  * sequential {@code for} loop:
@@ -65,11 +63,6 @@ class ParallelBatchEvaluationTest {
   private static final Path[] ALL_MODELS = {
     SPACECRAFT_ACTIVE, SPACECRAFT_VOYAGER, SPACECRAFT_INACTIVE, SATELLITE_VOYAGER, SATELLITE_ATLAS
   };
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   /**
    * A deliberately mixed batch: satisfied / violated (with varying violation counts) / a compiler
@@ -139,12 +132,18 @@ class ParallelBatchEvaluationTest {
     List<String> constraints = mixedConstraintBatch();
 
     BatchValidationResult sequential =
-        VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, 1);
+        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .withThreadPoolSize(1)
+            .evaluateAll(constraints);
     assertEquals(constraints.size(), sequential.getResults().size());
 
     for (int poolSize : new int[] {2, 4, 8, 16}) {
       BatchValidationResult parallel =
-          VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, poolSize);
+          VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+              .withModelDirectory(TestModels.DIRECTORY)
+              .withThreadPoolSize(poolSize)
+              .evaluateAll(constraints);
 
       assertEquals(
           sequential.getResults().size(),
@@ -178,14 +177,20 @@ class ParallelBatchEvaluationTest {
     int forAllIndex = 7;
 
     BatchValidationResult baseline =
-        VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, 1);
+        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .withThreadPoolSize(1)
+            .evaluateAll(constraints);
     ConstraintResult expectedSerialMatch = baseline.getResults().get(serialNumberMatchIndex);
     ConstraintResult expectedSizeCheck = baseline.getResults().get(sizeCheckIndex);
     ConstraintResult expectedForAll = baseline.getResults().get(forAllIndex);
 
     for (int run = 0; run < 20; run++) {
       BatchValidationResult parallel =
-          VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, 16);
+          VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+              .withModelDirectory(TestModels.DIRECTORY)
+              .withThreadPoolSize(16)
+              .evaluateAll(constraints);
       assertSameOutcome(expectedSerialMatch, parallel.getResults().get(serialNumberMatchIndex));
       assertSameOutcome(expectedSizeCheck, parallel.getResults().get(sizeCheckIndex));
       assertSameOutcome(expectedForAll, parallel.getResults().get(forAllIndex));
@@ -205,7 +210,10 @@ class ParallelBatchEvaluationTest {
             .toList();
 
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, 16);
+        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .withThreadPoolSize(16)
+            .evaluateAll(constraints);
 
     assertEquals(constraints.size(), result.getResults().size());
     for (int i = 0; i < constraints.size(); i++) {
@@ -228,7 +236,10 @@ class ParallelBatchEvaluationTest {
             "context spaceMission::Spacecraft inv other: true");
 
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, 8);
+        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .withThreadPoolSize(8)
+            .evaluateAll(constraints);
 
     assertEquals(3, result.getResults().size());
     assertTrue(
@@ -246,18 +257,20 @@ class ParallelBatchEvaluationTest {
   void defaultThreadPoolSizeOverloadStillWorks() {
     List<String> constraints = mixedConstraintBatch();
     BatchValidationResult result =
-        VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS);
+        VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluateAll(constraints);
     assertEquals(constraints.size(), result.getResults().size());
   }
 
   /**
    * Regression test for the union-dependency-analysis fix in {@code
-   * SmartLoader#loadForConstraints}: {@link VitruvOCL#evaluateConstraints(List, Path[], Path[],
-   * int)} used to load only the <em>first</em> constraint's metamodel dependencies for the whole
-   * batch, so a later constraint referencing a package the first constraint doesn't need would fail
-   * to resolve it. Directly mirrors {@code
+   * SmartLoader#loadForConstraints}: file-based batch evaluation ({@link
+   * VitruvOclEngine#evaluateAll(List)}) used to load only the <em>first</em> constraint's metamodel
+   * dependencies for the whole batch, so a later constraint referencing a package the first
+   * constraint doesn't need would fail to resolve it. Directly mirrors {@code
    * VitruvOclCliTest#testEvalBatchHandlesConstraintsWithDifferentMetamodelDependencies}, but calls
-   * {@code evaluateConstraints(...)} directly instead of going through the CLI subprocess-style
+   * {@code VitruvOclEngine#evaluateAll} directly instead of going through the CLI subprocess-style
    * loop, at several pool sizes.
    */
   @Test
@@ -270,7 +283,10 @@ class ParallelBatchEvaluationTest {
 
     for (int poolSize : new int[] {1, 4}) {
       BatchValidationResult result =
-          VitruvOCL.evaluateConstraints(constraints, BOTH_ECORES, ALL_MODELS, poolSize);
+          VitruvOclEngine.forFiles(BOTH_ECORES, ALL_MODELS)
+              .withModelDirectory(TestModels.DIRECTORY)
+              .withThreadPoolSize(poolSize)
+              .evaluateAll(constraints);
 
       assertEquals(2, result.getResults().size());
       ConstraintResult first = result.getResults().get(0);

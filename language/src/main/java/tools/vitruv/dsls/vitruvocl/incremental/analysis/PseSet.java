@@ -21,8 +21,8 @@ import java.util.Set;
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EStructuralFeature;
-import tools.vitruv.dsls.vitruvocl.incremental.ModelEvent;
-import tools.vitruv.dsls.vitruvocl.incremental.TransactionDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
 
 /**
  * The potentially satisfaction-violating events (PSEs) of a constraint (incremental level 2;

@@ -20,12 +20,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.vitruv.dsls.vitruvocl.cli.VitruvOclCli;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /**
  * The CLI option {@code --incremental-level}: the CLI has no transaction, so every level must
@@ -37,11 +35,6 @@ class IncrementalCliTest {
   private static final String XMI =
       "src/test/resources/test-models/spacecraft-voyager.spacemission,"
           + "src/test/resources/test-models/spacecraft-with-payloads.spacemission";
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   private static String run(String... args) {
     PrintStream original = System.out;

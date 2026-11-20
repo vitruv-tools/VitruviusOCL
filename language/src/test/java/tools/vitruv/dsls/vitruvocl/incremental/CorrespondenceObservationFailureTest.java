@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.emf.ecore.EObject;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
 
 /**
  * A failing correspondence snapshot must not break the session: the transaction falls back to an

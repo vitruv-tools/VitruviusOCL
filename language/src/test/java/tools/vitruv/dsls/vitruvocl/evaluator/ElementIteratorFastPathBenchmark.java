@@ -17,7 +17,9 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Manual microbenchmark comparing {@code getElements()}+loop against {@code elementIterator()}

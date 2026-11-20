@@ -11,6 +11,7 @@ import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
+import tools.vitruv.dsls.vitruvocl.allinstances.analysis.EcoreConformance;
 import tools.vitruv.dsls.vitruvocl.allinstances.cache.CacheConfiguration;
 
 /**
@@ -75,9 +76,11 @@ public class SinglePassInstanceCollector {
       EObject current = stack.pop();
       classify(current, cacheConfig, result, kindMatchCache);
 
+      // the pruning only covers analysed classes; below anything else, walk every containment
+      boolean prunable = cacheConfig.isAnalyzed(current.eClass());
       List<EObject> children = new ArrayList<>();
       for (EReference containment : current.eClass().getEAllContainments()) {
-        if (!traversableRefs.contains(containment)) {
+        if (prunable && !traversableRefs.contains(containment)) {
           continue;
         }
         Object value = current.eGet(containment, false);
@@ -129,7 +132,7 @@ public class SinglePassInstanceCollector {
         type -> {
           List<EClass> matches = new ArrayList<>();
           for (EClass kindType : cacheConfig.getAllOfKind()) {
-            if (kindType.isSuperTypeOf(type)) {
+            if (EcoreConformance.conforms(type, kindType)) {
               matches.add(kindType);
             }
           }

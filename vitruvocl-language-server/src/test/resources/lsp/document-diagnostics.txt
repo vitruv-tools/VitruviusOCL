@@ -1,0 +1,206 @@
+# Diagnostics of the language server. Each case: "### name", the document, then "=> " lines:
+# whether a parse tree and node types were produced, then every diagnostic
+# ("startLine:startCol-endLine:endCol SEVERITY source data=<quick fix> | message", 0-based).
+# [crlf] uses CRLF line breaks, [noeol] omits the final line break. Change expectations only
+# for intended behaviour changes.
+
+### valid
+context spaceMission::Spacecraft inv hasName: self.name.size() > 0
+=> tree=true nodeTypes=true
+
+### keywordTypo
+kontext spaceMission::Spacecraft inv bad: self.mass > 0
+=> tree=true nodeTypes=true
+=> 0:0-0:7 Error vitruvOCL data=context | Unknown keyword 'kontext' — did you mean 'context'?
+
+### typeError
+context spaceMission::Spacecraft inv a: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 0:45-0:51 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### typeErrorWithSuggestion
+context spaceMission::Spacecraft inv a: self.mas > 0
+=> tree=true nodeTypes=true
+=> 0:45-0:48 Error vitruvOCL data=null | Unknown property 'mas' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### annotationTypo
+context spaceMission::Spacecraft inv a: @severty CRITICAL self.mass > 0
+=> tree=true nodeTypes=true
+=> 0:40-0:48 Error vitruvOCL data=@severity | Unknown annotation '@severty'. Did you mean '@severity'?
+=> 0:40-0:41 Error vitruvOCL data=null | token recognition error at: '@severt'
+=> 0:47-0:48 Error vitruvOCL data=null | Undefined variable: y
+=> 0:49-0:57 Error vitruvOCL data=or | Unknown operator 'CRITICAL' — this operator does not exist
+
+### importLines
+import "spaceMission.ecore"
+import 'x.ecore'
+context spaceMission::Spacecraft inv a: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:45-2:51 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### empty
+=> tree=true nodeTypes=true
+=> 2:0-2:5 Error vitruvOCL data=null | mismatched input '<EOF>' expecting 'context'
+
+### commentsOnly
+-- nothing
+=> tree=true nodeTypes=true
+=> 2:0-2:5 Error vitruvOCL data=null | mismatched input '<EOF>' expecting 'context'
+
+### severalConstraints
+context spaceMission::Spacecraft
+  inv a: self.mass > 0
+  inv b: self.noSuch > 0
+  inv c: self.mass >= 0
+=> tree=true nodeTypes=true
+=> 2:14-2:20 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### errorInMiddleConstraint
+context spaceMission::Spacecraft
+  inv a: self.mass > 0
+  inv b: self.mass >
+  inv c: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:19-2:20 Error vitruvOCL data=null | Missing right-hand operand for '>'
+
+### misspelledSecondContext
+context spaceMission::Spacecraft inv a: self.mass > 0
+
+constext spaceMission::Spacecraft inv b: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:0-2:8 Error vitruvOCL data=and | Unknown operator 'constext' — this operator does not exist
+=> 2:46-2:52 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### trailingParenthesis
+context spaceMission::Spacecraft inv a: self.mass >= 0 )
+=> tree=true nodeTypes=true
+=> 0:55-0:56 Error vitruvOCL data=null | unexpected input ')'
+
+### trailingLogicalOperator
+context spaceMission::Spacecraft inv a: self.mass >= 0 and
+=> tree=true nodeTypes=true
+=> 0:55-0:58 Error vitruvOCL data=null | Missing right-hand operand for 'and'
+
+### trailingComparison
+context spaceMission::Spacecraft inv a: self.mass >=
+=> tree=true nodeTypes=true
+=> 0:50-0:52 Error vitruvOCL data=null | Missing right-hand operand for '>='
+
+### lexerError
+context spaceMission::Spacecraft inv a: self.mass § 0
+=> tree=true nodeTypes=true
+=> 0:50-0:51 Error vitruvOCL data=null | token recognition error at: '§'
+=> 0:52-0:53 Error vitruvOCL data=null | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### unclosedParenthesis
+context spaceMission::Spacecraft inv a: (self.mass > 0
+=> tree=true nodeTypes=true
+=> 2:0-2:5 Error vitruvOCL data=null | extraneous input '<EOF>' expecting {'(', ')', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+
+### missingContextType
+context inv a: true
+=> tree=true nodeTypes=true
+=> 0:8-0:11 Error vitruvOCL data=null | extraneous input 'inv' expecting ID
+=> 0:15-0:19 Error vitruvOCL data=null | mismatched input 'true' expecting ID
+=> 0:0-0:1 Error vitruvOCL data=null | Invalid context declaration
+=> 0:0-0:1 Error vitruvOCL data=null | Invalid context declaration
+
+### crashingPass
+context spaceMission::Spacecraft inv a: true let
+=> tree=true nodeTypes=true
+=> 2:0-2:5 Error vitruvOCL data=null | mismatched input '<EOF>' expecting ID
+=> 0:0-0:1 Error vitruvOCL data=null | Internal language server error during symbol table construction (diagnostics may be incomplete): Cannot invoke "org.antlr.v4.runtime.Token.getText()" because "ctx.varName" is null
+=> 0:45-0:48 Error vitruvOCL data=null | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### crlf[crlf]
+context spaceMission::Spacecraft
+  inv a: self.mass > 0
+  inv b: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:14-2:20 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### errorAtEndWithoutNewline[noeol]
+context spaceMission::Spacecraft inv a: self.mass >
+=> tree=true nodeTypes=true
+=> 0:50-0:51 Error vitruvOCL data=null | Missing right-hand operand for '>'
+
+### preAndPost
+context spaceMission::Spacecraft::launch(p : Integer)
+  pre a: p > 0
+  post b: self.mass@pre >= self.noSuch
+=> tree=true nodeTypes=true
+=> 2:32-2:38 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### unknownOperation
+context spaceMission::Spacecraft inv a: self.name.toUppr() == "X"
+=> tree=true nodeTypes=true
+=> 0:50-0:56 Error vitruvOCL data=toUpper | Unknown operation 'toUppr' — did you mean 'toUpper'?
+
+### missingOperator
+context spaceMission::Spacecraft inv a: self.mass > 0 self.mass < 10
+=> tree=true nodeTypes=true
+=> 0:54-0:58 Error vitruvOCL data=null | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### correspondenceTypo
+context spaceMission::Spacecraft inv a: spaceMission::Spacecraft.allInstances().selct(~).isEmpty()
+=> tree=true nodeTypes=true
+=> 0:80-0:85 Error vitruvOCL data=select | Unknown operation 'selct' — did you mean 'select'?
+
+### multiLineTrailingOperator
+context spaceMission::Spacecraft
+  inv a: self.noSuch > 0 and
+=> tree=true nodeTypes=true
+=> 1:25-1:28 Error vitruvOCL data=null | Missing right-hand operand for 'and'
+=> 1:14-1:20 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### multiLineTrailingParenthesis
+context spaceMission::Spacecraft
+  inv a: self.noSuch > 0 )
+=> tree=true nodeTypes=true
+=> 1:25-1:26 Error vitruvOCL data=null | unexpected input ')'
+=> 1:14-1:20 Error vitruvOCL data=null | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### partialNavigationInTheMiddle
+context spaceMission::Spacecraft
+  inv a: self.
+  inv b: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 1:13-1:14 Error vitruvOCL data=null | unexpected input '.'
+=> 1:2-1:3 Error vitruvOCL data=null | Invariant must be Boolean, got spaceMission::Spacecraft
+
+### unclosedParenthesisInTheMiddle
+context spaceMission::Spacecraft
+  inv a: (self.mass > 0
+  inv b: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:2-2:5 Error vitruvOCL data=null | extraneous input 'inv' expecting {'(', ')', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+
+### incompleteLetInTheMiddle
+context spaceMission::Spacecraft
+  inv a: let x =
+  inv b: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:2-2:5 Error vitruvOCL data=null | extraneous input 'inv' expecting {'(', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+=> 2:7-2:8 Error vitruvOCL data=null | mismatched input ':' expecting {',', '<', '>', '*', '/', '+', '-', '~', '==', '!=', '=', '<=', '>=', '^', 'and', 'or', 'xor', 'implies', '.', 'in', '@pre', ID, INVALID_OP_SEQ, MULTI_EQ}
+
+### incompleteIfInTheMiddle
+context spaceMission::Spacecraft
+  inv a: if self.mass > 0 then
+  inv b: self.noSuch > 0
+=> tree=true nodeTypes=true
+=> 2:2-2:5 Error vitruvOCL data=null | extraneous input 'inv' expecting {'(', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+=> 2:7-2:8 Error vitruvOCL data=null | extraneous input ':' expecting {'(', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'else', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+=> 4:0-4:5 Error vitruvOCL data=null | extraneous input '<EOF>' expecting {'(', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'else', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+
+### lexerErrorOnALaterLine
+context spaceMission::Spacecraft
+  inv a: self.mass > 0
+  inv b: self.mass § 0
+=> tree=true nodeTypes=true
+=> 2:19-2:20 Error vitruvOCL data=null | token recognition error at: '§'
+
+### misspelledSecondContextKeyword
+context spaceMission::Spacecraft inv a: self.mass > 0
+kontext spaceMission::Spacecraft inv b: true
+=> tree=true nodeTypes=true
+=> 1:0-1:7 Error vitruvOCL data=and | Unknown operator 'kontext' — this operator does not exist

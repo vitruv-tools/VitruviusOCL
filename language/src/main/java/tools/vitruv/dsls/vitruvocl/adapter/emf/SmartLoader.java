@@ -1,0 +1,432 @@
+/* ******************************************************************************
+ * Copyright (c) 2026 Max Oesterle
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *    Max Oesterle - initial API and implementation
+ *******************************************************************************/
+
+package tools.vitruv.dsls.vitruvocl.adapter.emf;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import tools.vitruv.dsls.vitruvocl.compiler.DependencyAnalyzer;
+import tools.vitruv.dsls.vitruvocl.result.FileError;
+import tools.vitruv.dsls.vitruvocl.result.Warning;
+
+/**
+ * Intelligent loader that analyzes constraints to load only required metamodels and instances.
+ *
+ * <p>Performs dependency analysis on constraints to determine which metamodels are actually
+ * referenced, then selectively loads only necessary files. Provides comprehensive error reporting
+ * and warnings for missing dependencies, unused files, and duplicate definitions.
+ *
+ * <p>Absolute paths are used as they are; relative paths are looked up in the model directory a
+ * caller passes, if any, and otherwise resolved against the working directory.
+ */
+public class SmartLoader {
+
+  private static final String PKG_CORRESPONDENCE = "correspondence";
+
+  /**
+   * Packages EMF and Vitruvius have built in, whose generated implementation a copy of their {@code
+   * .ecore} must not replace just because a model declares them; constraints that name them still
+   * load them as before.
+   */
+  private static final Set<String> BUILT_IN_PACKAGES =
+      Set.of("ecore", "xml", "xmltype", "xmi", "xsi", PKG_CORRESPONDENCE);
+
+  private SmartLoader() {}
+
+  /** Result of loading operation with wrapper, errors, and warnings. */
+  public static class LoadResult {
+    /** Configured wrapper with loaded metamodels and instances. */
+    public final MetamodelWrapper wrapper;
+
+    /** File-level errors preventing loading. */
+    public final List<FileError> fileErrors;
+
+    /** Non-fatal warnings about unused or duplicate files. */
+    public final List<Warning> warnings;
+
+    /**
+     * Creates a load result.
+     *
+     * @param wrapper configured wrapper with loaded metamodels and instances
+     * @param fileErrors file-level errors preventing loading
+     * @param warnings non-fatal warnings about unused or duplicate files
+     */
+    public LoadResult(
+        MetamodelWrapper wrapper, List<FileError> fileErrors, List<Warning> warnings) {
+      this.wrapper = wrapper;
+      this.fileErrors = fileErrors;
+      this.warnings = warnings;
+    }
+
+    /**
+     * Returns whether any file errors occurred.
+     *
+     * @return {@code true} if any file errors occurred
+     */
+    public boolean hasErrors() {
+      return !fileErrors.isEmpty();
+    }
+  }
+
+  /**
+   * Loads metamodels and instances based on constraint dependencies.
+   *
+   * <p>Process:
+   *
+   * <ol>
+   *   <li>Analyzes constraint to extract required package names
+   *   <li>Validates and resolves all file paths
+   *   <li>Maps files to package names via introspection
+   *   <li>Loads only metamodels referenced in constraint
+   *   <li>Loads corresponding model instances
+   *   <li>Warns about unused files and missing instances
+   * </ol>
+   *
+   * @param constraint OCL constraint expression to analyze
+   * @param ecoreFiles Metamodel files (absolute, or relative to the working directory)
+   * @param xmiFiles Model instance files (absolute, or relative to the working directory)
+   * @return Load result with configured wrapper, errors, and warnings
+   */
+  public static LoadResult loadForConstraint(
+      String constraint, Path[] ecoreFiles, Path[] xmiFiles) {
+    return loadForConstraints(List.of(constraint), ecoreFiles, xmiFiles);
+  }
+
+  /**
+   * Same as {@link #loadForConstraint(String, Path[], Path[])}, looking up relative files in {@code
+   * modelDirectory} first and in the working directory second.
+   *
+   * @throws NullPointerException if {@code modelDirectory} is {@code null}
+   */
+  public static LoadResult loadForConstraint(
+      String constraint, Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory) {
+    return loadForConstraints(List.of(constraint), ecoreFiles, xmiFiles, modelDirectory);
+  }
+
+  /**
+   * Loads metamodels and instances based on the combined dependencies of a whole constraint list.
+   *
+   * <p>Runs {@link DependencyAnalyzer#analyzeConstraint} over every constraint in {@code
+   * constraints} and loads the <b>union</b> of all referenced metamodel packages (and their
+   * matching instances) into a single wrapper — rather than only the first constraint's
+   * dependencies. This is what {@code VitruvOclEngine#evaluateAll} uses so that a batch whose
+   * constraints reference different metamodel packages resolves correctly for every constraint, not
+   * just the first one; see {@code ConstraintListEvaluator} for how the resulting wrapper is then
+   * shared (read-mostly) across the parallel per-constraint evaluation tasks.
+   *
+   * <p>Dependency analysis itself (pure lexing per constraint, no I/O) runs entirely within this
+   * method, before any parallel task is started — the loaded wrapper this method returns is only
+   * handed to the executor afterwards.
+   *
+   * <p>{@link #loadForConstraint(String, Path[], Path[])} delegates here with a singleton list, so
+   * single-constraint evaluation is unaffected — the union of one constraint's packages is just
+   * that constraint's own packages.
+   *
+   * @param constraints OCL constraint expressions to analyze, in any order
+   * @param ecoreFiles Metamodel files (absolute, or relative to the working directory)
+   * @param xmiFiles Model instance files (absolute, or relative to the working directory)
+   * @return Load result with configured wrapper, errors, and warnings
+   */
+  public static LoadResult loadForConstraints(
+      List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles) {
+    return load(constraints, ecoreFiles, xmiFiles, null);
+  }
+
+  /**
+   * Same as {@link #loadForConstraints(List, Path[], Path[])}, looking up relative files in {@code
+   * modelDirectory} first and in the working directory second.
+   *
+   * @throws NullPointerException if {@code modelDirectory} is {@code null}
+   */
+  public static LoadResult loadForConstraints(
+      List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory) {
+    return load(
+        constraints,
+        ecoreFiles,
+        xmiFiles,
+        Objects.requireNonNull(modelDirectory, "modelDirectory"));
+  }
+
+  /**
+   * Loads the files the constraints need, resolving relative paths as {@link #resolveFilePath}
+   * describes.
+   *
+   * @param modelDirectory where relative files are looked up first, or {@code null} to resolve them
+   *     against the working directory only
+   */
+  private static LoadResult load(
+      List<String> constraints, Path[] ecoreFiles, Path[] xmiFiles, Path modelDirectory) {
+    MetamodelWrapper wrapper = new MetamodelWrapper();
+    List<FileError> fileErrors = new ArrayList<>();
+    List<Warning> warnings = new ArrayList<>();
+
+    List<Path> resolvedEcores = resolveAndValidate(ecoreFiles, modelDirectory, fileErrors);
+    List<Path> resolvedXmis = resolveAndValidate(xmiFiles, modelDirectory, fileErrors);
+    if (!fileErrors.isEmpty()) {
+      return new LoadResult(wrapper, fileErrors, warnings);
+    }
+
+    // Resolve platform:/plugin/ supertype references (e.g. PCM's Identifier/Units ecores) to
+    // local copies among the supplied ecore files, so cross-ecore eSuperTypes are visible to
+    // EMF outside of an Eclipse/OSGi runtime. Without this, types like pcm's Entity (which
+    // extends platform:/plugin/de.uka.ipd.sdq.identifier/model/identifier.ecore#//Identifier)
+    // fail to load model instances referencing inherited features (e.g. "id").
+    wrapper.registerWorkspaceEcoresForPlatformResolution(resolvedEcores);
+
+    Map<String, Path> availableEcores = mapEcoresToPackageNames(resolvedEcores, fileErrors);
+    XmiIndex xmiIndex = indexXmiPackageNames(resolvedXmis, warnings);
+
+    if (!fileErrors.isEmpty()) {
+      return new LoadResult(wrapper, fileErrors, warnings);
+    }
+
+    Set<String> requiredPackages = analyzeRequiredPackages(constraints);
+    // Always load correspondence instances when present — the ecore is embedded in the JAR
+    // and auto-registered, so no explicit .ecore file is required for it.
+    requiredPackages.add(PKG_CORRESPONDENCE);
+
+    loadRequiredPackages(
+        wrapper, requiredPackages, availableEcores, xmiIndex, fileErrors, warnings);
+
+    return new LoadResult(wrapper, fileErrors, warnings);
+  }
+
+  /**
+   * Unions the metamodel packages referenced by every constraint in {@code constraints}.
+   *
+   * <p>{@link LinkedHashSet} keeps first-seen order deterministic (matches the analysis-order
+   * pattern already used for {@code queriedAllInstancesTypes} in {@link MetamodelWrapper}); dedup
+   * beyond that has no observable effect since the result only ever drives set membership checks.
+   */
+  private static Set<String> analyzeRequiredPackages(List<String> constraints) {
+    Set<String> requiredPackages = new LinkedHashSet<>();
+    for (String constraint : constraints) {
+      requiredPackages.addAll(DependencyAnalyzer.analyzeConstraint(constraint));
+    }
+    return requiredPackages;
+  }
+
+  /** Resolves and validates each path, collecting file-level errors as they are found. */
+  private static List<Path> resolveAndValidate(
+      Path[] paths, Path modelDirectory, List<FileError> fileErrors) {
+    List<Path> resolved = new ArrayList<>();
+    for (Path path : paths) {
+      Path resolvedPath = resolveFilePath(path, modelDirectory);
+      FileValidator.validateFile(resolvedPath).ifPresent(fileErrors::add);
+      resolved.add(resolvedPath);
+    }
+    return resolved;
+  }
+
+  /** Maps each ecore file to every package name it declares (first file wins on conflicts). */
+  private static Map<String, Path> mapEcoresToPackageNames(
+      List<Path> resolvedEcores, List<FileError> fileErrors) {
+    Map<String, Path> availableEcores = new HashMap<>();
+    for (Path ecore : resolvedEcores) {
+      try {
+        Set<String> packageNames = FileValidator.extractAllPackageNamesFromEcore(ecore);
+        for (String packageName : packageNames) {
+          availableEcores.putIfAbsent(packageName, ecore);
+        }
+      } catch (IOException e) {
+        fileErrors.add(new FileError(ecore, FileError.FileErrorType.PARSE_ERROR, e.getMessage()));
+      }
+    }
+    return availableEcores;
+  }
+
+  /**
+   * One entry per occurrence in the xmi file list, each carrying every package name referenced by
+   * that file. Duplicated input paths are kept as separate entries so that callers intentionally
+   * passing the same file twice get it loaded twice.
+   */
+  private record XmiIndex(List<Path> occurrences, List<Set<String>> packageNames) {}
+
+  /** Extracts package names referenced by each xmi file, skipping unrecognised files. */
+  private static XmiIndex indexXmiPackageNames(List<Path> resolvedXmis, List<Warning> warnings) {
+    List<Path> occurrences = new ArrayList<>();
+    List<Set<String>> packageNames = new ArrayList<>();
+    for (Path xmi : resolvedXmis) {
+      try {
+        packageNames.add(FileValidator.extractAllPackageNamesFromXmi(xmi));
+        occurrences.add(xmi);
+      } catch (IOException e) {
+        // Non-XML or unrecognised files (e.g. Vitruvius-internal metadata) are skipped silently.
+        warnings.add(
+            new Warning(
+                Warning.WarningType.UNUSED_MODEL,
+                "Skipping unrecognised instance file: " + xmi.getFileName()));
+      }
+    }
+    return new XmiIndex(occurrences, packageNames);
+  }
+
+  /**
+   * Loads only required metamodels and the instances that match them, together with the metamodels
+   * of every other package such an instance uses: an instance can only be loaded if all its
+   * packages are known, also those the constraints do not refer to (e.g. a PCM repository using the
+   * packages of an extension).
+   */
+  private static void loadRequiredPackages(
+      MetamodelWrapper wrapper,
+      Set<String> requiredPackages,
+      Map<String, Path> availableEcores,
+      XmiIndex xmiIndex,
+      List<FileError> fileErrors,
+      List<Warning> warnings) {
+    boolean[] loaded = new boolean[xmiIndex.occurrences().size()];
+    MetamodelLoader metamodels = new MetamodelLoader(wrapper, availableEcores, fileErrors);
+    for (String pkg : requiredPackages) {
+      metamodels.loadRequired(pkg);
+      boolean foundInstance =
+          loadInstancesForPackage(wrapper, pkg, xmiIndex, loaded, metamodels, fileErrors);
+
+      // Don't warn for correspondence package if it has no instances
+      if (!foundInstance && !pkg.equals(PKG_CORRESPONDENCE)) {
+        warnings.add(
+            new Warning(Warning.WarningType.UNUSED_MODEL, "No instances for '" + pkg + "'"));
+      }
+    }
+  }
+
+  /** Loads the metamodels of packages, each file once. */
+  private static final class MetamodelLoader {
+    private final MetamodelWrapper wrapper;
+    private final Map<String, Path> availableEcores;
+    private final List<FileError> fileErrors;
+    private final Set<Path> loadedEcores = new HashSet<>();
+
+    MetamodelLoader(
+        MetamodelWrapper wrapper, Map<String, Path> availableEcores, List<FileError> fileErrors) {
+      this.wrapper = wrapper;
+      this.availableEcores = availableEcores;
+      this.fileErrors = fileErrors;
+    }
+
+    /** Loads the metamodel of a package the constraints need; a missing one is an error. */
+    void loadRequired(String pkg) {
+      if (!availableEcores.containsKey(pkg)) {
+        // PKG_CORRESPONDENCE ecore is embedded in the JAR and auto-registered — not an error.
+        if (!pkg.equals(PKG_CORRESPONDENCE)) {
+          fileErrors.add(
+              new FileError(
+                  null,
+                  FileError.FileErrorType.NOT_FOUND,
+                  "Required metamodel '" + pkg + "' not found"));
+        }
+        return;
+      }
+      load(pkg);
+    }
+
+    /**
+     * Loads the metamodels of the packages an instance uses, as far as they are given; a missing
+     * one is reported when the instance fails to load.
+     */
+    void loadUsedBy(Set<String> packages) {
+      for (String pkg : packages) {
+        if (availableEcores.containsKey(pkg) && !BUILT_IN_PACKAGES.contains(pkg)) {
+          load(pkg);
+        }
+      }
+    }
+
+    private void load(String pkg) {
+      Path ecore = availableEcores.get(pkg);
+      if (!loadedEcores.add(ecore)) {
+        return;
+      }
+      try {
+        wrapper.loadMetamodel(pkg, ecore);
+      } catch (IOException e) {
+        fileErrors.add(
+            new FileError(
+                ecore,
+                FileError.FileErrorType.PARSE_ERROR,
+                "Failed to load metamodel: " + e.getMessage()));
+      }
+    }
+  }
+
+  private static boolean loadInstancesForPackage(
+      MetamodelWrapper wrapper,
+      String pkg,
+      XmiIndex xmiIndex,
+      boolean[] loaded,
+      MetamodelLoader metamodels,
+      List<FileError> fileErrors) {
+    boolean foundInstance = false;
+    List<Path> occurrences = xmiIndex.occurrences();
+    List<Set<String>> packageNames = xmiIndex.packageNames();
+    for (int i = 0; i < occurrences.size(); i++) {
+      if (!packageNames.get(i).contains(pkg)) {
+        continue;
+      }
+      foundInstance = true;
+      if (!loaded[i]) {
+        // Already loaded for a different package name found in the same occurrence
+        // (e.g. a repository:Repository root with nested xsi:type="seff:..." elements).
+        loaded[i] = true;
+        metamodels.loadUsedBy(packageNames.get(i));
+        loadModelInstance(wrapper, occurrences.get(i), fileErrors);
+      }
+    }
+    return foundInstance;
+  }
+
+  private static void loadModelInstance(
+      MetamodelWrapper wrapper, Path xmi, List<FileError> fileErrors) {
+    try {
+      wrapper.loadModelInstance(xmi);
+    } catch (IOException e) {
+      fileErrors.add(
+          new FileError(
+              xmi, FileError.FileErrorType.PARSE_ERROR, "Failed to load model: " + e.getMessage()));
+    } catch (Exception e) {
+      fileErrors.add(
+          new FileError(
+              xmi,
+              FileError.FileErrorType.PARSE_ERROR,
+              "Failed to load model (runtime error): " + e.getMessage()));
+    }
+  }
+
+  /**
+   * Resolves a file path: absolute paths as they are; relative paths under {@code modelDirectory}
+   * if that file exists there, otherwise against the working directory.
+   *
+   * @param modelDirectory where relative files are looked up first, or {@code null}
+   * @return the resolved absolute or working-directory-based path
+   */
+  private static Path resolveFilePath(Path path, Path modelDirectory) {
+    if (path.isAbsolute()) {
+      return path;
+    }
+    if (modelDirectory != null) {
+      Path inModelDirectory = modelDirectory.resolve(path);
+      if (Files.exists(inModelDirectory)) {
+        return inModelDirectory;
+      }
+    }
+    return path.toAbsolutePath();
+  }
+}

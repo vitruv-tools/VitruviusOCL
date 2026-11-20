@@ -13,7 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Abstract base class for all symbols stored in the symbol table.
@@ -24,7 +24,6 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  * <ul>
  *   <li>{@link VariableSymbol}: local variables, iterator variables, parameters
  *   <li>{@link TypeSymbol}: metaclasses from the metamodel
- *   <li>{@link OperationSymbol}: OCL operations
  * </ul>
  *
  * <p>Each symbol has a name, an associated {@link Type}, and a defining scope. The type may be
@@ -32,7 +31,6 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  *
  * @see VariableSymbol
  * @see TypeSymbol
- * @see OperationSymbol
  */
 public abstract class Symbol {
 

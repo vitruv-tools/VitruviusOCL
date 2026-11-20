@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -31,7 +30,6 @@ import tools.vitruv.dsls.vitruvocl.incremental.support.ConstraintCorpus;
 import tools.vitruv.dsls.vitruvocl.incremental.support.LiveModel;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ModelMutator;
 import tools.vitruv.dsls.vitruvocl.incremental.support.ModelSet;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /**
  * Differential (oracle) tests of the incremental evaluator against full evaluation, over the
@@ -60,11 +58,6 @@ class IncrementalOracleTest {
       Boolean.getBoolean("vitruvocl.incremental.manySeeds")
           ? new long[] {1L, 7L, 42L, 1234L, 99991L}
           : new long[] {7L, 42L};
-
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(java.nio.file.Path.of("src/test/resources/test-models"));
-  }
 
   /** The levels implemented so far; every oracle test runs for each. */
   static List<IncrementalLevel> levels() {

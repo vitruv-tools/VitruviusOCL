@@ -13,7 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Interface for the symbol table of the OCL compiler.
@@ -24,7 +24,6 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  * <ul>
  *   <li><b>Variables</b> (local variables, iterator variables, parameters)
  *   <li><b>Types</b> (metaclasses from the underlying metamodels)
- *   <li><b>Operations</b> (OCL operations)
  * </ul>
  *
  * <p>The symbol table supports entering and leaving scopes during tree traversal and delegates
@@ -66,7 +65,7 @@ public interface SymbolTable {
   /**
    * Returns the global (outermost) scope.
    *
-   * <p>The global scope contains globally defined symbols such as types and operations.
+   * <p>The global scope contains globally defined symbols such as types.
    *
    * @return the global scope
    */
@@ -90,13 +89,6 @@ public interface SymbolTable {
    */
   void defineType(TypeSymbol symbol);
 
-  /**
-   * Defines an operation symbol in the global scope.
-   *
-   * @param symbol the operation symbol to define
-   */
-  void defineOperation(OperationSymbol symbol);
-
   // ---------------------------------------------------------------------------
   // Type-safe symbol resolution
   // ---------------------------------------------------------------------------
@@ -116,14 +108,6 @@ public interface SymbolTable {
    * @return the resolved type symbol, or {@code null} if not found
    */
   TypeSymbol resolveType(String name);
-
-  /**
-   * Resolves an operation symbol by name.
-   *
-   * @param name the name of the operation
-   * @return the resolved operation symbol, or {@code null} if not found
-   */
-  OperationSymbol resolveOperation(String name);
 
   // ---------------------------------------------------------------------------
   // Type lookup

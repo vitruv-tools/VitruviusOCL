@@ -33,7 +33,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EcoreFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Unit tests for {@link CorrespondenceLookup}: the answers equal the uncached bidirectional check
@@ -71,8 +71,8 @@ class CorrespondenceLookupTest {
     edges.add(new Object[] {partners.get(4), self, null});
   }
 
-  private MetamodelWrapperInterface wrapper(boolean taggedLookup) {
-    MetamodelWrapperInterface wrapper = mock(MetamodelWrapperInterface.class);
+  private ModelAccess wrapper(boolean taggedLookup) {
+    ModelAccess wrapper = mock(ModelAccess.class);
     when(wrapper.hasTaggedCorrespondenceLookup()).thenReturn(taggedLookup);
     when(wrapper.getCorrespondingObjects(any(EObject.class)))
         .thenAnswer(inv -> lookup(inv.getArgument(0), null));
@@ -121,7 +121,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void untagged_looksUpEveryDistinctObjectAtMostOnce() {
-    MetamodelWrapperInterface wrapper = wrapper(false);
+    ModelAccess wrapper = wrapper(false);
     CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper);
 
     for (int round = 0; round < 3; round++) {
@@ -138,7 +138,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void untagged_skipsTheReverseLookupWhenTheForwardOneMatches() {
-    MetamodelWrapperInterface wrapper = wrapper(false);
+    ModelAccess wrapper = wrapper(false);
     CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper);
 
     assertTrue(lookup.corresponds(self, partners.get(0)));
@@ -149,7 +149,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void tagged_withTaggedLookup_isExactAndCachedPerTag() {
-    MetamodelWrapperInterface wrapper = wrapper(true);
+    ModelAccess wrapper = wrapper(true);
     CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper);
 
     for (int round = 0; round < 3; round++) {
@@ -171,7 +171,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void tagged_withoutTaggedLookup_delegatesToTheWrapperUnchanged() {
-    MetamodelWrapperInterface wrapper = wrapper(false);
+    ModelAccess wrapper = wrapper(false);
     CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper);
 
     assertTrue(lookup.corresponds(partners.get(0), self, "elem"));
@@ -181,8 +181,8 @@ class CorrespondenceLookupTest {
     verify(wrapper, never()).getCorrespondingObjectsWithTag(any(), any());
   }
 
-  private MetamodelWrapperInterface wrapperWithParticipants() {
-    MetamodelWrapperInterface wrapper = wrapper(true);
+  private ModelAccess wrapperWithParticipants() {
+    ModelAccess wrapper = wrapper(true);
     Set<EObject> participants = new LinkedHashSet<>();
     for (Object[] e : edges) {
       participants.add((EObject) e[0]);
@@ -194,7 +194,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void participantFilter_stopsLookingUpObjectsOutsideEveryCorrespondence() {
-    MetamodelWrapperInterface wrapper = wrapperWithParticipants();
+    ModelAccess wrapper = wrapperWithParticipants();
     CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper, true);
     List<EObject> many = new ArrayList<>();
     for (int i = 0; i < 50; i++) {
@@ -225,7 +225,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void participantFilter_isNotUsedWhenDisabledOrUnsupported() {
-    MetamodelWrapperInterface disabled = wrapperWithParticipants();
+    ModelAccess disabled = wrapperWithParticipants();
     CorrespondenceLookup off = new CorrespondenceLookup(disabled, false);
     for (EObject s : strangers) {
       off.corresponds(self, s);
@@ -233,7 +233,7 @@ class CorrespondenceLookupTest {
     }
     verify(disabled, never()).getAllObjectsInACorrespondence();
 
-    MetamodelWrapperInterface unsupported = wrapper(true); // Optional.empty() by default
+    ModelAccess unsupported = wrapper(true); // Optional.empty() by default
     CorrespondenceLookup lookup = new CorrespondenceLookup(unsupported, true);
     for (int round = 0; round < 3; round++) {
       for (EObject p : partners) {
@@ -248,7 +248,7 @@ class CorrespondenceLookupTest {
   @Test
   void participantFilter_keepsTaggedChecksExact_withAndWithoutTaggedLookup() {
     for (boolean taggedLookup : List.of(true, false)) {
-      MetamodelWrapperInterface wrapper = wrapperWithParticipants();
+      ModelAccess wrapper = wrapperWithParticipants();
       when(wrapper.hasTaggedCorrespondenceLookup()).thenReturn(taggedLookup);
       CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper, true);
       for (int round = 0; round < 3; round++) { // the filter is active from the second round on
@@ -265,7 +265,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void participantFilter_isDroppedWhenEnumerationFails() {
-    MetamodelWrapperInterface wrapper = wrapper(true);
+    ModelAccess wrapper = wrapper(true);
     when(wrapper.getAllObjectsInACorrespondence()).thenThrow(new IllegalStateException("broken"));
     CorrespondenceLookup lookup = new CorrespondenceLookup(wrapper, true);
     for (int round = 0; round < 3; round++) {
@@ -281,7 +281,7 @@ class CorrespondenceLookupTest {
 
   @Test
   void nullFromTheWrapperCountsAsNoCorrespondents() {
-    MetamodelWrapperInterface wrapper = mock(MetamodelWrapperInterface.class);
+    ModelAccess wrapper = mock(ModelAccess.class);
     when(wrapper.hasTaggedCorrespondenceLookup()).thenReturn(true);
     when(wrapper.getCorrespondingObjects(any(EObject.class))).thenReturn(null);
     when(wrapper.getCorrespondingObjectsWithTag(any(EObject.class), anyString())).thenReturn(null);

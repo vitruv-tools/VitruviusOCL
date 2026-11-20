@@ -13,9 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.cli;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -23,11 +21,9 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
 
 /**
  * Integration tests for the {@link VitruvOclCli} command-line interface.
@@ -51,12 +47,6 @@ class VitruvOclCliTest {
   private PrintStream originalErr;
   private ByteArrayOutputStream capturedOut;
   private ByteArrayOutputStream capturedErr;
-
-  /** Sets up the test model path before all tests. */
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
 
   /** Redirects stdout and stderr before each test to capture CLI output. */
   @BeforeEach
@@ -490,7 +480,9 @@ class VitruvOclCliTest {
           "--xmi", SPACECRAFT_VOYAGER.toString()
         });
 
-    assertTrue(output().contains("unknown"), "Unnamed constraint should use 'unknown' as name");
+    assertTrue(
+        output().contains("\"name\":\"unknown\""),
+        "Unnamed constraint should use 'unknown' as name");
   }
 
   /** Tests that eval-batch output contains name, success and satisfied fields per constraint. */
@@ -546,7 +538,7 @@ class VitruvOclCliTest {
 
   /**
    * Tests that eval-batch accepts the optional {@code --threads <N>} flag (passed through to {@code
-   * VitruvOCL.evaluateConstraints(..., threadPoolSize)}) without changing output shape or content
+   * VitruvOclEngine.withThreadPoolSize(threadPoolSize)}) without changing output shape or content
    * compared to the default (no {@code --threads}) invocation.
    */
   @Test
@@ -577,11 +569,11 @@ class VitruvOclCliTest {
   }
 
   /**
-   * Documents the (accepted) behavior change from switching {@code evalBatch} to the {@code
-   * evaluateConstraints(...)} batch path: byte-identical duplicate constraints within one batch
+   * Documents the (accepted) behavior change from switching {@code evalBatch} to the batch path
+   * ({@code VitruvOclEngine#evaluateFile}): byte-identical duplicate constraints within one batch
    * file are now detected — the second (and any later) occurrence is reported as {@code
    * satisfied:false} with a duplicate-constraint warning rather than being independently evaluated
-   * again, matching {@code evaluateConstraints}'s existing duplicate-detection pre-pass (see {@code
+   * again, matching the batch path's duplicate-detection pre-pass (see {@code
    * VitruvOclCliTest#testEvalBatchMultipleConstraints} and {@code ParallelBatchEvaluationTest
    * #duplicateConstraintDetectionStillWorksWithParallelEvaluation} for the underlying, unmodified
    * batch-path behavior this now surfaces through the CLI too).
@@ -627,8 +619,8 @@ class VitruvOclCliTest {
    * dependencies for the whole list — a later constraint referencing a package the first one didn't
    * need would fail to resolve it (confirmed empirically). {@code SmartLoader#loadForConstraints}
    * was then changed to union every constraint's dependencies before loading, which removed that
-   * limitation; {@code evalBatch} now loads the context once via {@code evaluateConstraints(...)}
-   * and this test guards that the cross-metamodel case keeps working end-to-end.
+   * limitation; {@code evalBatch} now loads the context once via the engine's batch path and this
+   * test guards that the cross-metamodel case keeps working end-to-end.
    */
   @Test
   void testEvalBatchHandlesConstraintsWithDifferentMetamodelDependencies(@TempDir Path tempDir)
@@ -737,60 +729,5 @@ class VitruvOclCliTest {
     assertTrue(
         out.contains("does-not-exist.ecore"),
         "The error message should name the missing file, not leave \"errors\" empty: " + out);
-  }
-
-  // ══════════════════════════════════════════════════════════════
-  // extractConstraintName (unit tests)
-  // ══════════════════════════════════════════════════════════════
-
-  /** Tests extraction of named invariant from multiline constraint. */
-  @Test
-  void testExtractNamedConstraint() {
-    String constraint = "context spaceMission::Spacecraft inv myInvariant:\n  self.mass > 0";
-    assertEquals("myInvariant", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests that unnamed invariant returns 'unknown'. */
-  @Test
-  void testExtractUnnamedConstraint() {
-    String constraint = "context spaceMission::Spacecraft inv:\n  self.mass > 0";
-    assertEquals("unknown", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction with whitespace around constraint name. */
-  @Test
-  void testExtractConstraintNameWithWhitespace() {
-    String constraint = "context spaceMission::Spacecraft inv  myName  :\n  self.mass > 0";
-    assertEquals("myName", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction from single-line constraint. */
-  @Test
-  void testExtractConstraintNameSingleLine() {
-    String constraint = "context spaceMission::Spacecraft inv singleLine: self.mass > 0";
-    assertEquals("singleLine", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction from qualified context name. */
-  @Test
-  void testExtractConstraintNameQualifiedContext() {
-    String constraint = "context brakesystem::BrakeDisk inv overlapping:\n  self.radius > 0";
-    assertEquals("overlapping", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction returns 'unknown' when no inv keyword present. */
-  @Test
-  void testExtractConstraintNameNoInv() {
-    String constraint = "context spaceMission::Spacecraft\n  self.mass > 0";
-    assertEquals("unknown", VitruvOclCli.extractConstraintName(constraint));
-  }
-
-  /** Tests extraction from constraint with parenthesized name. */
-  @Test
-  void testExtractConstraintNameWithParenthesizedSpec() {
-    String constraint = "context spaceMission::Spacecraft inv myName(self.mass > 0): true";
-    // The method extracts up to the colon — parenthesized form may not be standard
-    // but the fallback should still not crash
-    assertNotNull(VitruvOclCli.extractConstraintName(constraint));
   }
 }

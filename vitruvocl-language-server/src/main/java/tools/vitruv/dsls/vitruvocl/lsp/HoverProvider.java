@@ -27,7 +27,7 @@ import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import tools.vitruv.dsls.vitruvocl.lsp.OclOperationDocs.OperationDoc;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Produces hover cards for OCL# tokens.

@@ -72,6 +72,7 @@
         <lsp4j.version>1.0.0</lsp4j.version>
         <gson.version>2.15.0</gson.version>
         <jacoco.version>0.8.16</jacoco.version>
+        <archunit.version>1.5.1</archunit.version>
     </properties>
 
     <!-- Dependency Management -->
@@ -194,6 +195,14 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <!-- Core library only: archunit-junit5 ships a JUnit 5 platform engine, while this
+                 build runs on JUnit 6, so architecture rules are checked from plain Jupiter tests. -->
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit</artifactId>
+                <version>${archunit.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>

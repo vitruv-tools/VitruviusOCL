@@ -10,13 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.TestModels;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Type Matrix: EFloat as Ecore attribute type.
@@ -54,13 +53,10 @@ class EFloatEcoreAttributeTest {
   private static final Path CAD_ECORE = Path.of("src/test/resources/test-metamodels/cad.ecore");
   private static final Path CAD_INST = Path.of("brake_disc_and_caliper_plate.cad");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   private static ConstraintResult evalCad(String c) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {CAD_ECORE}, new Path[] {CAD_INST});
+    return VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {CAD_INST})
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(c);
   }
 
   @ParameterizedTest
@@ -137,10 +133,9 @@ class EFloatEcoreAttributeTest {
   @Test
   void testSphereRadiusComparisonNegativeFails() {
     ConstraintResult r =
-        VitruvOCL.evaluateConstraint(
-            "context cad::Sphere inv:\n  self.radius < 0",
-            new Path[] {CAD_ECORE},
-            new Path[] {Path.of("Intersecting.cad")});
+        VitruvOclEngine.forFiles(new Path[] {CAD_ECORE}, new Path[] {Path.of("Intersecting.cad")})
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate("context cad::Sphere inv:\n  self.radius < 0");
     assertTrue(r.isSuccess(), r.toDetailedErrorString());
     assertFalse(r.isSatisfied(), "No sphere should have negative radius");
   }

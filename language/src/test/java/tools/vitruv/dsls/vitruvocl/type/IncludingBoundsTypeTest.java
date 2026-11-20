@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.antlr.v4.runtime.CharStreams;
@@ -29,14 +30,14 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Multiplicity;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Multiplicity;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Tests for {@code visitIncludingOp}'s cardinality-bound computation (the χ case system for {@code
@@ -83,8 +84,13 @@ class IncludingBoundsTypeTest {
     ROOT_CLASS.getEStructuralFeatures().add(bagNums);
   }
 
-  private static final MetamodelWrapperInterface WRAPPER =
-      new MetamodelWrapperInterface() {
+  private static final ModelAccess WRAPPER =
+      new ModelAccess() {
+        @Override
+        public Collection<EPackage> metamodelPackages() {
+          return List.of();
+        }
+
         @Override
         public EClass resolveEClass(String metamodelName, String className) {
           return "dummy4".equals(metamodelName) && "Root".equals(className) ? ROOT_CLASS : null;

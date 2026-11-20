@@ -108,6 +108,46 @@ class RelevantInstanceTest {
   }
 
   @Test
+  void reverseIndexCountsRepeatedLinkEventsWithinOneTransaction() {
+    // refs is non-unique: insert, remove and re-insert of the same link leaves b2 -> a1 in place,
+    // although the third event is identical to the first one
+    String c = "context edge::Item inv: self.refs.forAll(r | r.value >= 0)";
+    IncrementalStats stats =
+        level3(
+            c,
+            fx -> set(fx, "a1", "value", 4), // builds the index for 'refs'
+            fx -> {
+              List<Object> refs = EdgeFixture.list(fx.find("b2"), "refs");
+              refs.add(fx.find("a1"));
+              refs.remove(fx.find("a1"));
+              refs.add(fx.find("a1"));
+            },
+            fx -> set(fx, "a1", "value", -1)); // b1 and b2 both hold a1
+    assertPartial(stats, 2);
+  }
+
+  @Test
+  void reverseIndexKeepsHolderWhenANewLinkIsMovedInTheSameTransaction() {
+    // a move is recorded as remove + insert, the insert identical to the first one
+    String c = "context edge::Item inv: self.refs.forAll(r | r.value >= 0)";
+    IncrementalStats stats =
+        level3(
+            c,
+            fx -> set(fx, "a1", "value", 4), // builds the index for 'refs'
+            fx -> {
+              @SuppressWarnings("unchecked")
+              org.eclipse.emf.common.util.EList<Object> refs =
+                  (org.eclipse.emf.common.util.EList<Object>)
+                      fx.find("b2").eGet(EdgeFixture.feature(fx.find("b2"), "refs"));
+              refs.add(fx.find("a2"));
+              refs.add(fx.find("a1"));
+              refs.move(0, 1);
+            },
+            fx -> set(fx, "a1", "value", -1)); // b1 and b2 both hold a1
+    assertPartial(stats, 2);
+  }
+
+  @Test
   void containerFeatureIsInvertedViaItsContainmentOpposite() {
     String c = "context edge::Item inv: self.owner.tags.size() <= 2";
     assertPartial(level3(c, fx -> EdgeFixture.list(fx.root(2), "tags").add("t")), 1);

@@ -130,25 +130,37 @@ context spaceMission::Spacecraft inv massCheck:
 ### Supported Operations
 
 **Collection:**
-- `select(x | cond)`, `reject(x | cond)`, `collect(x | expr)`
-- `forAll(x | cond)`, `exists(x | cond)`
-- `size()`, `isEmpty()`, `notEmpty()`
-- `includes(v)`, `excludes(v)`, `including(v)`, `excluding(v)`
-- `union(c)`, `intersection(c)`, `append(v)`, `flatten()`
-- `first()`, `last()`, `reverse()`, `at(i)` (1-based)
-- `sum()`, `avg()`, `min()`, `max()`
-- `allInstances()` — all EMF instances of a type
+- query: `includes(v)`, `excludes(v)`, `includesAll(c)`, `excludesAll(c)`, `count(v)`,
+  `size()`, `isEmpty()`, `notEmpty()`, `first()`, `last()`, `at(i)` (1-based)
+- modification: `including(v)`, `excluding(v)`, `union(c)`, `intersection(c)`,
+  `symmetricDifference(c)`, `append(v)`, `prepend(v)`, `insertAt(i, v)`,
+  `subSequence(start, end)`, `reverse()`, `flatten()`, `lift()`
+- conversion: `asSet()`, `asBag()`, `asSequence()`, `asOrderedSet()`
+- aggregation: `sum()`, `avg()`, `min()`, `max()`
 
-**Arithmetic:** `+`, `-`, `*`, `/`, `%`, unary `-`
+**Iterators:** `select(x | cond)`, `reject(x | cond)`, `collect(x | expr)`,
+`collectNested(x | expr)`, `forAll(x | cond)`, `exists(x | cond)`, `one(x | cond)`,
+`any(x | cond)`, `isUnique(x | expr)`, `sortedBy(x | expr)`,
+`iterate(x; acc : Type = init | expr)`
 
-**Math:** `abs()`, `floor()`, `ceil()`, `round()`
+**Classifier:** `allInstances()` — all EMF instances of a type
+
+**Arithmetic:** `+`, `-`, `*`, `/`, unary `-` (integer division and remainder: `div(n)`, `mod(n)`)
+
+**Numeric:** `abs()`, `floor()`, `ceil()`, `ceiling()`, `round()`, `div(n)`, `mod(n)`
 
 **Comparison:** `<`, `<=`, `>`, `>=`, `==`, `!=`
 
 **Boolean:** `and`, `or`, `xor`, `not`, `implies`
 
-**String:** `concat(s)`, `size()`, `length()`, `toUpper()`, `toLower()`,
-`substring(start, end)`, `indexOf(s)`, `equalsIgnoreCase(s)`
+**String:** `concat(s)`, `length()`, `toUpper()`, `toLower()`,
+`substring(start, end)`, `indexOf(s)`, `equalsIgnoreCase(s)`, `toInteger()`, `toReal()`,
+`characters()`, `matches(pattern)`, `substituteAll(pattern, replacement)`,
+`substituteFirst(pattern, replacement)`, `tokenize(delimiters)`
+
+**Transactions** (in `post` blocks): `self.attr@pre` reads the value before the transaction;
+`OCLisNew`, `OCLisModified` and `OCLisDeleted` test what the transaction did to an object
+(`OCLisNew(attr => value, ...)` also checks its values)
 
 **Control Flow:**
 ```ocl
@@ -244,21 +256,54 @@ Coverage report: `language/target/site/jacoco/index.html`
 
 ---
 
+## Adding an Operation
+
+A new built-in operation touches these places; `OperationCoverageTest`, `ReadmeOperationsTest` and
+`OclOperationDocsCoverageTest` fail until the wiring is complete:
+
+1. **Grammar** (`language/src/main/antlr4/.../VitruvOCL.g4`): a labeled alternative in the rule of
+   its family, e.g. `| 'trim' '(' ')' # trimOp` in `stringOpCS`, and the keyword in the fallback
+   alternative `opMissingParens` of `operationCall` (and in `noArgOpWithArgs` if it takes no
+   arguments), so that a misuse gets a helpful message. ANTLR generates a default `visitTrimOp`
+   that only visits the children. The name becomes a keyword: a metamodel feature called `trim`
+   can no longer be navigated by that name.
+2. **Type rule:** a one-line `visitTrimOp` in `TypeCheckVisitor` delegating to the family's typing
+   class (`StringOperationTyping`, `CollectionOperationTyping`, `NumericOperationTyping`,
+   `IteratorOperationTyping`, `MetamodelOperationTyping`, ...), which holds the rule.
+3. **Runtime semantics:** a one-line `visitTrimOp` in `EvaluationVisitor` delegating to the
+   family's evaluation class (`StringOperationEvaluation`, ...), which holds the implementation.
+4. **Catalog:** `add(STRING, "trim")` in `operations/OclOperations.java`; the catalog drives the
+   "did you mean" suggestions.
+5. **Documentation:** an entry in `OclOperationDocs` of the language server (hover, completion,
+   signature help) and the operation in [Supported Operations](#supported-operations) above.
+
+Without steps 2 and 3 the operation would still compile, but silently fall back to the generated
+default, which is why `OperationCoverageTest` checks that every operation of the grammar is
+declared in both visitors.
+
+---
+
 ## Java API
 
 ```java
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
 import java.nio.file.Path;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
 
-// Evaluate all constraints in a project directory
-BatchValidationResult result = VitruvOCLCompiler.evaluateProject(Path.of("."));
+// Evaluate all constraints of a project (model/src/main/{constraints.ocl,ecore,instances})
+Path project = Path.of(".");
+BatchValidationResult result =
+    VitruvOclEngine.forProject(project).evaluateFile(ConstraintFiles.projectConstraints(project));
 
-System.out.println("Satisfied: " + result.getSatisfiedCount());
-System.out.println("Violated:  " + result.getViolatedCount());
+System.out.println("Satisfied: " + result.getSatisfiedConstraints().size());
+System.out.println("Violated:  " + result.getViolatedConstraints().size());
 ```
 
-See `tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCLCompiler` for the full API.
+See `tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine` for the full API: engines for a
+`ModelAccess`, a Vitruvius virtual model (`forVsum`), files (`forFiles`) or a project
+(`forProject`), each evaluating single constraints, lists and `.ocl` files, with or without a
+transaction, and opening incremental sessions.
 
 ### Constraints of a Vitruvius VSUM
 

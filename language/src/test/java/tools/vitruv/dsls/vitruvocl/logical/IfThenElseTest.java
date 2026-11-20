@@ -26,14 +26,14 @@ import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableImpl;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
 import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Comprehensive test suite for if-then-else conditional expressions in VitruvOCL.
@@ -473,7 +473,7 @@ class IfThenElseTest extends DummyTestSpecification {
     VitruvOCLParser parser = new VitruvOCLParser(tokens);
     ParseTree tree = parser.infixedExpCS();
 
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -499,7 +499,6 @@ class IfThenElseTest extends DummyTestSpecification {
 
     EvaluationVisitor evaluator =
         new EvaluationVisitor(symbolTable, dummySpec, errors, typeChecker.getNodeTypes());
-    evaluator.setTokenStream(tokens);
     Value result = evaluator.visit(tree);
 
     if (evaluator.hasErrors()) {
@@ -515,7 +514,7 @@ class IfThenElseTest extends DummyTestSpecification {
     VitruvOCLParser parser = new VitruvOCLParser(tokens);
     ParseTree tree = parser.infixedExpCS();
 
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.antlr.v4.runtime.CharStreams;
@@ -13,12 +14,13 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
 import tools.vitruv.dsls.vitruvocl.evaluator.EvaluationVisitor;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -59,7 +61,7 @@ public abstract class DummyTestSpecification {
   protected Value compile(String input) {
     ParseTree tree = parse(input);
 
-    MetamodelWrapperInterface dummySpec = buildDummySpec();
+    ModelAccess dummySpec = buildDummySpec();
     SymbolTable symbolTable = new SymbolTableImpl(dummySpec);
     ScopeAnnotator scopeAnnotator = new ScopeAnnotator();
     ErrorCollector errors = new ErrorCollector();
@@ -231,16 +233,21 @@ public abstract class DummyTestSpecification {
   }
 
   /**
-   * Creates a no-op {@link MetamodelWrapperInterface} for use in tests that do not require
-   * metamodel or instance data.
+   * Creates a no-op {@link ModelAccess} for use in tests that do not require metamodel or instance
+   * data.
    *
    * <p>All instance-related methods return empty results or throw {@link
    * UnsupportedOperationException} if called unexpectedly.
    *
-   * @return a dummy {@link MetamodelWrapperInterface} implementation
+   * @return a dummy {@link ModelAccess} implementation
    */
-  protected MetamodelWrapperInterface buildDummySpec() {
-    return new MetamodelWrapperInterface() {
+  protected ModelAccess buildDummySpec() {
+    return new ModelAccess() {
+      @Override
+      public Collection<EPackage> metamodelPackages() {
+        return List.of();
+      }
+
       @Override
       public EClass resolveEClass(String metamodel, String className) {
         return null;

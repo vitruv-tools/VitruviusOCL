@@ -15,6 +15,7 @@ package tools.vitruv.dsls.vitruvocl.evaluator;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.antlr.v4.runtime.CharStreams;
@@ -32,7 +33,8 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -41,19 +43,19 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Correctness proof for the {@code nodeTypes} key-mismatch fix in {@link
- * EvaluationVisitor#visitPropertyAccessWithReceiver}.
+ * NavigationEvaluation#property}.
  *
  * <p><b>The bug:</b> {@link
  * tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor#visitPropertyNav} stores the combined
  * Ctype for a navigation {@code e.p} keyed by the outer {@code PropertyNavContext} ({@code
- * nodeTypes.put(ctx, resultType)}). {@code visitPropertyAccessWithReceiver} used to look the type
- * back up keyed by the <em>inner</em> {@code PropertyAccessContext} - a different parse tree node -
- * so the lookup always missed and silently fell back to {@code Type.set(Type.ANY)}, which is always
- * {@code unique=true}. That made {@code LazyOperations#dedupe} run unconditionally on every {@code
- * e.p} navigation regardless of the feature's real {@code unique} flag, silently dropping genuine
- * duplicates from the result of any many-valued, non-unique (Bag/Sequence) feature access. Order
- * was never affected (dedupe does not reorder), which is why no prior test caught this - none of
- * them used duplicate-valued data.
+ * nodeTypes.put(ctx, resultType)}). {@code NavigationEvaluation#property} (formerly in the visitor)
+ * used to look the type back up keyed by the <em>inner</em> {@code PropertyAccessContext} - a
+ * different parse tree node - so the lookup always missed and silently fell back to {@code
+ * Type.set(Type.ANY)}, which is always {@code unique=true}. That made {@code LazyOperations#dedupe}
+ * run unconditionally on every {@code e.p} navigation regardless of the feature's real {@code
+ * unique} flag, silently dropping genuine duplicates from the result of any many-valued, non-unique
+ * (Bag/Sequence) feature access. Order was never affected (dedupe does not reorder), which is why
+ * no prior test caught this - none of them used duplicate-valued data.
  *
  * <p>{@code liste} here is a many-valued {@code EInt} attribute with {@code unique=false, ordered=
  * true} (Sequence semantics: duplicates allowed, order preserved), populated with real duplicates
@@ -103,8 +105,13 @@ class NavigationDedupeKeyMismatchTest {
     }
   }
 
-  private MetamodelWrapperInterface wrapperFor(EObject instance) {
-    return new MetamodelWrapperInterface() {
+  private ModelAccess wrapperFor(EObject instance) {
+    return new ModelAccess() {
+      @Override
+      public Collection<EPackage> metamodelPackages() {
+        return List.of();
+      }
+
       @Override
       public EClass resolveEClass(String metamodelName, String className) {
         return "dummy2".equals(metamodelName) && "Container".equals(className)
@@ -164,7 +171,7 @@ class NavigationDedupeKeyMismatchTest {
     };
   }
 
-  private boolean evaluateInvariant(String constraint, MetamodelWrapperInterface wrapper) {
+  private boolean evaluateInvariant(String constraint, ModelAccess wrapper) {
     VitruvOCLLexer lexer = new VitruvOCLLexer(CharStreams.fromString(constraint));
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     VitruvOCLParser parser = new VitruvOCLParser(tokens);

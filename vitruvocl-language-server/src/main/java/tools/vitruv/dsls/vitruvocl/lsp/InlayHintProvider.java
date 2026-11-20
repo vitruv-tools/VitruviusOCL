@@ -22,7 +22,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Provides LSP {@code textDocument/inlayHint} responses.
@@ -178,8 +178,14 @@ final class InlayHintProvider {
         return t;
       }
       // expCS: infixedExpCS — try the single child
-      if (ctx.infixedExpCS() != null) {
-        t = types.get(ctx.infixedExpCS());
+      VitruvOCLParser.InfixedExpCSContext infixed = ctx.infixedExpCS();
+      if (infixed != null) {
+        t = types.get(infixed);
+      }
+      // infixedExpCS: prefixedExpCS (# prefixedExpr) — the TypeCheckVisitor annotates only the
+      // prefixed node (e.g. primaryWithNav), so non-binary initialisers need one more level.
+      if (t == null && infixed instanceof VitruvOCLParser.PrefixedExprContext prefixed) {
+        t = types.get(prefixed.prefixedExpCS());
       }
       return t;
     }

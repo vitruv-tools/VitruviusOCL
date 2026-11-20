@@ -24,10 +24,6 @@ import java.util.Map;
  * <ul>
  *   <li><b>Built-in types:</b> Primitive types (Integer, Real, String, Boolean) and collection
  *       types (Collection, Set, Bag, Sequence) defined during symbol table initialization
- *   <li><b>Standard library operations:</b> Built-in operations like arithmetic operators (+, -, *,
- *       /), collection operations (size, isEmpty, first, last, at), string operations (concat,
- *       substring, toUpper, toLower), and iterator operations (select, reject, collect, forAll,
- *       exists)
  *   <li><b>Global variables:</b> Optional global variable definitions (currently unused but
  *       supported for future extensions)
  * </ul>
@@ -51,9 +47,6 @@ public class GlobalScope implements Scope {
 
   /** Built-in types: Integer, Real, String, Boolean, Collection, Set, Bag, Sequence. */
   private final Map<String, TypeSymbol> types = new HashMap<>();
-
-  /** Standard library operations: arithmetic, comparison, collection, string, and iterators. */
-  private final Map<String, OperationSymbol> operations = new HashMap<>();
 
   /**
    * Defines a variable in the global scope.
@@ -81,18 +74,6 @@ public class GlobalScope implements Scope {
   }
 
   /**
-   * Defines an operation in the global scope.
-   *
-   * <p>Used during symbol table initialization to register standard library operations.
-   *
-   * @param symbol the operation symbol to define
-   */
-  @Override
-  public void defineOperation(OperationSymbol symbol) {
-    operations.put(symbol.getName(), symbol);
-  }
-
-  /**
    * Resolves a variable name in the global scope.
    *
    * @param name the variable name to resolve
@@ -112,17 +93,6 @@ public class GlobalScope implements Scope {
   @Override
   public TypeSymbol resolveType(String name) {
     return types.get(name);
-  }
-
-  /**
-   * Resolves an operation name in the global scope.
-   *
-   * @param name the operation name to resolve (e.g., "+", "size", "select")
-   * @return the operation symbol, or {@code null} if not found
-   */
-  @Override
-  public OperationSymbol resolveOperation(String name) {
-    return operations.get(name);
   }
 
   /**

@@ -14,37 +14,72 @@
 package tools.vitruv.dsls.vitruvocl.cli;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
+import tools.vitruv.dsls.vitruvocl.api.ConstraintFiles;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalConfig;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalLevel;
 import tools.vitruv.dsls.vitruvocl.incremental.IncrementalSession;
-import tools.vitruv.dsls.vitruvocl.pipeline.BatchValidationResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.result.BatchValidationResult;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Command-line interface for VitruvOCL compiler. Outputs JSON for easy integration with IDEs and
- * tools.
+ * tools; the documents are described by {@link CliJson}. Every command except {@code version}
+ * prints exactly one JSON document on standard output; a failure, including invalid arguments, is
+ * {@code {"success":false,"error":...}} with exit status 1.
  */
 @SuppressWarnings("java:S106")
 public class VitruvOclCli {
 
-  private static final String JSON_KEY_SUCCESS = "\"success\":";
+  /** Standard output: the JSON result or failure, and the version. */
+  private final PrintStream out;
+
+  /** Standard error: the usage text after invalid arguments. */
+  private final PrintStream err;
+
+  private VitruvOclCli(PrintStream out, PrintStream err) {
+    this.out = out;
+    this.err = err;
+  }
 
   /**
-   * CLI entry point.
+   * CLI entry point; exits with status 1 if the command failed.
    *
    * @param args command-line arguments; first argument selects the subcommand
    */
   public static void main(String[] args) {
+    int status = run(args, System.out, System.err);
+    if (status != 0) {
+      System.exit(status);
+    }
+  }
+
+  /**
+   * Runs a command.
+   *
+   * @param args command-line arguments; first argument selects the subcommand
+   * @param out where the JSON result or failure and the version are printed
+   * @param err where the usage text is printed after invalid arguments
+   * @return the exit status: 0 on success, 1 on invalid arguments or a failed command
+   */
+  static int run(String[] args, PrintStream out, PrintStream err) {
+    VitruvOclCli cli = new VitruvOclCli(out, err);
+    try {
+      cli.execute(args);
+      return 0;
+    } catch (ExitException exit) {
+      return exit.status;
+    }
+  }
+
+  private void execute(String[] args) {
     if (args.length == 0) {
-      printUsage();
-      System.exit(1);
+      throw invalidArguments("Missing command", true);
     }
 
     String command = args[0];
@@ -55,62 +90,57 @@ public class VitruvOclCli {
         case "eval" -> evalConstraint(args);
         case "eval-batch" -> evalBatch(args);
         case "version" -> printVersion();
-        default -> {
-          System.err.println("Unknown command: " + command);
-          printUsage();
-          System.exit(1);
-        }
+        default -> throw invalidArguments("Unknown command: " + command, true);
       }
+    } catch (ExitException exit) {
+      throw exit;
     } catch (Exception e) {
-      System.out.println(
-          String.format(
-              "{\"success\":false,\"error\":%s}",
-              jsonString(e.getClass().getSimpleName() + ": " + e.getMessage())));
-      System.exit(1);
+      out.println(CliJson.failure(e));
+      throw new ExitException(1);
     }
   }
 
-  private static void checkConstraint(String[] args) throws IOException {
+  private void checkConstraint(String[] args) throws IOException {
     CLIArgs parsed = parseArgs(args);
     String constraintText = Files.readString(parsed.constraintFile);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(constraintText, parsed.ecoreFiles, new Path[0]);
+        VitruvOclEngine.forFiles(parsed.ecoreFiles, new Path[0]).evaluate(constraintText);
 
-    System.out.println(buildCheckJson(result));
+    out.println(CliJson.check(result));
   }
 
-  private static void evalConstraint(String[] args) throws IOException {
+  private void evalConstraint(String[] args) throws IOException {
     CLIArgs parsed = parseArgs(args);
     String constraintText = Files.readString(parsed.constraintFile);
 
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(constraintText, parsed.ecoreFiles, parsed.xmiFiles);
+        VitruvOclEngine.forFiles(parsed.ecoreFiles, parsed.xmiFiles).evaluate(constraintText);
 
-    System.out.println(buildEvalJson(result));
+    out.println(CliJson.eval(result));
   }
 
   /**
    * Evaluates all constraints in a file and returns individual results for each.
    *
    * <p>Loads the metamodel/instance context once for the whole batch — via {@link
-   * VitruvOCL#evaluateConstraints(Path, Path[], Path[], int)}, whose {@code SmartLoader} loading
-   * step unions every constraint's dependencies (not just the first one's) before any evaluation
-   * starts — and then evaluates the full constraint list through the existing parallel batch path
-   * ({@code ConstraintListEvaluator}), instead of the old per-constraint loop that re-loaded the
-   * context on every iteration. Per-constraint JSON shape and field content are unchanged; only how
-   * the underlying results are produced differs.
+   * VitruvOclEngine#evaluateFile(Path)}, whose {@code SmartLoader} loading step unions every
+   * constraint's dependencies (not just the first one's) before any evaluation starts — and then
+   * evaluates the full constraint list through the parallel batch path ({@code
+   * ConstraintListEvaluator}), instead of a per-constraint loop that re-loads the context on every
+   * iteration.
    *
-   * <p>Delegates constraints-file parsing to {@link VitruvOCL} itself rather than keeping a second,
-   * divergent copy of the same splitting logic here — the CLI's own copy was missing {@code import}
-   * line filtering, which silently corrupted every constraint's compiled text whenever the file
-   * being evaluated declared an {@code import} (breaking compilation of the whole batch).
+   * <p>Constraints-file parsing is left to {@link ConstraintFiles} rather than keeping a second,
+   * divergent copy of the same splitting logic here — an earlier CLI copy was missing {@code
+   * import} line filtering, which silently corrupted every constraint's compiled text whenever the
+   * file being evaluated declared an {@code import} (breaking compilation of the whole batch).
    */
-  private static void evalBatch(String[] args) throws IOException {
+  private void evalBatch(String[] args) throws IOException {
     CLIArgs parsed = parseArgs(args);
     Integer threadPoolSize = parseThreadPoolSize(args);
     IncrementalLevel incrementalLevel = parseIncrementalLevel(args);
 
+    VitruvOclEngine engine = VitruvOclEngine.forFiles(parsed.ecoreFiles, parsed.xmiFiles);
     BatchValidationResult batch;
     if (incrementalLevel != null && incrementalLevel != IncrementalLevel.FULL) {
       // The CLI has no transaction: an incremental session can only perform its initial full
@@ -119,11 +149,10 @@ public class VitruvOclCli {
           IncrementalConfig.fromSystemProperties()
               .withLevel(incrementalLevel)
               .withThreads(threadPoolSize != null ? threadPoolSize : 1);
+      List<String> constraints = ConstraintFiles.read(parsed.constraintFile);
       IncrementalSession session;
       try {
-        session =
-            VitruvOCL.openIncrementalSession(
-                parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles, config);
+        session = engine.openIncrementalSession(constraints, config);
       } catch (IllegalStateException loadFailure) {
         session = null; // model files could not be loaded: report exactly as level 0 does
       }
@@ -132,86 +161,40 @@ public class VitruvOclCli {
           batch = s.latestResult().result();
         }
       } else {
-        batch =
-            VitruvOCL.evaluateConstraints(
-                parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles, config.threads());
+        batch = engine.withThreadPoolSize(config.threads()).evaluateFile(parsed.constraintFile);
       }
     } else {
-      batch =
-          threadPoolSize != null
-              ? VitruvOCL.evaluateConstraints(
-                  parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles, threadPoolSize)
-              : VitruvOCL.evaluateConstraints(
-                  parsed.constraintFile, parsed.ecoreFiles, parsed.xmiFiles);
+      VitruvOclEngine configured =
+          threadPoolSize != null ? engine.withThreadPoolSize(threadPoolSize) : engine;
+      batch = configured.evaluateFile(parsed.constraintFile);
     }
 
-    // Build batch result JSON
-    StringBuilder json = new StringBuilder();
-    json.append("{");
-    json.append("\"success\":true,");
-    json.append("\"constraints\":[");
-
-    List<String> constraintResults = new ArrayList<>();
-    for (ConstraintResult result : batch.getResults()) {
-      // Extract constraint name from "context X inv NAME:"
-      String name = extractConstraintName(result.getConstraint());
-
-      StringBuilder constraintJson = new StringBuilder();
-      constraintJson.append("{");
-      constraintJson.append("\"name\":").append(jsonString(name)).append(",");
-      constraintJson.append(JSON_KEY_SUCCESS).append(result.isSuccess()).append(",");
-      constraintJson.append("\"satisfied\":").append(result.isSatisfied());
-
-      if (!result.getCompilerErrors().isEmpty() || !result.getFileErrors().isEmpty()) {
-        constraintJson.append(",\"errors\":[");
-        constraintJson.append(formatErrorsJson(result, false));
-        constraintJson.append("]");
-      }
-
-      if (!result.getWarnings().isEmpty()) {
-        constraintJson.append(",\"warnings\":[");
-        String warnings =
-            result.getWarnings().stream()
-                .map(w -> jsonString(w.getMessage()))
-                .collect(Collectors.joining(","));
-        constraintJson.append(warnings);
-        constraintJson.append("]");
-      }
-
-      constraintJson.append("}");
-      constraintResults.add(constraintJson.toString());
-    }
-
-    json.append(String.join(",", constraintResults));
-    json.append("]}");
-
-    System.out.println(json.toString());
+    out.println(CliJson.batch(batch));
   }
 
   /**
    * Parses an optional {@code --threads <N>} argument for {@code eval-batch}, controlling how many
-   * worker threads {@link VitruvOCL#evaluateConstraints(List, Path[], Path[], int)} distributes
-   * constraint evaluation across.
+   * worker threads {@link VitruvOclEngine#withThreadPoolSize(int)} distributes constraint
+   * evaluation across.
    *
    * @param args full CLI argument array
    * @return the requested thread pool size, or {@code null} if {@code --threads} was not given (in
-   *     which case the caller uses {@code evaluateConstraints}'s own default)
+   *     which case the caller uses the engine's default thread pool size)
    */
   @SuppressWarnings("java:S127")
-  private static Integer parseThreadPoolSize(String[] args) {
+  private Integer parseThreadPoolSize(String[] args) {
     for (int i = 2; i < args.length; i++) {
       if ("--threads".equals(args[i]) && i + 1 < args.length) {
         String value = args[++i].trim();
         try {
           int threadPoolSize = Integer.parseInt(value);
           if (threadPoolSize < 1) {
-            System.err.println("--threads must be at least 1, got: " + value);
-            System.exit(1);
+            throw invalidArguments("--threads must be at least 1, got: " + value, false);
           }
           return threadPoolSize;
         } catch (NumberFormatException e) {
-          System.err.println("Invalid --threads value: " + value + " (must be an integer)");
-          System.exit(1);
+          throw invalidArguments(
+              "Invalid --threads value: " + value + " (must be an integer)", false);
         }
       }
     }
@@ -227,147 +210,39 @@ public class VitruvOclCli {
    * @return the requested level, or {@code null} if neither option nor property is set
    */
   @SuppressWarnings("java:S127")
-  private static IncrementalLevel parseIncrementalLevel(String[] args) {
+  private IncrementalLevel parseIncrementalLevel(String[] args) {
     for (int i = 2; i < args.length; i++) {
       if ("--incremental-level".equals(args[i]) && i + 1 < args.length) {
         String value = args[++i];
         try {
           return IncrementalLevel.parse(value);
         } catch (IllegalArgumentException e) {
-          System.err.println("Invalid --incremental-level value: " + value + " (must be 0-3)");
-          System.exit(1);
+          throw invalidArguments(
+              "Invalid --incremental-level value: " + value + " (must be 0-3)", false);
         }
       }
     }
     String fromProperty = System.getProperty(IncrementalConfig.PROP_LEVEL);
-    return fromProperty == null ? null : IncrementalLevel.parse(fromProperty);
-  }
-
-  /**
-   * Extracts the constraint name from an {@code inv}/{@code pre}/{@code post} {@code NAME:}
-   * declaration.
-   *
-   * @param constraint the OCL constraint source
-   * @return the extracted name, or a fallback value if none is found
-   */
-  public static String extractConstraintName(String constraint) {
-    java.util.regex.Matcher matcher =
-        java.util.regex.Pattern.compile("(?<!@)\\b(?:inv|pre|post)\\s+(\\w+)\\s*:")
-            .matcher(constraint);
-    if (matcher.find()) {
-      return matcher.group(1);
+    if (fromProperty == null) {
+      return null;
     }
-    return "unknown";
-  }
-
-  /**
-   * Renders both error categories a {@link ConstraintResult} can carry — {@link
-   * ConstraintResult#getCompilerErrors()} (source-position parse/type errors) and {@link
-   * ConstraintResult#getFileErrors()} (missing/unreadable metamodel or model files, reported once
-   * per batch rather than per constraint) — into one JSON array of {@code {line,column,message[,
-   * severity]}} objects.
-   *
-   * <p>Before this method existed, every call site here rendered only {@code
-   * getCompilerErrors()}. Whenever a batch failed to load (e.g. a bad {@code --ecore}/{@code
-   * --xmi} path), every constraint in it got a {@link ConstraintResult} with populated {@code
-   * fileErrors} but empty {@code compilerErrors} — {@link ConstraintResult#isSuccess()} correctly
-   * reported {@code false}, but the JSON's {@code errors}/{@code diagnostics} array stayed empty,
-   * so a genuine load failure looked identical to "every constraint is broken for no visible
-   * reason." File errors have no source position, so {@code line}/{@code column} are {@code 0}.
-   *
-   * @param includeSeverity whether to add a {@code "severity"} field (file errors are always
-   *     reported as {@code ERROR}) — {@code eval-batch}'s per-constraint JSON omits it for
-   *     backward compatibility with its existing {@code {line,column,message}} shape, while {@code
-   *     check}/{@code eval} already included it for compiler errors.
-   */
-  private static String formatErrorsJson(ConstraintResult result, boolean includeSeverity) {
-    String compilerErrors =
-        result.getCompilerErrors().stream()
-            .map(
-                e ->
-                    includeSeverity
-                        ? String.format(
-                            "{\"line\":%d,\"column\":%d,\"message\":%s,\"severity\":\"%s\"}",
-                            e.getLine(), e.getColumn(), jsonString(e.getMessage()), e.getSeverity())
-                        : String.format(
-                            "{\"line\":%d,\"column\":%d,\"message\":%s}",
-                            e.getLine(), e.getColumn(), jsonString(e.getMessage())))
-            .collect(Collectors.joining(","));
-
-    String fileErrors =
-        result.getFileErrors().stream()
-            .map(
-                e ->
-                    includeSeverity
-                        ? String.format(
-                            "{\"line\":0,\"column\":0,\"message\":%s,\"severity\":\"ERROR\"}",
-                            jsonString(e.toString()))
-                        : String.format(
-                            "{\"line\":0,\"column\":0,\"message\":%s}", jsonString(e.toString())))
-            .collect(Collectors.joining(","));
-
-    if (compilerErrors.isEmpty()) {
-      return fileErrors;
+    try {
+      return IncrementalLevel.parse(fromProperty);
+    } catch (IllegalArgumentException e) {
+      throw invalidArguments(
+          "Invalid system property "
+              + IncrementalConfig.PROP_LEVEL
+              + ": "
+              + fromProperty
+              + " (must be 0-3)",
+          false);
     }
-    if (fileErrors.isEmpty()) {
-      return compilerErrors;
-    }
-    return compilerErrors + "," + fileErrors;
-  }
-
-  private static String buildCheckJson(ConstraintResult result) {
-    StringBuilder json = new StringBuilder();
-    json.append("{");
-    json.append(JSON_KEY_SUCCESS).append(result.isSuccess());
-    json.append(",\"diagnostics\":[");
-    json.append(formatErrorsJson(result, true));
-    json.append("]}");
-
-    return json.toString();
-  }
-
-  private static String buildEvalJson(ConstraintResult result) {
-    StringBuilder json = new StringBuilder();
-    json.append("{");
-    json.append(JSON_KEY_SUCCESS).append(result.isSuccess());
-    json.append(",\"satisfied\":").append(result.isSatisfied());
-
-    json.append(",\"errors\":[");
-    json.append(formatErrorsJson(result, true));
-
-    json.append("],\"warnings\":[");
-    String warnings =
-        result.getWarnings().stream()
-            .map(w -> jsonString(w.getMessage()))
-            .collect(Collectors.joining(","));
-    json.append(warnings);
-
-    json.append("]}");
-
-    return json.toString();
-  }
-
-  private static String jsonString(String str) {
-    if (str == null) {
-      return "null";
-    }
-    return "\""
-        + str.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-            .replace("\b", "\\b")
-            .replace("\f", "\\f")
-        + "\"";
   }
 
   @SuppressWarnings("java:S127")
-  private static CLIArgs parseArgs(String[] args) {
+  private CLIArgs parseArgs(String[] args) {
     if (args.length < 2) {
-      System.err.println("Missing constraint file");
-      printUsage();
-      System.exit(1);
+      throw invalidArguments("Missing constraint file", true);
     }
 
     Path constraintFile = Path.of(args[1]);
@@ -393,8 +268,24 @@ public class VitruvOclCli {
     return new CLIArgs(constraintFile, ecoreFiles, xmiFiles);
   }
 
-  private static void printUsage() {
-    System.out.println(
+  /**
+   * Reports invalid arguments: the message as a JSON failure on standard output, so that a caller
+   * parsing it always gets JSON, and the usage text on standard error.
+   *
+   * @param message what is wrong
+   * @param withUsage whether to print the usage text
+   * @return the exception that ends the command with status 1
+   */
+  private ExitException invalidArguments(String message, boolean withUsage) {
+    out.println(CliJson.failure(message));
+    if (withUsage) {
+      printUsage();
+    }
+    return new ExitException(1);
+  }
+
+  private void printUsage() {
+    err.println(
         """
         VitruvOCL Command Line Interface
 
@@ -433,10 +324,22 @@ public class VitruvOclCli {
         """);
   }
 
-  private static void printVersion() {
-    System.out.println("VitruvOCL 1.0.0");
+  private void printVersion() {
+    out.println("VitruvOCL 1.0.0");
   }
 
   @SuppressWarnings("java:S6218")
   record CLIArgs(Path constraintFile, Path[] ecoreFiles, Path[] xmiFiles) {}
+
+  /** Ends a command with an exit status, after its messages were printed. */
+  private static final class ExitException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    private final int status;
+
+    ExitException(int status) {
+      super(null, null, false, false);
+      this.status = status;
+    }
+  }
 }

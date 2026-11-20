@@ -1,0 +1,157 @@
+# Constraints that do not compile, through VitruvOCLCompiler, PreparedConstraint and the rendered
+# result. Each case: "### name", the constraint, then "=> " lines: the compiler's errors, whether
+# the prepared constraint compiled, the errors of its evaluation and the compiler errors of the
+# rendered result ("line:column-endLine:endColumn SEVERITY source | message", \n escaped).
+# Change expectations only for intended behaviour changes.
+
+### compiles
+context spaceMission::Spacecraft inv a: self.mass >= 0
+=> compiler hasErrors=false
+=> prepared compiled=true
+=> outcome failed=false
+
+### syntaxError
+context spaceMission::Spacecraft inv a: self.mass >=
+=> compiler hasErrors=true
+=> compiler 1:50-1:52 ERROR type-checker | Missing right-hand operand for '>='
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:50-1:52 ERROR type-checker | Missing right-hand operand for '>='
+=> result 1:50-1:52 ERROR type-checker | Missing right-hand operand for '>='
+
+### lexerError
+context spaceMission::Spacecraft inv a: self.mass § 0
+=> compiler hasErrors=true
+=> compiler 1:50-1:51 ERROR lexer | token recognition error at: '§'
+=> compiler 1:52-1:53 ERROR type-checker | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:50-1:51 ERROR lexer | token recognition error at: '§'
+=> outcome 1:52-1:53 ERROR type-checker | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+=> result 1:50-1:51 ERROR lexer | token recognition error at: '§'
+=> result 1:52-1:53 ERROR type-checker | Missing logical operator before this expression — did you mean 'and', 'or', or 'implies'?
+
+### multiLineSyntaxError
+context spaceMission::Spacecraft
+  inv a:
+    self.mass >= 0 and
+=> compiler hasErrors=true
+=> compiler 3:19-3:22 ERROR parser | Missing right-hand operand for 'and'
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 3:19-3:22 ERROR parser | Missing right-hand operand for 'and'
+=> result 3:19-3:22 ERROR parser | Missing right-hand operand for 'and'
+
+### unknownContextClass
+context spaceMission::Nope inv a: true
+=> compiler hasErrors=true
+=> compiler 1:22-1:26 ERROR symbol-table-builder | Unknown class 'Nope' in metamodel 'spaceMission'
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:22-1:26 ERROR symbol-table-builder | Unknown class 'Nope' in metamodel 'spaceMission'
+=> result 1:22-1:26 ERROR symbol-table-builder | Unknown class 'Nope' in metamodel 'spaceMission'
+
+### unknownMetamodel
+context nope::Spacecraft inv a: true
+=> compiler hasErrors=true
+=> compiler 1:8-1:12 ERROR symbol-table-builder | Unknown metamodel 'nope'
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:8-1:12 ERROR symbol-table-builder | Unknown metamodel 'nope'
+=> result 1:8-1:12 ERROR symbol-table-builder | Unknown metamodel 'nope'
+
+### unknownFeature
+context spaceMission::Spacecraft inv a: self.noSuchFeature > 0
+=> compiler hasErrors=true
+=> compiler 1:45-1:58 ERROR type-checker | Unknown property 'noSuchFeature' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:45-1:58 ERROR type-checker | Unknown property 'noSuchFeature' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+=> result 1:45-1:58 ERROR type-checker | Unknown property 'noSuchFeature' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+
+### typeMismatch
+context spaceMission::Spacecraft inv a: self.mass and true
+=> compiler hasErrors=true
+=> compiler 1:40--1:-1 ERROR type-checker | Type mismatch: cannot apply 'and' to !Integer! and Boolean
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:40--1:-1 ERROR type-checker | Type mismatch: cannot apply 'and' to !Integer! and Boolean
+=> result 1:40--1:-1 ERROR type-checker | Type mismatch: cannot apply 'and' to !Integer! and Boolean
+
+### severalTypeErrors
+context spaceMission::Spacecraft inv a: self.noSuch > 0 and self.mass + "x" > 0
+=> compiler hasErrors=true
+=> compiler 1:45-1:51 ERROR type-checker | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+=> compiler 1:60--1:-1 ERROR type-checker | Type mismatch: cannot apply '+' to !Integer! and String
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:45-1:51 ERROR type-checker | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+=> outcome 1:60--1:-1 ERROR type-checker | Type mismatch: cannot apply '+' to !Integer! and String
+=> result 1:45-1:51 ERROR type-checker | Unknown property 'noSuch' on type 'Spacecraft' (not found on declared type or any known subtype; use oclIsKindOf + oclAsType to cast to the concrete subtype first)
+=> result 1:60--1:-1 ERROR type-checker | Type mismatch: cannot apply '+' to !Integer! and String
+
+### duplicateLetVariable
+context spaceMission::Spacecraft inv a: let x = 1, x = 2 in x > 0
+=> compiler hasErrors=true
+=> compiler 1:51--1:-1 ERROR symbol-table-builder | Variable 'x' already defined in this scope
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:51--1:-1 ERROR symbol-table-builder | Variable 'x' already defined in this scope
+=> result 1:51--1:-1 ERROR symbol-table-builder | Variable 'x' already defined in this scope
+
+### invariantNotBoolean
+context spaceMission::Spacecraft inv a: self.mass
+=> compiler hasErrors=true
+=> compiler 1:33--1:-1 ERROR type-checker | Invariant must be Boolean, got !Integer!
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:33--1:-1 ERROR type-checker | Invariant must be Boolean, got !Integer!
+=> result 1:33--1:-1 ERROR type-checker | Invariant must be Boolean, got !Integer!
+
+### unclosedParenthesis
+context spaceMission::Spacecraft inv a: (self.mass > 0
+=> compiler hasErrors=true
+=> compiler 1:54-1:54 ERROR parser | extraneous input '<EOF>' expecting {'(', ')', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:54-1:54 ERROR parser | extraneous input '<EOF>' expecting {'(', ')', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+=> result 1:54-1:54 ERROR parser | extraneous input '<EOF>' expecting {'(', ')', 'Collection', 'Bag', 'OrderedSet', 'Sequence', 'Set', 'Boolean', 'Integer', 'Real', 'String', 'ID', 'UnlimitedNatural', 'OclAny', '-', 'not', 'self', 'if', 'let', NumberLiteralExpCS, BooleanLiteralExpCS, ID, STRING}
+
+### missingContextType
+context inv a: true
+=> compiler hasErrors=true
+=> compiler 1:8-1:11 ERROR parser | extraneous input 'inv' expecting ID
+=> compiler 1:15-1:19 ERROR parser | mismatched input 'true' expecting ID
+=> compiler 1:0--1:-1 ERROR symbol-table-builder | Invalid context declaration
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:8-1:11 ERROR parser | extraneous input 'inv' expecting ID
+=> outcome 1:15-1:19 ERROR parser | mismatched input 'true' expecting ID
+=> outcome 1:0--1:-1 ERROR symbol-table-builder | Invalid context declaration
+=> result 1:8-1:11 ERROR parser | extraneous input 'inv' expecting ID
+=> result 1:15-1:19 ERROR parser | mismatched input 'true' expecting ID
+=> result 1:0--1:-1 ERROR symbol-table-builder | Invalid context declaration
+
+### trailingInputIgnored
+context spaceMission::Spacecraft inv a: self.mass >= 0 )
+=> compiler hasErrors=true
+=> compiler 1:55-1:56 ERROR parser | unexpected input ')'
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:55-1:56 ERROR parser | unexpected input ')'
+=> result 1:55-1:56 ERROR parser | unexpected input ')'
+
+### warningOnly
+context spaceMission::Spacecraft inv a: Set{1}.includes("x")
+=> compiler hasErrors=false
+=> compiler 1:47--1:-1 WARNING type-checker | includes() argument type String incompatible with collection element type Integer
+=> prepared compiled=true
+=> outcome failed=false
+
+### empty
+=> compiler hasErrors=true
+=> compiler 1:0-1:0 ERROR parser | mismatched input '<EOF>' expecting 'context'
+=> prepared compiled=false
+=> outcome failed=true
+=> outcome 1:0-1:0 ERROR parser | mismatched input '<EOF>' expecting 'context'
+=> result 1:0-1:0 ERROR parser | mismatched input '<EOF>' expecting 'context'

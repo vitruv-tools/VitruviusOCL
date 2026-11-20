@@ -17,14 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.TestModels;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Tests for single-metamodel OCL constraints using the spaceMission metamodel.
@@ -48,15 +47,12 @@ class SingleMetamodelConstraintTest {
   private static final Path SPACECRAFT_ACTIVE = Path.of("spacecraft-active.spacemission");
   private static final Path SPACECRAFT_INACTIVE = Path.of("spacecraft-inactive.spacemission");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   // ── helpers ──────────────────────────────────────────────────────────────────
 
   private static ConstraintResult eval(String c, Path instance) {
-    return VitruvOCL.evaluateConstraint(c, new Path[] {SPACEMISSION_ECORE}, new Path[] {instance});
+    return VitruvOclEngine.forFiles(new Path[] {SPACEMISSION_ECORE}, new Path[] {instance})
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(c);
   }
 
   // ── Satisfied constraints (isSuccess + isSatisfied both true) ─────────────
@@ -211,10 +207,11 @@ class SingleMetamodelConstraintTest {
   @Test
   void testMultipleInstances() {
     ConstraintResult r =
-        VitruvOCL.evaluateConstraint(
-            "context spaceMission::Spacecraft inv: self.operational",
-            new Path[] {SPACEMISSION_ECORE},
-            new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE});
+        VitruvOclEngine.forFiles(
+                new Path[] {SPACEMISSION_ECORE},
+                new Path[] {SPACECRAFT_ACTIVE, SPACECRAFT_INACTIVE})
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate("context spaceMission::Spacecraft inv: self.operational");
     assertTrue(r.isSuccess());
   }
 

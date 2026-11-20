@@ -21,8 +21,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.eclipse.emf.ecore.EObject;
-import tools.vitruv.dsls.vitruvocl.incremental.CorrespondenceDelta.Pair;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta.Pair;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * The correspondence relation at one point in time: for every object in some correspondence, its
@@ -62,7 +63,7 @@ final class CorrespondenceSnapshot {
    * Captures the current relation, or returns empty if {@code wrapper} cannot enumerate the objects
    * in a correspondence.
    */
-  static Optional<CorrespondenceSnapshot> capture(MetamodelWrapperInterface wrapper) {
+  static Optional<CorrespondenceSnapshot> capture(ModelAccess wrapper) {
     Optional<Set<EObject>> objects = wrapper.getAllObjectsInACorrespondence();
     if (objects.isEmpty()) {
       return Optional.empty();

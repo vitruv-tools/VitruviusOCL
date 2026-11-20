@@ -27,7 +27,10 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.Origin;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.PseSet;
 import tools.vitruv.dsls.vitruvocl.incremental.analysis.RelevancePlan;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.CorrespondenceDelta;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.ModelEvent;
+import tools.vitruv.dsls.vitruvocl.incremental.delta.TransactionDelta;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * Level 3: the context instances of a constraint that a transaction can affect (Cabot &amp;
@@ -67,15 +70,15 @@ final class RelevantInstanceResolver {
    * The wrapper of the current state, read per call: the session's evaluation view, which answers
    * correspondence queries from the transaction's snapshot.
    */
-  private final Supplier<MetamodelWrapperInterface> wrapper;
+  private final Supplier<ModelAccess> wrapper;
 
   private final ReverseIndex reverseIndex;
 
-  RelevantInstanceResolver(MetamodelWrapperInterface wrapper, ReverseIndex reverseIndex) {
+  RelevantInstanceResolver(ModelAccess wrapper, ReverseIndex reverseIndex) {
     this(() -> wrapper, reverseIndex);
   }
 
-  RelevantInstanceResolver(Supplier<MetamodelWrapperInterface> wrapper, ReverseIndex reverseIndex) {
+  RelevantInstanceResolver(Supplier<ModelAccess> wrapper, ReverseIndex reverseIndex) {
     this.wrapper = wrapper;
     this.reverseIndex = reverseIndex;
   }

@@ -19,8 +19,8 @@ import tools.vitruv.dsls.vitruvocl.DummyTestSpecification;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.evaluator.OCLElement;
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -191,7 +191,7 @@ class CollectionLiteralTypeTest extends DummyTestSpecification {
     assertSingleDouble(
         new Value(
             java.util.List.of(r.getElements().get(0)),
-            tools.vitruv.dsls.vitruvocl.typechecker.Type.DOUBLE),
+            tools.vitruv.dsls.vitruvocl.types.Type.DOUBLE),
         3.0);
   }
 

@@ -22,17 +22,27 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import org.eclipse.emf.ecore.EPackage;
+import tools.vitruv.dsls.vitruvocl.adapter.vsum.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalysis;
+import tools.vitruv.dsls.vitruvocl.analysis.OclAnalyzer;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
 import tools.vitruv.dsls.vitruvocl.common.CompileError;
-import tools.vitruv.dsls.vitruvocl.pipeline.DependencyAnalyzer;
-import tools.vitruv.dsls.vitruvocl.pipeline.FileError;
-import tools.vitruv.dsls.vitruvocl.pipeline.Violation;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
-import tools.vitruv.dsls.vitruvocl.pipeline.VsumWrapper;
+import tools.vitruv.dsls.vitruvocl.compiler.ConstraintEvaluations;
+import tools.vitruv.dsls.vitruvocl.compiler.DependencyAnalyzer;
+import tools.vitruv.dsls.vitruvocl.compiler.PreparedConstraint;
+import tools.vitruv.dsls.vitruvocl.result.FileError;
+import tools.vitruv.dsls.vitruvocl.result.Violation;
+import tools.vitruv.dsls.vitruvocl.source.OclSourceSplitter;
 import tools.vitruv.dsls.vitruvocl.vitruv.OclInvariantParser.ParsedInvariant;
 import tools.vitruv.framework.vsum.constraints.ConstraintCheckContext;
 import tools.vitruv.framework.vsum.constraints.ConstraintChecker;
@@ -48,20 +58,19 @@ import tools.vitruv.framework.vsum.constraints.UnknownConstraintException;
 
 /**
  * A Vitruv {@link ConstraintChecker} for VitruvOCL constraints. Register it at a virtual model via
- * {@link
- * tools.vitruv.framework.vsum.VirtualModelBuilder#withConstraintChecker(ConstraintChecker)}.
+ * {@link tools.vitruv.framework.vsum.VirtualModelBuilder#withConstraintChecker(ConstraintChecker)}.
  *
- * <p>Each invariant is a constraint. Its id is the context type and the invariant name, e.g.
- * {@code shop::Item::nonNegativePrice}, so invariant names only need to be unique per context, as
- * in OCL. Unnamed invariants are numbered per context in declaration order ({@code
- * shop::Item#1}); name invariants to get ids that do not change when constraints are added.
+ * <p>Each invariant is a constraint. Its id is the context type and the invariant name, e.g. {@code
+ * shop::Item::nonNegativePrice}, so invariant names only need to be unique per context, as in OCL.
+ * Unnamed invariants are numbered per context in declaration order ({@code shop::Item#1}); name
+ * invariants to get ids that do not change when constraints are added.
  *
- * <p>Constraints can be created, updated and deleted while the virtual model is running, see
- * {@link EditableConstraintChecker}. Such constraints must be named, so their ids are stable.
+ * <p>Constraints can be created, updated and deleted while the virtual model is running, see {@link
+ * EditableConstraintChecker}. Such constraints must be named, so their ids are stable.
  *
- * <p>Unlike {@link VitruvOCL#registerVSUM}, the checker does not register a VSUM globally.
- * Metamodels are still resolved by the name of their package, both from the global {@link
- * org.eclipse.emf.ecore.EPackage.Registry} and from the models of the checked virtual model.
+ * <p>The checker does not register a VSUM globally. Metamodels are still resolved by the name of
+ * their package, both from the global {@link org.eclipse.emf.ecore.EPackage.Registry} and from the
+ * models of the checked virtual model.
  */
 public final class VitruvOclConstraintChecker implements EditableConstraintChecker {
 
@@ -73,6 +82,21 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    * consistent set of constraints.
    */
   private volatile Map<String, ConstraintDescriptor> constraints;
+
+  /**
+   * Serializes the read-check-replace of {@link #constraints} in create/update/delete, so that
+   * concurrent edits are neither lost nor duplicated. Parsing and type checking stay outside.
+   */
+  private final Object editLock = new Object();
+
+  /** Guards {@link #prepared} and {@link #preparedAgainst}. */
+  private final Object preparedLock = new Object();
+
+  /** Compiled constraints by source; see {@link #preparedFor}. */
+  private final Map<String, PreparedConstraint> prepared = new HashMap<>();
+
+  /** The metamodels (as the wrapper resolves names) {@link #prepared} was compiled against. */
+  private Map<String, EPackage> preparedAgainst = Map.of();
 
   private VitruvOclConstraintChecker(List<ParsedInvariant> invariants) {
     Map<String, ConstraintDescriptor> initial = new LinkedHashMap<>();
@@ -207,9 +231,14 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
       throw new DuplicateConstraintException(created.id());
     }
     typeCheck(source);
-    Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
-    changed.put(created.id(), created);
-    constraints = Collections.unmodifiableMap(changed);
+    synchronized (editLock) {
+      if (constraints.containsKey(created.id())) {
+        throw new DuplicateConstraintException(created.id()); // created concurrently
+      }
+      Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
+      changed.put(created.id(), created);
+      constraints = Collections.unmodifiableMap(changed);
+    }
     return created;
   }
 
@@ -217,10 +246,14 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
    * {@inheritDoc}
    *
    * <p>The source must contain exactly one named invariant with the same context type and name.
+   *
+   * @throws java.util.ConcurrentModificationException if the constraint was replaced (deleted and
+   *     created again) while the update was being checked
    */
   @Override
   public ConstraintDescriptor update(String id, String source) {
-    if (!constraints.containsKey(id)) {
+    ConstraintDescriptor before = constraints.get(id);
+    if (before == null) {
       throw new UnknownConstraintException(id);
     }
     ConstraintDescriptor updated = parseSingle(source);
@@ -237,20 +270,46 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
                       + " is updated; context type and invariant name cannot be changed")));
     }
     typeCheck(source);
-    Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
-    changed.put(id, updated);
-    constraints = Collections.unmodifiableMap(changed);
+    replaceIfUnchanged(id, before, updated);
     return updated;
+  }
+
+  /**
+   * Replaces the constraint {@code id} by {@code updated}, provided it is still {@code expected},
+   * the version the update started from. Parsing and type checking run without the lock, so the
+   * constraint may have been deleted, or deleted and created again, meanwhile; overwriting that
+   * newer version with the update's would silently lose it.
+   *
+   * @throws UnknownConstraintException if the constraint was deleted meanwhile
+   * @throws ConcurrentModificationException if it was replaced meanwhile
+   */
+  void replaceIfUnchanged(
+      String id, ConstraintDescriptor expected, ConstraintDescriptor updated) {
+    synchronized (editLock) {
+      ConstraintDescriptor current = constraints.get(id);
+      if (current == null) {
+        throw new UnknownConstraintException(id); // deleted concurrently
+      }
+      if (current != expected) {
+        throw new ConcurrentModificationException(
+            "The constraint " + id + " was changed concurrently; the update was not applied");
+      }
+      Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
+      changed.put(id, updated);
+      constraints = Collections.unmodifiableMap(changed);
+    }
   }
 
   @Override
   public void delete(String id) {
-    if (!constraints.containsKey(id)) {
-      throw new UnknownConstraintException(id);
+    synchronized (editLock) {
+      if (!constraints.containsKey(id)) {
+        throw new UnknownConstraintException(id);
+      }
+      Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
+      changed.remove(id);
+      constraints = Collections.unmodifiableMap(changed);
     }
-    Map<String, ConstraintDescriptor> changed = new LinkedHashMap<>(constraints);
-    changed.remove(id);
-    constraints = Collections.unmodifiableMap(changed);
   }
 
   /** Parses a source that must contain exactly one named invariant. */
@@ -274,21 +333,28 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
   }
 
   /**
-   * Compiles the constraint against the registered metamodels and an empty model, reporting
-   * unknown types, features and other compile errors with their position in the given source.
+   * Type-checks the constraint against the registered metamodels, reporting unknown types, features
+   * and other compile errors with their position in the given source; nothing is evaluated.
    */
   private static void typeCheck(String source) {
-    tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            OclInvariantParser.withoutImports(source), new VsumWrapper(EmptyCheckContext.INSTANCE));
-    if (!result.getCompilerErrors().isEmpty()) {
-      List<ConstraintDiagnostic> diagnostics = new ArrayList<>();
-      for (CompileError error : result.getCompilerErrors()) {
-        diagnostics.add(
-            new ConstraintDiagnostic(error.getLine(), error.getColumn(), error.getMessage()));
-      }
-      throw new InvalidConstraintException(diagnostics);
+    OclAnalysis analysis =
+        OclAnalyzer.analyze(
+            OclSourceSplitter.withoutImports(source),
+            new VsumWrapper(EmptyCheckContext.INSTANCE),
+            OclAnalyzer.Mode.STRICT);
+    if (analysis.compiled()) {
+      return; // warnings alone do not reject a constraint
     }
+    List<ConstraintDiagnostic> diagnostics = new ArrayList<>();
+    for (CompileError error : analysis.allErrors()) {
+      diagnostics.add(
+          new ConstraintDiagnostic(error.getLine(), error.getColumn(), error.getMessage()));
+    }
+    if (diagnostics.isEmpty()) {
+      // the source was split from a syntactically valid document, so this is not expected
+      diagnostics.add(new ConstraintDiagnostic(1, 0, "Syntax error in constraint"));
+    }
+    throw new InvalidConstraintException(diagnostics);
   }
 
   /**
@@ -303,20 +369,71 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
     // a fresh wrapper per check sees all metamodels registered up to now
     VsumWrapper wrapper = new VsumWrapper(context);
     Map<String, ConstraintDescriptor> current = constraints;
-    List<ConstraintResult> results = new ArrayList<>();
+    List<ConstraintDescriptor> checked = new ArrayList<>();
     for (String id : constraintIds) {
       ConstraintDescriptor descriptor = current.get(id);
       if (descriptor != null) {
-        results.add(evaluate(descriptor, wrapper));
+        checked.add(descriptor);
       }
+    }
+    Map<String, PreparedConstraint> compiled = preparedFor(checked, context, wrapper);
+    // one traversal for the instances of all checked constraints instead of one per new type
+    PreparedConstraint.prefetchInstances(
+        compiled.values().stream().filter(Objects::nonNull).toList(), wrapper);
+    List<ConstraintResult> results = new ArrayList<>();
+    for (ConstraintDescriptor descriptor : checked) {
+      results.add(evaluate(descriptor, compiled.get(descriptor.source()), wrapper));
     }
     return results;
   }
 
-  private static ConstraintResult evaluate(ConstraintDescriptor descriptor, VsumWrapper wrapper) {
+  /**
+   * The compiled form of every checked constraint, compiled once and reused across checks (a
+   * check would otherwise lex, parse and type-check every constraint again). The cache is dropped
+   * when the metamodels change, i.e. when the wrapper resolves some metamodel name to a different
+   * package than when the constraints were compiled; entries of constraints that no longer exist
+   * are dropped too. Not observed: a package changed in place (classes or features edited).
+   */
+  private Map<String, PreparedConstraint> preparedFor(
+      List<ConstraintDescriptor> checked, ConstraintCheckContext context, VsumWrapper wrapper) {
+    Map<String, EPackage> metamodels = wrapper.metamodelsByName();
+    Map<String, PreparedConstraint> result = new LinkedHashMap<>();
+    synchronized (preparedLock) {
+      if (!metamodels.equals(preparedAgainst)) {
+        prepared.clear();
+        preparedAgainst = metamodels;
+      }
+      Set<String> sources = new HashSet<>();
+      constraints.values().forEach(d -> sources.add(d.source()));
+      prepared.keySet().retainAll(sources);
+      for (ConstraintDescriptor descriptor : checked) {
+        String source = descriptor.source();
+        result.put(source, prepared.computeIfAbsent(source, s -> prepare(s, wrapper)));
+      }
+    }
+    return result;
+  }
+
+  private static PreparedConstraint prepare(String source, VsumWrapper wrapper) {
     try {
-      return toVitruvResult(
-          descriptor, VitruvOCL.evaluateConstraint(descriptor.source(), wrapper));
+      return PreparedConstraint.prepare(source, wrapper);
+    } catch (RuntimeException | StackOverflowError e) {
+      return null; // evaluated from scratch, which reports the failure for this constraint only
+    }
+  }
+
+  private static ConstraintResult evaluate(
+      ConstraintDescriptor descriptor, PreparedConstraint compiled, VsumWrapper wrapper) {
+    try {
+      tools.vitruv.dsls.vitruvocl.result.ConstraintResult oclResult =
+          compiled == null
+              ? VitruvOclEngine.forModel(wrapper).evaluate(descriptor.source())
+              : ConstraintEvaluations.render(
+                  descriptor.source(),
+                  wrapper,
+                  List.of(),
+                  compiled.evaluate(wrapper, List.of(), false, null));
+      return toVitruvResult(descriptor, oclResult);
     } catch (RuntimeException | StackOverflowError e) {
       String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
       return ConstraintResult.error(descriptor, List.of("Evaluation failed: " + reason));
@@ -325,7 +442,7 @@ public final class VitruvOclConstraintChecker implements EditableConstraintCheck
 
   private static ConstraintResult toVitruvResult(
       ConstraintDescriptor descriptor,
-      tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult oclResult) {
+      tools.vitruv.dsls.vitruvocl.result.ConstraintResult oclResult) {
     if (!oclResult.isSuccess()) {
       List<String> errors = new ArrayList<>();
       for (CompileError error : oclResult.getCompilerErrors()) {

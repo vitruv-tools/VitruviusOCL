@@ -21,14 +21,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.evaluator.lazy.OCLElementSource;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElement;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.OCLElementSource;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Tests {@link Value}'s lazy backing: materialize-on-demand {@link Value#getElements()}, the
  * non-materializing {@link Value#elementIterator()} pull path, and the lazy implementations of
  * {@code merge}/{@code excluding}/{@code intersection}/{@code flatten} built on top of {@link
- * tools.vitruv.dsls.vitruvocl.evaluator.lazy.LazyOperations}.
+ * tools.vitruv.dsls.vitruvocl.evaluator.value.LazyOperations}.
  */
 class ValueLazyTest {
 

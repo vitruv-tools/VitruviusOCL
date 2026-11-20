@@ -16,15 +16,17 @@ package tools.vitruv.dsls.vitruvocl.incremental;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.atomic.EChange;
 import tools.vitruv.dsls.vitruvocl.incremental.support.EdgeFixture;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
  * If processing a transaction fails, its delta is lost; the next transaction must therefore
@@ -34,11 +36,11 @@ import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
 class SessionRecoveryTest {
 
   /** Delegating wrapper whose instance access can be made to fail. */
-  private static final class FailingWrapper implements MetamodelWrapperInterface {
-    private final MetamodelWrapperInterface delegate;
+  private static final class FailingWrapper implements ModelAccess {
+    private final ModelAccess delegate;
     private boolean fail;
 
-    FailingWrapper(MetamodelWrapperInterface delegate) {
+    FailingWrapper(ModelAccess delegate) {
       this.delegate = delegate;
     }
 
@@ -63,6 +65,11 @@ class SessionRecoveryTest {
     @Override
     public Set<String> getAvailableMetamodels() {
       return delegate.getAvailableMetamodels();
+    }
+
+    @Override
+    public Collection<EPackage> metamodelPackages() {
+      return delegate.metamodelPackages();
     }
 
     @Override

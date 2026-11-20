@@ -13,6 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.incremental;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,34 +21,32 @@ import java.util.Set;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
 import org.eclipse.emf.ecore.EObject;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import org.eclipse.emf.ecore.EPackage;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 
 /**
- * A view of a wrapper that answers
- * every correspondence query from a {@link CorrespondenceSnapshot} of the current state and
- * delegates everything else.
+ * A view of a wrapper that answers every correspondence query from a {@link CorrespondenceSnapshot}
+ * of the current state and delegates everything else.
  *
  * <p>The session captures the snapshot once per transaction anyway (to observe correspondence
  * changes), so all constraints evaluated for that transaction share it instead of scanning the
- * correspondence model per object. Valid only while the model is in the captured state; the
- * session creates a new view for every transaction. Stateless apart from the immutable snapshot,
- * so it may be used from several worker threads.
+ * correspondence model per object. Valid only while the model is in the captured state; the session
+ * creates a new view for every transaction. Stateless apart from the immutable snapshot, so it may
+ * be used from several worker threads.
  *
  * <p>The answers equal the wrapper's because the snapshot stores the wrapper's own per-tag lookups
  * and the untagged lookup is their union; {@link #correspondenceHasTag} is the two-way tagged
- * lookup, which is the contract of {@link
- * MetamodelWrapperInterface#hasTaggedCorrespondenceLookup()} that every wrapper with correspondence
- * enumeration (the precondition for a snapshot) fulfils; the session uses this view only for
- * wrappers that declare it. The snapshot compares objects by identity, Vitruvius by {@code equals};
- * both agree for EMF objects, which do not override it.
+ * lookup, which is the contract of {@link ModelAccess#hasTaggedCorrespondenceLookup()} that every
+ * wrapper with correspondence enumeration (the precondition for a snapshot) fulfils; the session
+ * uses this view only for wrappers that declare it. The snapshot compares objects by identity,
+ * Vitruvius by {@code equals}; both agree for EMF objects, which do not override it.
  */
-final class SnapshotCorrespondenceWrapper implements MetamodelWrapperInterface {
+final class SnapshotCorrespondenceWrapper implements ModelAccess {
 
-  private final MetamodelWrapperInterface delegate;
+  private final ModelAccess delegate;
   private final CorrespondenceSnapshot snapshot;
 
-  SnapshotCorrespondenceWrapper(
-      MetamodelWrapperInterface delegate, CorrespondenceSnapshot snapshot) {
+  SnapshotCorrespondenceWrapper(ModelAccess delegate, CorrespondenceSnapshot snapshot) {
     this.delegate = delegate;
     this.snapshot = snapshot;
   }
@@ -98,6 +97,11 @@ final class SnapshotCorrespondenceWrapper implements MetamodelWrapperInterface {
   }
 
   @Override
+  public Map<EClass, List<EObject>> getAllInstances(Collection<EClass> types) {
+    return delegate.getAllInstances(types);
+  }
+
+  @Override
   public EEnum resolveEEnum(String enumName) {
     return delegate.resolveEEnum(enumName);
   }
@@ -105,6 +109,11 @@ final class SnapshotCorrespondenceWrapper implements MetamodelWrapperInterface {
   @Override
   public Set<String> getAvailableMetamodels() {
     return delegate.getAvailableMetamodels();
+  }
+
+  @Override
+  public Collection<EPackage> metamodelPackages() {
+    return delegate.metamodelPackages();
   }
 
   @Override

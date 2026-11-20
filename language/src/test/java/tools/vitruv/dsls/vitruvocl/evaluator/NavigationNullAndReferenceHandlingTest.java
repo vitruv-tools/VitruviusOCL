@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.antlr.v4.runtime.CharStreams;
@@ -36,7 +37,8 @@ import org.junit.jupiter.api.Test;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
 import tools.vitruv.dsls.vitruvocl.common.ErrorCollector;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
+import tools.vitruv.dsls.vitruvocl.evaluator.value.Value;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
 import tools.vitruv.dsls.vitruvocl.symboltable.ScopeAnnotator;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTable;
 import tools.vitruv.dsls.vitruvocl.symboltable.SymbolTableBuilder;
@@ -45,7 +47,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
 
 /**
  * Targeted checks that the {@code navigateOne()} many-valued-feature streaming fix ({@link
- * EvaluationVisitor.SkipNullMappingIterator}) preserves two behaviors the old eager {@code for
+ * NavigationEvaluation.SkipNullMappingIterator}) preserves two behaviors the old eager {@code for
  * (Object item : list) if (item != null) ...} loop had, now that pulling happens lazily one element
  * at a time instead of all at once up front.
  *
@@ -53,7 +55,7 @@ import tools.vitruv.dsls.vitruvocl.typechecker.TypeCheckVisitor;
  *   <li><b>Null-skipping</b>: {@code null} entries in the backing list must still be skipped, one
  *       at a time as encountered, not just when the whole list happens to be pre-scanned.
  *   <li><b>EReference vs. EAttribute</b>: a many-valued {@code EReference} (whose elements wrap to
- *       {@link OCLElement.MetaclassValue} via {@link EvaluationVisitor#wrapValue}) must work
+ *       {@link OCLElement.MetaclassValue} via {@link NavigationEvaluation#wrap}) must work
  *       per-element exactly like a many-valued {@code EAttribute} - including when a reference slot
  *       is {@code null} (an unset/absent reference in the list) interspersed with EObject values.
  * </ol>
@@ -144,8 +146,13 @@ class NavigationNullAndReferenceHandlingTest {
     }
   }
 
-  private MetamodelWrapperInterface wrapperFor(EObject instance) {
-    return new MetamodelWrapperInterface() {
+  private ModelAccess wrapperFor(EObject instance) {
+    return new ModelAccess() {
+      @Override
+      public Collection<EPackage> metamodelPackages() {
+        return List.of();
+      }
+
       @Override
       public EClass resolveEClass(String metamodelName, String className) {
         if (!"dummy4".equals(metamodelName)) {
@@ -218,7 +225,7 @@ class NavigationNullAndReferenceHandlingTest {
     };
   }
 
-  private boolean evaluateInvariant(String constraint, MetamodelWrapperInterface wrapper) {
+  private boolean evaluateInvariant(String constraint, ModelAccess wrapper) {
     VitruvOCLLexer lexer = new VitruvOCLLexer(CharStreams.fromString(constraint));
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     VitruvOCLParser parser = new VitruvOCLParser(tokens);
@@ -281,7 +288,7 @@ class NavigationNullAndReferenceHandlingTest {
   @Test
   void nullReferenceSlotsInAManyValuedEReferenceAreSkippedAndRemainingObjectsWrapCorrectly() {
     // children = [A, null, B, null] - two real Child EObjects with an unset reference slot
-    // between and after each. Proves wrapValue()'s EObject branch still runs correctly per
+    // between and after each. Proves wrap()'s EObject branch still runs correctly per
     // element when reached lazily, and that a null EReference slot is skipped exactly like a
     // null EAttribute slot.
     Child a = new Child("alpha");

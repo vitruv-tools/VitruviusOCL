@@ -239,10 +239,14 @@ public final class OclOperationDocs {
     m.put(
         "sortedBy",
         op(
-            T_COLLECTION + ".sortedBy(" + PARAM_ITERATOR + ": T | key: Comparable) → OrderedSet<T>",
-            "Returns an `OrderedSet` with all elements sorted in ascending order of the key"
-                + " expression. Supports numeric keys and enum keys.",
-            "An `OrderedSet<T>` ordered by `key` ascending",
+            T_COLLECTION
+                + ".sortedBy("
+                + PARAM_ITERATOR
+                + ": T | key: Comparable) → OrderedSet<T> | Sequence<T>",
+            "Returns all elements sorted in ascending order of the key expression: an `OrderedSet`"
+                + " for Set/OrderedSet receivers, a `Sequence` (duplicates kept) for Bag/Sequence"
+                + " receivers. Supports numeric, string and enum keys.",
+            "An `OrderedSet<T>` or `Sequence<T>` ordered by `key` ascending",
             param(PARAM_ITERATOR, "T", "The loop variable"),
             param("key", "Comparable", "Expression whose value determines the sort order")));
 

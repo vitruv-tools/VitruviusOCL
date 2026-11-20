@@ -1,8 +1,10 @@
 package tools.vitruv.dsls.vitruvocl.allinstances.analysis;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,7 +46,7 @@ public class ContainmentReachabilityAnalyzer {
    *
    * <p>Matches the paper's algorithm signature directly: iterate over every concrete EClass
    * reachable from {@code rootPackage}, and for each of its (inherited) containment references,
-   * decide via {@link #shouldBeTraversed} whether it must be kept.
+   * decide via {@link #canHoldAny} whether it must be kept.
    *
    * @param rootPackage the root of the metamodel to analyze (its classifiers and all classifiers
    *     of its transitively nested subpackages)
@@ -74,21 +76,26 @@ public class ContainmentReachabilityAnalyzer {
     for (EPackage rootPackage : rootPackages) {
       collectClassifiersRecursively(rootPackage, allClasses);
     }
+    addRequestedAndContainedClasses(allClasses, cacheConfig);
+
+    Map<EClass, Set<EClass>> subtypeMemo = new HashMap<>();
+    Set<EClass> leadsToRelevant =
+        classesLeadingToRelevantInstances(allClasses, cacheConfig, subtypeMemo);
 
     Set<EReference> refs = new LinkedHashSet<>();
-    Map<EReference, Boolean> memo = new HashMap<>();
-    Map<EClass, Set<EClass>> subtypeMemo = new HashMap<>();
-
     for (EClass eClass : allClasses) {
       if (eClass.isAbstract()) {
         continue;
       }
       for (EReference ref : eClass.getEAllContainments()) {
-        shouldBeTraversed(ref, cacheConfig, refs, memo, allClasses, subtypeMemo);
+        if (canHoldAny(ref, leadsToRelevant, allClasses, subtypeMemo)) {
+          refs.add(ref);
+        }
       }
     }
 
     cacheConfig.setTraverse(refs);
+    cacheConfig.setAnalyzedClasses(new LinkedHashSet<>(allClasses));
     return refs;
   }
 
@@ -114,68 +121,122 @@ public class ContainmentReachabilityAnalyzer {
   }
 
   /**
-   * Decides whether containment reference {@code r} must be traversed, per Algorithm 1.
-   *
-   * <p>Memoization ({@code memo}) is mandatory, not an optimization detail: metamodels commonly
-   * contain cyclic containment structures (e.g. two classes containing one another), and without
-   * memoization the recursion into the containments of {@code reachableTypes} would never
-   * terminate. The placeholder {@code memo.put(r, false)} written before recursing breaks the
-   * cycle — a reference is never considered to depend on its own relevance.
-   *
-   * <p>Per the paper, once a recursive call into a sibling containment reference of the same
-   * target type has established that {@code r} should be traversed, the loop still visits the
-   * remaining sibling references rather than returning early: each sibling has its own
-   * independent memo entry and may itself need to be added to {@code refs}, regardless of what was
-   * just concluded about {@code r}.
+   * Extends {@code classes} by every requested type and, transitively, by the declared type of
+   * every containment reference of a known class — types that may live in packages outside the
+   * analyzed ones (e.g. an unregistered or unloaded metamodel), but whose instances are still
+   * reachable at runtime and must therefore take part in the analysis.
    */
-  private boolean shouldBeTraversed(
-      EReference r,
-      CacheConfiguration cacheConfig,
-      Set<EReference> refs,
-      Map<EReference, Boolean> memo,
-      List<EClass> allClasses,
-      Map<EClass, Set<EClass>> subtypeMemo) {
-    if (memo.containsKey(r)) {
-      return memo.get(r);
-    }
-    memo.put(r, false); // cycle guard: a reference cannot depend on its own relevance
-
-    Set<EClass> reachableTypes =
-        transitiveClosureOfSubtypes(r.getEReferenceType(), allClasses, subtypeMemo);
-    boolean relevant =
-        reachableTypes.stream()
-            .anyMatch(
-                t ->
-                    cacheConfig.getAllOfKind().contains(t)
-                        || cacheConfig.getAllOfType().contains(t));
-
-    boolean shouldTraverse = relevant;
-    if (!relevant) {
-      // Algorithm 1: "foreach containment EReference tr of each of the types" — a subtype may
-      // declare containment references the declared/supertype does not have (e.g. Member is
-      // abstract with no containments of its own, but its subtype Staff has its own "webpage"
-      // containment), so every type in reachableTypes must contribute its own containments here,
-      // not just r.getEReferenceType() alone. A Set dedupes references inherited by more than one
-      // type in the closure (e.g. a containment declared on Member is reported by both Student
-      // and Staff via getEAllContainments()).
-      Set<EReference> candidateContainments = new LinkedHashSet<>();
-      for (EClass type : reachableTypes) {
-        candidateContainments.addAll(type.getEAllContainments());
+  private static void addRequestedAndContainedClasses(
+      List<EClass> classes, CacheConfiguration cacheConfig) {
+    Set<EClass> known = new LinkedHashSet<>(classes);
+    Deque<EClass> pending = new ArrayDeque<>(classes);
+    for (EClass requested : cacheConfig.getAllOfKind()) {
+      if (known.add(requested)) {
+        pending.add(requested);
       }
-      for (EReference transitive : candidateContainments) {
-        if (shouldBeTraversed(transitive, cacheConfig, refs, memo, allClasses, subtypeMemo)) {
-          shouldTraverse = true;
-          // Intentionally no early break: every sibling containment must still be visited so its
-          // own memo entry (and possible refs.add) gets computed, independent of r's outcome.
+    }
+    for (EClass requested : cacheConfig.getAllOfType()) {
+      if (known.add(requested)) {
+        pending.add(requested);
+      }
+    }
+    while (!pending.isEmpty()) {
+      for (EReference ref : pending.poll().getEAllContainments()) {
+        EClass target = ref.getEReferenceType();
+        if (target != null && known.add(target)) {
+          pending.add(target);
         }
       }
     }
+    classes.clear();
+    classes.addAll(known);
+  }
 
-    if (shouldTraverse) {
-      refs.add(r);
+  /**
+   * Computes every class whose instances are either requested themselves or can (transitively,
+   * via containment) contain a requested instance.
+   *
+   * <p>This is the set Algorithm 1's recursion explores, computed as a least fixpoint instead of by
+   * recursion. The paper notes that its algorithm is "simplified for presentation purposes" and
+   * needs memoisation against cyclic containment; a recursive formulation whose cycle guard
+   * memoizes a provisional {@code false} is wrong for mutually containing classes, though: the
+   * provisional answer for a reference still in progress gets stored permanently for every other
+   * reference that reached it, so later laps around the cycle are pruned. The fixpoint has no
+   * provisional answers and is therefore independent of cycles and of classifier order.
+   *
+   * <p>As in Algorithm 1, a subtype may declare containments its declared supertype does not have
+   * (e.g. abstract {@code Member} without containments, its subtype {@code Staff} with {@code
+   * webpage}), so a reference is judged by the subtype closure of its declared type.
+   */
+  private Set<EClass> classesLeadingToRelevantInstances(
+      List<EClass> allClasses,
+      CacheConfiguration cacheConfig,
+      Map<EClass, Set<EClass>> subtypeMemo) {
+    Set<EClass> result = new LinkedHashSet<>();
+    for (EClass eClass : allClasses) {
+      if (isRequested(eClass, cacheConfig)) {
+        result.add(eClass);
+      }
     }
-    memo.put(r, shouldTraverse);
-    return shouldTraverse;
+    boolean changed = true;
+    while (changed) {
+      changed = false;
+      for (EClass eClass : allClasses) {
+        if (result.contains(eClass)) {
+          continue;
+        }
+        for (EReference ref : eClass.getEAllContainments()) {
+          if (canHoldAny(ref, result, allClasses, subtypeMemo)) {
+            result.add(eClass);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Whether {@code ref} may hold an instance of one of {@code targets} at runtime, i.e. whether the
+   * subtype closure of its declared type intersects {@code targets}.
+   */
+  private boolean canHoldAny(
+      EReference ref,
+      Set<EClass> targets,
+      List<EClass> allClasses,
+      Map<EClass, Set<EClass>> subtypeMemo) {
+    if (EcoreConformance.isEObject(ref.getEReferenceType())) {
+      // every class conforms to EObject, but EClass#isSuperTypeOf does not know that
+      return !targets.isEmpty();
+    }
+    Set<EClass> holdable =
+        transitiveClosureOfSubtypes(ref.getEReferenceType(), allClasses, subtypeMemo);
+    for (EClass type : holdable) {
+      if (targets.contains(type)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Whether instances of exactly {@code type} are requested: {@code allOfType} matches the exact
+   * type, {@code allOfKind} matches the requested type and all of its subtypes (OCL's {@code
+   * allInstances()} returns direct and indirect instances, so a containment declared with a
+   * concrete subtype, e.g. {@code Register.males : Male}, is needed for {@code
+   * Person.allInstances()}).
+   */
+  private static boolean isRequested(EClass type, CacheConfiguration cacheConfig) {
+    if (cacheConfig.getAllOfType().contains(type)) {
+      return true;
+    }
+    for (EClass kind : cacheConfig.getAllOfKind()) {
+      if (EcoreConformance.conforms(type, kind)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

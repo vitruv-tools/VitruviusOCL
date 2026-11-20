@@ -38,9 +38,9 @@ import java.util.Map;
  * #hasVariableInCurrentScope(String)} method enables duplicate detection within a single scope
  * while allowing legitimate shadowing across scope boundaries.
  *
- * <p><b>Design Constraint:</b> Types and operations cannot be defined in local scopes. All type and
- * operation definitions must reside in the global scope. Attempts to define types or operations
- * locally will throw {@link UnsupportedOperationException}.
+ * <p><b>Design Constraint:</b> Types cannot be defined in local scopes. All type definitions must
+ * reside in the global scope. Attempts to define types locally will throw {@link
+ * UnsupportedOperationException}.
  *
  * @see Scope
  * @see GlobalScope
@@ -90,19 +90,6 @@ public class LocalScope implements Scope {
   }
 
   /**
-   * Operations cannot be defined in local scopes.
-   *
-   * @param symbol (unused)
-   * @throws UnsupportedOperationException always, as operations must be defined in GlobalScope
-   */
-  @Override
-  public void defineOperation(OperationSymbol symbol) {
-    // Operations can only be defined in GlobalScope
-    throw new UnsupportedOperationException(
-        "Cannot define operations in local scope. Operations must be defined in GlobalScope.");
-  }
-
-  /**
    * Resolves a variable name using lexical scoping rules.
    *
    * <p>Resolution proceeds as follows:
@@ -146,21 +133,6 @@ public class LocalScope implements Scope {
   public TypeSymbol resolveType(String name) {
     // Types are only in GlobalScope, delegate to parent
     return parent != null ? parent.resolveType(name) : null;
-  }
-
-  /**
-   * Resolves an operation name by delegating to the parent scope.
-   *
-   * <p>Since operations can only be defined in GlobalScope, this method immediately delegates to
-   * the parent scope without checking locally.
-   *
-   * @param name the operation name to resolve
-   * @return the operation symbol from the scope chain, or {@code null} if not found
-   */
-  @Override
-  public OperationSymbol resolveOperation(String name) {
-    // Operations are only in GlobalScope, delegate to parent
-    return parent != null ? parent.resolveOperation(name) : null;
   }
 
   /**

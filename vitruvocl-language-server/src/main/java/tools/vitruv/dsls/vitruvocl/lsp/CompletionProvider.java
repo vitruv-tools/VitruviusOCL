@@ -26,8 +26,11 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.Position;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.operations.OclOperation;
+import tools.vitruv.dsls.vitruvocl.operations.OclOperation.Family;
+import tools.vitruv.dsls.vitruvocl.operations.OclOperations;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Builds context-sensitive completion lists for OCL# documents.
@@ -89,37 +92,9 @@ public class CompletionProvider {
   private static final List<String> PRIMITIVE_TYPES =
       List.of("Integer", "Real", "String", "Boolean", "OclAny", "OclVoid");
 
-  // OCL# collection operations: name → insert snippet (uses LSP snippet syntax).
-  // Iterator-based operations use "x | $0" to place cursor after the body.
-  private static final java.util.Map<String, String> COLLECTION_OPS =
-      java.util.Map.ofEntries(
-          java.util.Map.entry("select", "select(${1:x} | $0)"),
-          java.util.Map.entry("reject", "reject(${1:x} | $0)"),
-          java.util.Map.entry("collect", "collect(${1:x} | $0)"),
-          java.util.Map.entry("forAll", "forAll(${1:x} | $0)"),
-          java.util.Map.entry("exists", "exists(${1:x} | $0)"),
-          java.util.Map.entry("sortedBy", "sortedBy(${1:x} | $0)"),
-          java.util.Map.entry("includes", "includes($0)"),
-          java.util.Map.entry("excludes", "excludes($0)"),
-          java.util.Map.entry("including", "including($0)"),
-          java.util.Map.entry("excluding", "excluding($0)"),
-          java.util.Map.entry("union", "union($0)"),
-          java.util.Map.entry("append", "append($0)"),
-          java.util.Map.entry("prepend", "prepend($0)"),
-          java.util.Map.entry("isEmpty", "isEmpty()"),
-          java.util.Map.entry("notEmpty", "notEmpty()"),
-          java.util.Map.entry("size", "size()"),
-          java.util.Map.entry("flatten", "flatten()"),
-          java.util.Map.entry("sum", "sum()"),
-          java.util.Map.entry("max", "max()"),
-          java.util.Map.entry("min", "min()"),
-          java.util.Map.entry("avg", "avg()"),
-          java.util.Map.entry("first", "first()"),
-          java.util.Map.entry("last", "last()"),
-          java.util.Map.entry("reverse", "reverse()"),
-          java.util.Map.entry("oclIsKindOf", "oclIsKindOf($0)"),
-          java.util.Map.entry("oclIsTypeOf", "oclIsTypeOf($0)"),
-          java.util.Map.entry("oclAsType", "oclAsType($0)"));
+  // Operations offered after "." on a collection receiver, from the shared operation catalog.
+  private static final List<OclOperation> COLLECTION_OPS =
+      OclOperations.ofFamilies(Family.COLLECTION, Family.ITERATOR, Family.TYPE);
 
   private final MetamodelWrapper wrapper;
 
@@ -489,17 +464,17 @@ public class CompletionProvider {
 
   private List<CompletionItem> collectionOpItems() {
     List<CompletionItem> items = new ArrayList<>();
-    for (var entry : COLLECTION_OPS.entrySet()) {
+    for (OclOperation op : COLLECTION_OPS) {
+      String snippet = op.snippet();
       // Label shows the readable signature; filterText ensures typing the name still matches.
       String label =
-          entry
-              .getValue()
+          snippet
               .replaceAll("\\$\\{\\d+:([^}]+)\\}", "$1") // ${1:x} → x
               .replaceAll("\\$\\d+", ""); // $0 → (removed)
       CompletionItem item = new CompletionItem(label);
-      item.setFilterText(entry.getKey());
+      item.setFilterText(op.name());
       item.setKind(CompletionItemKind.Method);
-      item.setInsertText(entry.getValue());
+      item.setInsertText(snippet);
       item.setInsertTextFormat(InsertTextFormat.Snippet);
       items.add(item);
     }

@@ -13,8 +13,7 @@
 
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
-import tools.vitruv.dsls.vitruvocl.evaluator.Value;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Symbol representing a variable in the symbol table.
@@ -32,7 +31,8 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  * <ul>
  *   <li><b>Symbol table construction:</b> variables are declared and associated with a scope
  *   <li><b>Type checking:</b> the variable type may be refined or inferred
- *   <li><b>Evaluation:</b> the variable may be associated with a runtime value
+ *   <li><b>Evaluation:</b> the evaluator binds the variable to a runtime value; that value is kept
+ *       by the evaluator, not by the symbol, so a symbol table carries no runtime values
  * </ul>
  *
  * @see Symbol
@@ -48,14 +48,6 @@ public class VariableSymbol extends Symbol {
   private final boolean isIteratorVariable;
 
   /**
-   * The runtime value of this variable.
-   *
-   * <p>This field is {@code null} during symbol table construction and type checking, and is only
-   * set during the evaluation phase.
-   */
-  private Value value;
-
-  /**
    * Creates a new variable symbol.
    *
    * @param name the name of the variable
@@ -66,7 +58,6 @@ public class VariableSymbol extends Symbol {
   public VariableSymbol(String name, Type type, Scope definingScope, boolean isIteratorVariable) {
     super(name, type, definingScope);
     this.isIteratorVariable = isIteratorVariable;
-    this.value = null;
   }
 
   /**
@@ -76,27 +67,5 @@ public class VariableSymbol extends Symbol {
    */
   public boolean isIteratorVariable() {
     return isIteratorVariable;
-  }
-
-  /**
-   * Returns the runtime value of this variable.
-   *
-   * <p>This method is used during the evaluation phase.
-   *
-   * @return the runtime value, or {@code null} if no value has been assigned
-   */
-  public Value getValue() {
-    return value;
-  }
-
-  /**
-   * Sets the runtime value of this variable.
-   *
-   * <p>This method is used during the evaluation phase.
-   *
-   * @param value the runtime value to assign
-   */
-  public void setValue(Value value) {
-    this.value = value;
   }
 }

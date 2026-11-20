@@ -22,7 +22,7 @@ import java.nio.file.Path;
 import org.eclipse.emf.ecore.EClass;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
+import tools.vitruv.dsls.vitruvocl.adapter.emf.MetamodelWrapper;
 
 /**
  * Integration test suite for metamodel loading and access in VitruvOCL.
@@ -129,16 +129,12 @@ class MetamodelIntegrationTest {
    * <p>This method:
    *
    * <ol>
-   *   <li>Configures the path to test model instances ({@code src/test/resources/test-models/})
    *   <li>Creates a new {@link MetamodelWrapper} instance
    *   <li>Loads the spaceMission metamodel from {@code
    *       src/test/resources/test-metamodels/spaceMission.ecore}
    *   <li>Loads the satelliteSystem metamodel from {@code
    *       src/test/resources/test-metamodels/satelliteSystem.ecore}
    * </ol>
-   *
-   * <p><b>Path configuration:</b> The {@code TEST_MODELS_PATH} static field is set to enable the
-   * wrapper to locate model instances when evaluating {@code allInstances()} operations.
    *
    * <p><b>Metamodel loading:</b> Both metamodels are loaded before tests run, making their
    * metaclasses available for resolution.
@@ -147,8 +143,6 @@ class MetamodelIntegrationTest {
    */
   @BeforeEach
   void setup() throws java.io.IOException {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-
     specification = new MetamodelWrapper();
     specification.loadMetamodel(Path.of("src/test/resources/test-metamodels/spaceMission.ecore"));
     specification.loadMetamodel(

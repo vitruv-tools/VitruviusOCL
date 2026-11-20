@@ -16,11 +16,10 @@ package tools.vitruv.dsls.vitruvocl.metamodel;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.TestModels;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Regression tests for the Ctype combination rule of implicit-collect navigation ({@code e.p} where
@@ -40,14 +39,11 @@ class NavigationOrderednessTest {
   private static final Path SPACECRAFT_WITH_PAYLOADS =
       Path.of("spacecraft-with-payloads.spacemission");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   private static ConstraintResult eval(String constraint) {
-    return VitruvOCL.evaluateConstraint(
-        constraint, new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_WITH_PAYLOADS});
+    return VitruvOclEngine.forFiles(
+            new Path[] {SPACEMISSION_ECORE}, new Path[] {SPACECRAFT_WITH_PAYLOADS})
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(constraint);
   }
 
   /**

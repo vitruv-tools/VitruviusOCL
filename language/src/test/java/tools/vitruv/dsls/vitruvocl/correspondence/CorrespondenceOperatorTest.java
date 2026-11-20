@@ -18,14 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.TestModels;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Tests for the correspondence operator (~) in VitruvOCL.
@@ -81,13 +80,10 @@ class CorrespondenceOperatorTest {
   private static final Path SATELLITE_HUBBLE = Path.of("satellite-hubble.satellitesystem");
   private static final Path CORRESPONDENCES = Path.of("correspondences.correspondence");
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   private static ConstraintResult eval(String c, Path... instances) {
-    return VitruvOCL.evaluateConstraint(c, ECORES, instances);
+    return VitruvOclEngine.forFiles(ECORES, instances)
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(c);
   }
 
   // ── Parameterized: satisfied constraints ─────────────────────────────────
@@ -95,7 +91,10 @@ class CorrespondenceOperatorTest {
   @ParameterizedTest
   @MethodSource("satisfiedConstraints")
   void testConstraintSatisfied(String c, Path[] instances) {
-    ConstraintResult r = VitruvOCL.evaluateConstraint(c, ECORES, instances);
+    ConstraintResult r =
+        VitruvOclEngine.forFiles(ECORES, instances)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate(c);
     assertTrue(r.isSuccess(), "Evaluation should succeed");
     assertTrue(r.isSatisfied());
   }
@@ -217,7 +216,10 @@ class CorrespondenceOperatorTest {
   @ParameterizedTest
   @MethodSource("successOnlyConstraints")
   void testConstraintSuccess(String c, Path[] instances) {
-    ConstraintResult r = VitruvOCL.evaluateConstraint(c, ECORES, instances);
+    ConstraintResult r =
+        VitruvOclEngine.forFiles(ECORES, instances)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate(c);
     assertTrue(r.isSuccess(), "Evaluation should succeed");
   }
 

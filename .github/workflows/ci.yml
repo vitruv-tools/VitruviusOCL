@@ -158,6 +158,7 @@ jobs:
     - name: Deploy snapshot
       run: >
         ./mvnw clean deploy -P snapshot
+        -Dmaven.repository.credentialScope=id
         -DskipTests
         --batch-mode
         --update-snapshots

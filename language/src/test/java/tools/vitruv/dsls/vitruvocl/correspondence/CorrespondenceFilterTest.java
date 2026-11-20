@@ -21,15 +21,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.vitruv.dsls.vitruvocl.TestModels;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLLexer;
 import tools.vitruv.dsls.vitruvocl.VitruvOCLParser;
-import tools.vitruv.dsls.vitruvocl.pipeline.ConstraintResult;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapper;
-import tools.vitruv.dsls.vitruvocl.pipeline.VitruvOCL;
+import tools.vitruv.dsls.vitruvocl.api.VitruvOclEngine;
+import tools.vitruv.dsls.vitruvocl.result.ConstraintResult;
 
 /**
  * Type-matrix test suite for the Correspondence Filter extensions: {@code select(~)}, {@code
@@ -82,7 +81,7 @@ class CorrespondenceFilterTest {
       Path.of("src/test/resources/test-metamodels/correspondence.ecore");
 
   // ================================================================
-  // Model instance paths (relative — resolved against TEST_MODELS_PATH)
+  // Model instance paths (relative — resolved against TestModels.DIRECTORY)
   // ================================================================
 
   private static final Path FAMILY_MODEL = Path.of("testmodel.family");
@@ -92,17 +91,14 @@ class CorrespondenceFilterTest {
   private static final Path[] ECORES = {FAMILY_ECORE, PERSONS_ECORE, CORRESPONDENCE_ECORE};
   private static final Path[] MODELS = {FAMILY_MODEL, PERSONS_MODEL, CORR_MODEL};
 
-  @BeforeAll
-  static void setupPaths() {
-    MetamodelWrapper.setTestModelsPath(Path.of("src/test/resources/test-models"));
-  }
-
   // ================================================================
   // Evaluate helper
   // ================================================================
 
   private ConstraintResult eval(String constraint) {
-    return VitruvOCL.evaluateConstraint(constraint, ECORES, MODELS);
+    return VitruvOclEngine.forFiles(ECORES, MODELS)
+        .withModelDirectory(TestModels.DIRECTORY)
+        .evaluate(constraint);
   }
 
   // ================================================================
@@ -518,6 +514,33 @@ class CorrespondenceFilterTest {
               context family::Member inv:
                 self.firstName == "Homer" implies
                   persons::Person.allInstances().reject(~, Type = persons::Male).size() == 3
+              """));
+    }
+
+    @Test
+    @DisplayName("reject(~, Type=T) keeps the receiver's element type, not T")
+    void testRejectTildeType_doesNotNarrowElementType() {
+      // The result holds every element that is not a corresponding T, so it contains non-T
+      // elements (here: Females) and must not be typed as a collection of T.
+      ConstraintResult narrowed =
+          eval(
+              """
+              context family::Member inv:
+                let ms : Set(persons::Male) =
+                  persons::Person.allInstances().reject(~, Type = persons::Male) in true
+              """);
+      assertFalse(narrowed.isSuccess(), "reject(~, Type=Male) must not be typed as Set(Male)");
+      assertTrue(
+          narrowed.toDetailedErrorString().contains("Type mismatch"),
+          "Expected a let type mismatch, got: " + narrowed.toDetailedErrorString());
+
+      assertSatisfied(
+          eval(
+              """
+              context family::Member inv:
+                self.firstName == "Homer" implies
+                  persons::Person.allInstances().reject(~, Type = persons::Male)
+                    .exists(p | p.oclIsKindOf(persons::Female))
               """));
     }
 
@@ -1155,7 +1178,9 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep3_trivialConstraint() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context family::Member inv: true", ECORES, MODELS);
+        VitruvOclEngine.forFiles(ECORES, MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate("context family::Member inv: true");
     assertTrue(
         result.isSuccess(), "Trivial constraint should compile: " + result.getWarningsSummary());
     assertTrue(result.isSatisfied(), "Trivial 'true' constraint must be satisfied");
@@ -1164,13 +1189,13 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep4_oldSelectTildeNoFilter() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint(
-            """
+        VitruvOclEngine.forFiles(ECORES, MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate(
+                """
             context family::Member inv:
               persons::Person.allInstances().select(~).size() >= 0
-            """,
-            ECORES,
-            MODELS);
+            """);
     // select(~) with tilde is expected to fail at parse/type-check level, not produce a crash
     assertNotNull(result, "Result must not be null even for invalid select(~)");
   }
@@ -1178,7 +1203,9 @@ class CorrespondenceFilterTest {
   @Test
   void debugStep_trivialTrue() {
     ConstraintResult result =
-        VitruvOCL.evaluateConstraint("context family::Member inv: true", ECORES, MODELS);
+        VitruvOclEngine.forFiles(ECORES, MODELS)
+            .withModelDirectory(TestModels.DIRECTORY)
+            .evaluate("context family::Member inv: true");
     assertTrue(
         result.isSuccess(), "Trivial constraint must compile: " + result.toDetailedErrorString());
     assertTrue(result.isSatisfied(), "Trivial 'true' constraint must be satisfied");

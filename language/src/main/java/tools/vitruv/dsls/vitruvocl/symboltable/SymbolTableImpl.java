@@ -14,8 +14,8 @@
 package tools.vitruv.dsls.vitruvocl.symboltable;
 
 import org.eclipse.emf.ecore.EClass;
-import tools.vitruv.dsls.vitruvocl.pipeline.MetamodelWrapperInterface;
-import tools.vitruv.dsls.vitruvocl.typechecker.Type;
+import tools.vitruv.dsls.vitruvocl.model.ModelAccess;
+import tools.vitruv.dsls.vitruvocl.types.Type;
 
 /**
  * Default implementation of the {@link SymbolTable} interface.
@@ -23,8 +23,8 @@ import tools.vitruv.dsls.vitruvocl.typechecker.Type;
  * <p>This implementation maintains a hierarchy of {@link Scope}s and starts with a {@link
  * GlobalScope} as the initial and current scope.
  *
- * <p>Variables are defined in the currently active scope, whereas types and operations are always
- * defined in the global scope.
+ * <p>Variables are defined in the currently active scope, whereas types are always defined in the
+ * global scope.
  *
  * <p>The symbol table also provides a unified lookup mechanism for semantic {@link Type}s,
  * including primitive OCL types and metamodel-based types.
@@ -43,7 +43,7 @@ public class SymbolTableImpl implements SymbolTable {
    *
    * <p>Used to resolve qualified metamodel types (e.g., {@code Metamodel::Class}).
    */
-  private final MetamodelWrapperInterface wrapper;
+  private final ModelAccess wrapper;
 
   /** The currently active scope. */
   private Scope currentScope;
@@ -55,7 +55,7 @@ public class SymbolTableImpl implements SymbolTable {
    *
    * @param wrapper the metamodel wrapper used to resolve metamodel types
    */
-  public SymbolTableImpl(MetamodelWrapperInterface wrapper) {
+  public SymbolTableImpl(ModelAccess wrapper) {
     this.globalScope = new GlobalScope();
     this.currentScope = globalScope;
     this.wrapper = wrapper;
@@ -85,12 +85,6 @@ public class SymbolTableImpl implements SymbolTable {
   }
 
   @Override
-  public void defineOperation(OperationSymbol symbol) {
-    // Operations are only defined in the global scope
-    globalScope.defineOperation(symbol);
-  }
-
-  @Override
   public VariableSymbol resolveVariable(String name) {
     return currentScope.resolveVariable(name);
   }
@@ -98,11 +92,6 @@ public class SymbolTableImpl implements SymbolTable {
   @Override
   public TypeSymbol resolveType(String name) {
     return currentScope.resolveType(name);
-  }
-
-  @Override
-  public OperationSymbol resolveOperation(String name) {
-    return currentScope.resolveOperation(name);
   }
 
   @Override
@@ -135,21 +124,9 @@ public class SymbolTableImpl implements SymbolTable {
   @Override
   public Type lookupType(String typeName) {
     // 1. Primitive types
-    switch (typeName) {
-      case "Integer":
-        return Type.INTEGER;
-      case "Double", "Real":
-        return Type.DOUBLE;
-      case "Float":
-        return Type.FLOAT;
-      case "String":
-        return Type.STRING;
-      case "Boolean":
-        return Type.BOOLEAN;
-      case "OclAny":
-        return Type.ANY;
-      default:
-        break;
+    Type primitiveType = Type.fromPrimitiveTypeName(typeName);
+    if (primitiveType != null) {
+      return primitiveType;
     }
 
     // 2. Qualified metamodel type (Metamodel::Class)
